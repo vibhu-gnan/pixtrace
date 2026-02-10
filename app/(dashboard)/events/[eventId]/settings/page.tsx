@@ -1,0 +1,114 @@
+import { notFound } from 'next/navigation';
+import { getEvent } from '@/actions/events';
+import { DeleteEventButton } from '@/components/dashboard/delete-event-button';
+import { QRCodeGenerator } from '@/components/dashboard/qr-code-generator';
+import { EventLinkActions } from '@/components/event/event-link-actions';
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+export default async function SettingsPage({
+  params,
+}: {
+  params: Promise<{ eventId: string }>;
+}) {
+  const { eventId } = await params;
+  const event = await getEvent(eventId);
+
+  if (!event) {
+    notFound();
+  }
+
+  const galleryUrl = `${process.env.NEXT_PUBLIC_APP_URL}/gallery/${event.event_hash}`;
+
+  const formattedDate = event.event_date
+    ? new Date(event.event_date).toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+      })
+    : '\u2014';
+
+  const formattedCreatedAt = new Date(event.created_at).toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <DeleteEventButton eventId={eventId} eventName={event.name} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Event Details */}
+        <div className="lg:col-span-2">
+          <div className="flex items-center gap-2 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">Event Details</h2>
+            <button className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+              <EditIcon />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Event Name</p>
+              <p className="text-base text-gray-900">{event.name}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Event Date</p>
+              <p className="text-base text-gray-900">{formattedDate}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Event Venue</p>
+              <p className="text-base text-gray-900">{event.description || '\u2014'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Event Level</p>
+              <p className="text-base text-gray-900">{event.is_public ? 'Public' : 'Private'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Event created on</p>
+              <p className="text-base text-gray-900">{formattedCreatedAt}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Event Status</p>
+              <p className="text-base text-gray-900">
+                {event.is_public ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    Live
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    Not Live
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Event Link / QR */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Link</h2>
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <QRCodeGenerator url={galleryUrl} eventName={event.name} />
+
+            <EventLinkActions galleryUrl={galleryUrl} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

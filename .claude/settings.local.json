@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --turbopack --use-npm --skip-install --eslint)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npm run db:push:*)",
+      "Bash(claude config set:*)",
+      "Bash(npm run dev:*)",
+      "Bash(nslookup:*)",
+      "Bash(node -e \"const postgres = require\\(''postgres''\\); const sql = postgres\\({ host: ''aws-0-ap-south-1.pooler.supabase.com'', port: 6543, database: ''postgres'', username: ''postgres.mpgnrtbhdcbenxwhutms'', password: ''Vibhujnan7!'', ssl: ''require'', prepare: false }\\); sql\\\\`SELECT 1 as test\\\\`.then\\(r => { console.log\\(''SUCCESS:'', r\\); process.exit\\(0\\); }\\).catch\\(e => { console.log\\(''ERROR:'', e.message\\); process.exit\\(1\\); }\\);\")",
+      "Bash(node test-db.mjs:*)",
+      "Bash(del c:PIXTRACEtest-db.mjs)",
+      "Bash(timeout 8 tail -f:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx next build:*)",
+      "Bash(powershell -Command \"Stop-Process -Id 69900 -Force -ErrorAction SilentlyContinue; Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Remove-Item -Recurse -Force ''C:\\\\PIXTRACE\\\\.next'' -ErrorAction SilentlyContinue\")",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:developers.cloudflare.com)"
+    ]
+  }
+}
