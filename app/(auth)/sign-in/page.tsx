@@ -52,10 +52,13 @@ function SignInForm() {
     const supabase = createClient();
     const redirect = searchParams.get('redirect') || '/dashboard';
 
+    // Use environment variable for production, fallback to window.location.origin
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+        redirectTo: `${baseUrl}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
       },
     });
   };

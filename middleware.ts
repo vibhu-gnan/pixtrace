@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
     '/api/gallery',
     '/sign-in',
     '/sign-up',
+    '/auth/callback',
     '/',
   ];
 
