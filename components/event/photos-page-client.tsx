@@ -96,7 +96,8 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
   const [dragActive, setDragActive] = useState(false);
   const [showAlbumForm, setShowAlbumForm] = useState(false);
   const [albumRefreshKey, setAlbumRefreshKey] = useState(0);
-  const [viewMode, setViewMode] = useState<ViewMode>('albums');
+  // Default to 'photos' view if there are photos, otherwise show albums
+  const [viewMode, setViewMode] = useState<ViewMode>(media.length > 0 ? 'photos' : 'albums');
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
 
   // ─── Computed Values ─────────────────────────────────────
