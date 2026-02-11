@@ -52,9 +52,6 @@ export async function getCurrentOrganizer(): Promise<OrganizerProfile | null> {
     .single();
 
   if (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1f745aed-d317-47c8-8162-2ef13bf53e70', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'lib/auth/session.ts', message: 'organizer create failed', data: { errorCode: error.code, errorMessage: error.message }, timestamp: Date.now(), hypothesisId: 'D' }) }).catch(() => {});
-    // #endregion
     console.error('Error creating organizer profile:', error);
     return null;
   }

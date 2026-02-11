@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/auth/client';
 
@@ -15,22 +16,41 @@ function LogOutIcon({ className }: { className?: string }) {
 
 export function SignOutButton() {
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/sign-in');
-    router.refresh();
+    try {
+      setError(null);
+      const supabase = createClient();
+      const { error: signOutError } = await supabase.auth.signOut();
+
+      if (signOutError) {
+        throw signOutError;
+      }
+
+      router.push('/sign-in');
+      router.refresh();
+    } catch (err: any) {
+      console.error('Sign out error:', err);
+      setError(err.message || 'Failed to sign out');
+    }
   };
 
   return (
-    <button
-      onClick={handleSignOut}
-      className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
-      aria-label="Sign out"
-      title="Sign out"
-    >
-      <LogOutIcon />
-    </button>
+    <>
+      <button
+        onClick={handleSignOut}
+        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+        aria-label="Sign out"
+        title="Sign out"
+      >
+        <LogOutIcon />
+      </button>
+      {error && (
+        <div className="absolute top-full right-0 mt-2 p-2 bg-red-50 text-red-800 text-xs rounded-md shadow-lg z-50">
+          {error}
+        </div>
+      )}
+    </>
   );
 }

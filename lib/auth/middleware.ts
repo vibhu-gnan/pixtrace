@@ -1,12 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 
-// #region agent log
-const DEBUG_LOG = (msg: string, data: Record<string, unknown>) => {
-  fetch('http://127.0.0.1:7242/ingest/1f745aed-d317-47c8-8162-2ef13bf53e70', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'lib/auth/middleware.ts', message: msg, data, timestamp: Date.now(), hypothesisId: 'A' }) }).catch(() => {});
-};
-// #endregion
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -36,20 +30,11 @@ export async function updateSession(request: NextRequest) {
   );
 
   try {
-    // #region agent log
-    DEBUG_LOG('getUser called', { pathname: request.nextUrl.pathname });
-    // #endregion
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    // #region agent log
-    DEBUG_LOG('getUser result', { hasUser: !!user });
-    // #endregion
     return { user, response: supabaseResponse };
   } catch (e) {
-    // #region agent log
-    DEBUG_LOG('getUser threw', { error: String(e) });
-    // #endregion
     return { user: null, response: supabaseResponse };
   }
 }
