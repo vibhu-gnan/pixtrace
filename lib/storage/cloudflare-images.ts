@@ -41,10 +41,15 @@ export function getOriginalUrl(r2Key: string): string {
 /**
  * Check if Cloudflare Image Resizing is available
  * Image Resizing uses /cdn-cgi/image/ on your own domain (not imagedelivery.net)
+ *
+ * NOTE: Cloudflare Image Resizing requires a paid plan (Pro or higher).
+ * If not enabled, Cloudflare returns 403 Forbidden for /cdn-cgi/image/ URLs.
+ * In production, set CLOUDFLARE_IMAGE_RESIZING_URL to empty string to disable.
  */
 function hasImageResizing(): boolean {
   const url = process.env.CLOUDFLARE_IMAGE_RESIZING_URL;
-  return !!url && !url.includes('imagedelivery.net');
+  // Only enable if URL is set AND not pointing to imagedelivery.net AND not empty
+  return !!url && url.trim() !== '' && !url.includes('imagedelivery.net');
 }
 
 /**
