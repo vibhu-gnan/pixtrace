@@ -168,13 +168,21 @@ async function uploadSingleFile(
       updateItem(id, { status: 'done', progress: 100 });
       return; // Success, exit retry loop
     } catch (err: any) {
+      console.error(`Upload attempt ${attempt + 1}/${MAX_RETRIES} failed for ${file.name}:`, err);
+
       if (attempt === MAX_RETRIES - 1) {
+        // Final retry failed
         updateItem(id, {
           status: 'error',
           error: err.message || 'Upload failed',
           progress: 0,
         });
+      } else {
+        // Will retry - log retry info
+        const retryDelay = 1000 * Math.pow(2, attempt);
+        console.log(`Retrying upload for ${file.name} in ${retryDelay}ms`);
       }
+
       // Wait before retry with exponential backoff
       await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
     }
@@ -192,22 +200,56 @@ function uploadWithProgress(
     xhr.open('PUT', url);
     xhr.setRequestHeader('Content-Type', contentType);
 
+    // Set timeout (30 seconds per MB, minimum 30 seconds)
+    const timeoutMs = Math.max(30000, (file.size / (1024 * 1024)) * 30000);
+    xhr.timeout = timeoutMs;
+
+    let progressReceived = false;
+
+    // Primary progress handler (uses actual upload progress if available)
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable) {
+        progressReceived = true;
         onProgress(e.loaded / e.total);
       }
     });
 
+    // Fallback progress estimator for when lengthComputable is false
+    const startTime = Date.now();
+    // Estimate upload speed: 500KB/s (conservative), max duration 60s
+    const estimatedDuration = Math.min(file.size / (500 * 1024), 60000);
+    const progressInterval = setInterval(() => {
+      if (!progressReceived) {
+        const elapsed = Date.now() - startTime;
+        const estimatedProgress = Math.min(0.9, elapsed / estimatedDuration);
+        onProgress(estimatedProgress);
+      }
+    }, 500);
+
     xhr.addEventListener('load', () => {
+      clearInterval(progressInterval);
       if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1); // Mark as complete
         resolve();
       } else {
         reject(new Error(`Upload failed with status ${xhr.status}`));
       }
     });
 
-    xhr.addEventListener('error', () => reject(new Error('Upload failed')));
-    xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+    xhr.addEventListener('error', () => {
+      clearInterval(progressInterval);
+      reject(new Error('Upload failed - network error'));
+    });
+
+    xhr.addEventListener('abort', () => {
+      clearInterval(progressInterval);
+      reject(new Error('Upload aborted'));
+    });
+
+    xhr.addEventListener('timeout', () => {
+      clearInterval(progressInterval);
+      reject(new Error(`Upload timeout after ${(timeoutMs / 1000).toFixed(0)}s`));
+    });
 
     xhr.send(file);
   });

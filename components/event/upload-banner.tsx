@@ -147,6 +147,28 @@ export function UploadBanner({ eventName }: UploadBannerProps) {
           {errorCount} file{errorCount > 1 ? 's' : ''} failed to upload. Try again or clear the queue.
         </div>
       )}
+
+      {/* Debug info (only shown in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <details className="mt-3 text-xs">
+          <summary className="cursor-pointer text-gray-500 hover:text-gray-700">
+            Debug Info
+          </summary>
+          <div className="mt-2 space-y-1 font-mono text-gray-600 bg-gray-50 p-2 rounded">
+            {items.slice(0, 3).map(item => (
+              <div key={item.id} className="text-[10px]">
+                {item.file.name.slice(0, 30)}: {item.status} - {item.progress}%
+                {item.error && ` (${item.error})`}
+              </div>
+            ))}
+            {items.length > 3 && (
+              <div className="text-gray-400 text-[10px]">
+                ...and {items.length - 3} more files
+              </div>
+            )}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
