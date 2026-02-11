@@ -31,6 +31,14 @@ function getR2DirectUrl(r2Key: string): string {
 }
 
 /**
+ * Get the original (full resolution) image URL directly from R2
+ * Used for lightbox final view after 3-second intent detection
+ */
+export function getOriginalUrl(r2Key: string): string {
+  return getR2DirectUrl(r2Key);
+}
+
+/**
  * Check if Cloudflare Image Resizing is available
  * Image Resizing uses /cdn-cgi/image/ on your own domain (not imagedelivery.net)
  */

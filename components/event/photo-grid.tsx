@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { deleteMedia, deleteMultipleMedia } from '@/actions/media';
 import type { MediaItem } from '@/actions/media';
+import { PhotoLightbox } from './photo-lightbox';
 
 // ─── Icons ───────────────────────────────────────────────────
 
@@ -110,6 +111,8 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -215,10 +218,11 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
 
       {/* Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
-        {media.map((item) => (
+        {media.map((item, index) => (
           <PhotoThumbnail
             key={item.id}
             item={item}
+            index={index}
             selectionMode={selectionMode}
             selected={selectedIds.has(item.id)}
             onSelect={() => toggleSelect(item.id)}
@@ -227,6 +231,10 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
                 setSelectionMode(true);
                 setSelectedIds(new Set([item.id]));
               }
+            }}
+            onView={(idx) => {
+              setLightboxIndex(idx);
+              setLightboxOpen(true);
             }}
           />
         ))}
@@ -241,6 +249,16 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
           loading={deleting}
         />
       )}
+
+      {/* Lightbox for viewing photos */}
+      {lightboxOpen && (
+        <PhotoLightbox
+          media={media.filter(m => m.media_type === 'image')}
+          initialIndex={lightboxIndex}
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -249,18 +267,22 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
 
 interface PhotoThumbnailProps {
   item: MediaItem;
+  index: number;
   selectionMode: boolean;
   selected: boolean;
   onSelect: () => void;
   onLongPress: () => void;
+  onView: (index: number) => void;
 }
 
-function PhotoThumbnail({ item, selectionMode, selected, onSelect, onLongPress }: PhotoThumbnailProps) {
+function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLongPress, onView }: PhotoThumbnailProps) {
   const [loaded, setLoaded] = useState(false);
 
   const handleClick = () => {
     if (selectionMode) {
       onSelect();
+    } else {
+      onView(index);
     }
   };
 

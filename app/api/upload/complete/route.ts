@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -68,6 +69,10 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Revalidate Next.js cache to show new photos immediately
+    revalidatePath(`/events/${eventId}/photos`);
+    revalidatePath(`/events/${eventId}`);
 
     return NextResponse.json({ media });
   } catch (error) {

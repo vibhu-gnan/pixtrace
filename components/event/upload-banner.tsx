@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import * as Progress from '@radix-ui/react-progress';
 import { useUploadStore } from '@/lib/upload/upload-manager';
 
@@ -8,6 +9,7 @@ interface UploadBannerProps {
 }
 
 export function UploadBanner({ eventName }: UploadBannerProps) {
+  const router = useRouter();
   const { items, isUploading, clearAll, uploadStartedAt } = useUploadStore();
 
   if (items.length === 0) return null;
@@ -55,14 +57,17 @@ export function UploadBanner({ eventName }: UploadBannerProps) {
               All {doneCount} photos uploaded successfully!
             </p>
             <p className="text-xs text-green-600 mt-0.5">
-              Refresh to see them in the gallery below
+              Photos should appear below automatically
             </p>
           </div>
           <button
-            onClick={clearAll}
+            onClick={() => {
+              router.refresh();
+              clearAll();
+            }}
             className="text-xs text-green-700 hover:text-green-900 font-medium px-3 py-1.5 rounded-lg border border-green-300 hover:bg-green-100 transition-colors"
           >
-            Dismiss
+            Refresh & Dismiss
           </button>
         </div>
       </div>

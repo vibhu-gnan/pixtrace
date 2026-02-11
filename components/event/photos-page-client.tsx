@@ -163,7 +163,7 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
   // Auto-refresh page after uploads complete
   useEffect(() => {
     if (!isUploading && items.some((i) => i.status === 'done')) {
-      const timer = setTimeout(() => router.refresh(), 1500);
+      const timer = setTimeout(() => router.refresh(), 500); // Reduced from 1500ms - cache already revalidated server-side
       return () => clearTimeout(timer);
     }
   }, [isUploading, items, router])
