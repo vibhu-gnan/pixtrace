@@ -36,6 +36,7 @@ const supabase = createClient(
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
+const FORCE = args.includes('--force');
 const limitIdx = args.indexOf('--limit');
 const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
 
@@ -66,6 +67,7 @@ async function uploadToR2(key: string, data: Buffer, contentType: string): Promi
 
 async function generateThumbnail(imageBuffer: Buffer): Promise<Buffer> {
   return sharp(imageBuffer)
+    .rotate() // Auto-rotate based on EXIF orientation
     .resize(200, 200, { fit: 'cover', position: 'centre' })
     .webp({ quality: 50 })
     .toBuffer();
@@ -73,6 +75,7 @@ async function generateThumbnail(imageBuffer: Buffer): Promise<Buffer> {
 
 async function generatePreview(imageBuffer: Buffer): Promise<Buffer> {
   return sharp(imageBuffer)
+    .rotate() // Auto-rotate based on EXIF orientation
     .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 })
     .toBuffer();
@@ -82,7 +85,7 @@ async function generatePreview(imageBuffer: Buffer): Promise<Buffer> {
 
 async function main() {
   console.log('=== Backfill Image Variants ===');
-  console.log(`Mode: ${DRY_RUN ? 'DRY RUN (no changes)' : 'LIVE'}`);
+  console.log(`Mode: ${DRY_RUN ? 'DRY RUN (no changes)' : 'LIVE'}${FORCE ? ' (FORCE regenerate)' : ''}`);
   if (LIMIT) console.log(`Limit: ${LIMIT} records`);
   console.log('');
 
@@ -104,10 +107,12 @@ async function main() {
     process.exit(1);
   }
 
-  // Filter to only those missing at least one variant
-  const needsBackfill = (mediaRows || []).filter(
-    (row) => !row.thumbnail_r2_key || !row.preview_r2_key
-  );
+  // Filter to only those missing at least one variant (or all if --force)
+  const needsBackfill = FORCE
+    ? (mediaRows || [])
+    : (mediaRows || []).filter(
+        (row) => !row.thumbnail_r2_key || !row.preview_r2_key
+      );
 
   console.log(`Found ${mediaRows?.length || 0} total images, ${needsBackfill.length} need backfill`);
   console.log('');
