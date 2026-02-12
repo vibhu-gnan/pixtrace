@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { MediaItem } from '@/actions/media';
-import { getThumbnailUrl, getBlurPlaceholderUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+import { getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
-type LoadingPhase = 'thumbnail' | 'blur' | 'loading_original' | 'original';
+type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
 interface PhotoLightboxProps {
   media: MediaItem[];
@@ -17,7 +17,6 @@ interface PhotoLightboxProps {
 export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
-  const [originalLoaded, setOriginalLoaded] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentPhoto = media[currentIndex];
@@ -35,32 +34,34 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
 
     // Reset to thumbnail state
     setLoadingPhase('thumbnail');
-    setOriginalLoaded(false);
 
-    // Transition to blur after 100ms
-    const blurTimer = setTimeout(() => {
-      setLoadingPhase('blur');
-    }, 100);
+    // Immediately start preloading the preview variant
+    const previewImg = new Image();
+    previewImg.src = currentPhoto.full_url;
+    previewImg.onload = () => {
+      setLoadingPhase((current) => {
+        // Only upgrade to preview if we haven't already moved past it
+        if (current === 'thumbnail') return 'preview';
+        return current;
+      });
+    };
 
-    // Start loading original after 3 seconds (intent detection)
+    // After 3 seconds, start loading the full original
     timerRef.current = setTimeout(() => {
       setLoadingPhase('loading_original');
 
-      // Preload original image
-      const img = new Image();
-      img.src = getOriginalUrl(currentPhoto.r2_key);
-      img.onload = () => {
-        setOriginalLoaded(true);
+      const origImg = new Image();
+      origImg.src = getOriginalUrl(currentPhoto.r2_key);
+      origImg.onload = () => {
         setLoadingPhase('original');
       };
-      img.onerror = () => {
+      origImg.onerror = () => {
         console.error('Failed to load original image');
-        // Stay on blur if original fails
+        // Stay on preview if original fails
       };
-    }, 3000);
+    }, 5000);
 
     return () => {
-      clearTimeout(blurTimer);
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
@@ -102,9 +103,9 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
   // Determine which image to display based on loading phase
   const displayImage =
     loadingPhase === 'thumbnail'
-      ? getThumbnailUrl(currentPhoto.r2_key, 200)
-      : loadingPhase === 'blur' || loadingPhase === 'loading_original'
-      ? getBlurPlaceholderUrl(currentPhoto.r2_key)
+      ? currentPhoto.thumbnail_url
+      : loadingPhase === 'preview' || loadingPhase === 'loading_original'
+      ? currentPhoto.full_url
       : getOriginalUrl(currentPhoto.r2_key);
 
   return (
@@ -154,27 +155,16 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
               src={displayImage}
               alt={currentPhoto.original_filename}
               className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${
-                loadingPhase === 'original' && originalLoaded
-                  ? 'opacity-100'
-                  : loadingPhase === 'blur' || loadingPhase === 'loading_original'
-                  ? 'opacity-70'
-                  : 'opacity-100'
+                loadingPhase === 'thumbnail' ? 'opacity-70' : 'opacity-100'
               }`}
             />
 
             {/* Loading indicator during original load */}
-            {loadingPhase === 'loading_original' && !originalLoaded && (
+            {loadingPhase === 'loading_original' && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm text-white text-sm">
                   Loading full resolution...
                 </div>
-              </div>
-            )}
-
-            {/* Waiting indicator during blur phase */}
-            {loadingPhase === 'blur' && (
-              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-lg bg-black/50 text-white text-xs">
-                Stay to view full resolution
               </div>
             )}
           </div>
@@ -184,7 +174,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
             {currentPhoto.original_filename}
             {currentPhoto.width && currentPhoto.height && (
               <span className="ml-2 text-white/60">
-                {currentPhoto.width} × {currentPhoto.height}
+                {currentPhoto.width} x {currentPhoto.height}
               </span>
             )}
           </div>

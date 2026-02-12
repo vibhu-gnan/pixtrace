@@ -92,8 +92,9 @@ export const media = pgTable('media', {
   height: integer('height'),
   duration: integer('duration'), // For videos, in seconds
 
-  // Video-specific
-  thumbnailR2Key: text('thumbnail_r2_key'), // Generated thumbnail for videos
+  // Variant files (pre-computed thumbnails and previews)
+  thumbnailR2Key: text('thumbnail_r2_key'), // 200x200 cover-crop WebP
+  previewR2Key: text('preview_r2_key'),     // 1200x1200 contain-fit WebP
 
   // AI/Face Recognition - Note: vector type defined in migration
   // faceEmbedding: vector column added via SQL

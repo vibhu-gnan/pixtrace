@@ -3,6 +3,11 @@ import { getCurrentOrganizer } from '@/lib/auth/session';
 import { generatePresignedUrl } from '@/lib/storage/presigned-urls';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+interface VariantRequest {
+  suffix: string;
+  contentType: string;
+}
+
 export async function POST(request: NextRequest) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) {
@@ -10,7 +15,14 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { eventId, albumId, filename, contentType, fileSize } = body;
+  const { eventId, albumId, filename, contentType, fileSize, variants } = body as {
+    eventId: string;
+    albumId: string;
+    filename: string;
+    contentType: string;
+    fileSize: number;
+    variants?: VariantRequest[];
+  };
 
   if (!eventId || !albumId || !filename || !contentType) {
     return NextResponse.json(
@@ -52,15 +64,38 @@ export async function POST(request: NextRequest) {
   const r2Key = `organizers/${organizer.id}/events/${eventId}/${albumId}/${timestamp}-${safeFilename}`;
 
   try {
+    // Generate presigned URL for the original file
     const result = await generatePresignedUrl({
       key: r2Key,
       contentType,
     });
-    return NextResponse.json({
+
+    const response: any = {
       url: result.url,
       r2Key,
       expiresAt: result.expiresAt.toISOString(),
-    });
+    };
+
+    // Generate presigned URLs for variants if requested
+    if (variants && variants.length > 0) {
+      const variantResults = await Promise.all(
+        variants.map(async (v) => {
+          const variantKey = `${r2Key}${v.suffix}`;
+          const variantResult = await generatePresignedUrl({
+            key: variantKey,
+            contentType: v.contentType,
+          });
+          return {
+            suffix: v.suffix,
+            url: variantResult.url,
+            r2Key: variantKey,
+          };
+        })
+      );
+      response.variants = variantResults;
+    }
+
+    return NextResponse.json(response);
   } catch (e) {
     console.error('Failed to generate presigned URL:', e);
     return NextResponse.json(

@@ -64,9 +64,9 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
     height: item.height,
     processing_status: item.processing_status,
     created_at: item.created_at,
-    thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200) : '',
-    blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key) : '',
-    full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key) : '',
+    thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200, item.thumbnail_r2_key) : '',
+    blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.thumbnail_r2_key) : '',
+    full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
   }));
 }
 
@@ -89,7 +89,7 @@ export async function deleteMedia(mediaId: string, eventId: string) {
   // Fetch R2 keys before deleting
   const { data: mediaRow } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key')
     .eq('id', mediaId)
     .eq('event_id', eventId)
     .single();
@@ -112,6 +112,7 @@ export async function deleteMedia(mediaId: string, eventId: string) {
   const r2Keys: string[] = [];
   if (mediaRow.r2_key) r2Keys.push(mediaRow.r2_key);
   if (mediaRow.thumbnail_r2_key) r2Keys.push(mediaRow.thumbnail_r2_key);
+  if (mediaRow.preview_r2_key) r2Keys.push(mediaRow.preview_r2_key);
   if (r2Keys.length > 0) {
     deleteObjects(r2Keys).catch((err) => {
       console.error('Error deleting R2 objects:', err);
@@ -141,7 +142,7 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
   // Fetch R2 keys before deleting
   const { data: mediaRows } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key')
     .eq('event_id', eventId)
     .in('id', mediaIds);
 
@@ -163,6 +164,7 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
     for (const row of mediaRows) {
       if (row.r2_key) r2Keys.push(row.r2_key);
       if (row.thumbnail_r2_key) r2Keys.push(row.thumbnail_r2_key);
+      if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
     }
     if (r2Keys.length > 0) {
       deleteObjects(r2Keys).catch((err) => {

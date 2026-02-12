@@ -159,11 +159,11 @@ export async function deleteAlbum(albumId: string, eventId: string) {
 
   // Fetch R2 keys BEFORE deleting (cascade will remove media rows)
   // Wrapped in try-catch so fetch failure doesn't block album deletion
-  let mediaRows: { r2_key: string | null; thumbnail_r2_key: string | null }[] | null = null;
+  let mediaRows: { r2_key: string | null; thumbnail_r2_key: string | null; preview_r2_key: string | null }[] | null = null;
   try {
     const { data } = await supabase
       .from('media')
-      .select('r2_key, thumbnail_r2_key')
+      .select('r2_key, thumbnail_r2_key, preview_r2_key')
       .eq('album_id', albumId);
     mediaRows = data;
   } catch (fetchErr) {
@@ -189,6 +189,7 @@ export async function deleteAlbum(albumId: string, eventId: string) {
       for (const row of mediaRows) {
         if (row.r2_key) r2Keys.push(row.r2_key);
         if (row.thumbnail_r2_key) r2Keys.push(row.thumbnail_r2_key);
+        if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
       }
       if (r2Keys.length > 0) {
         deleteObjects(r2Keys).catch((err) => {

@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
       fileSize,
       width,
       height,
+      thumbnailR2Key,
+      previewR2Key,
     } = body;
 
     if (!eventId || !albumId || !r2Key || !originalFilename || !mediaType || !fileSize) {
@@ -57,6 +59,8 @@ export async function POST(request: NextRequest) {
         file_size: fileSize,
         width: width || null,
         height: height || null,
+        thumbnail_r2_key: thumbnailR2Key || null,
+        preview_r2_key: previewR2Key || null,
         processing_status: 'completed',
       })
       .select()

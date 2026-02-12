@@ -1,26 +1,10 @@
 /**
  * Image URL utilities
  *
- * Supports two modes:
- * 1. Cloudflare Image Resizing (if zone is on a paid Cloudflare plan with Image Resizing enabled)
- *    URL format: {your-domain}/cdn-cgi/image/{transforms}/{origin-url}
- * 2. Direct R2 public URL fallback (no transformations, serves original)
- *
- * NOTE: Cloudflare Images (imagedelivery.net) requires a separate upload API
- *       and cannot serve R2 objects directly. If CLOUDFLARE_IMAGES_DELIVERY_URL
- *       points to imagedelivery.net, we fall back to direct R2 URLs.
+ * Serves pre-computed image variants (thumbnail, preview) directly from R2.
+ * Falls back to original R2 URL when variant keys are not available
+ * (e.g., for older photos uploaded before variant generation was added).
  */
-
-export interface ImageTransformOptions {
-  width?: number;
-  height?: number;
-  fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
-  gravity?: 'auto' | 'left' | 'right' | 'top' | 'bottom' | 'center';
-  quality?: number; // 1-100
-  format?: 'auto' | 'webp' | 'avif' | 'json' | 'jpeg' | 'png';
-  blur?: number; // 1-250
-  sharpen?: number; // 0-10
-}
 
 /**
  * Get the base R2 public URL for an object
@@ -32,116 +16,47 @@ function getR2DirectUrl(r2Key: string): string {
 
 /**
  * Get the original (full resolution) image URL directly from R2
- * Used for lightbox final view after 3-second intent detection
  */
 export function getOriginalUrl(r2Key: string): string {
   return getR2DirectUrl(r2Key);
 }
 
 /**
- * Check if Cloudflare Image Resizing is available
- * Image Resizing uses /cdn-cgi/image/ on your own domain (not imagedelivery.net)
- *
- * NOTE: Cloudflare Image Resizing requires a paid plan (Pro or higher).
- * If not enabled, Cloudflare returns 403 Forbidden for /cdn-cgi/image/ URLs.
- * In production, set CLOUDFLARE_IMAGE_RESIZING_URL to empty string to disable.
+ * Get thumbnail URL (for grid display)
+ * Uses pre-computed 200x200 WebP variant if available, falls back to original
  */
-function hasImageResizing(): boolean {
-  const url = process.env.CLOUDFLARE_IMAGE_RESIZING_URL;
-  // Only enable if URL is set AND not pointing to imagedelivery.net AND not empty
-  return !!url && url.trim() !== '' && !url.includes('imagedelivery.net');
-}
-
-/**
- * Generate image URL with optional Cloudflare Image Resizing transformations
- * Falls back to direct R2 URL if resizing isn't configured
- */
-export function getCloudflareImageUrl(
+export function getThumbnailUrl(
   r2Key: string,
-  options: ImageTransformOptions = {}
+  size: number = 200,
+  thumbnailR2Key?: string | null,
 ): string {
-  // Always fall back to direct R2 URL if Image Resizing isn't available
-  if (!hasImageResizing()) {
-    return getR2DirectUrl(r2Key);
+  if (thumbnailR2Key) {
+    return getR2DirectUrl(thumbnailR2Key);
   }
-
-  const {
-    width,
-    height,
-    fit = 'cover',
-    gravity = 'auto',
-    quality = 85,
-    format = 'auto',
-    blur,
-    sharpen,
-  } = options;
-
-  // Build transformation string
-  const transforms: string[] = [];
-  if (width) transforms.push(`width=${width}`);
-  if (height) transforms.push(`height=${height}`);
-  transforms.push(`fit=${fit}`);
-  transforms.push(`gravity=${gravity}`);
-  transforms.push(`quality=${quality}`);
-  transforms.push(`format=${format}`);
-  if (blur) transforms.push(`blur=${blur}`);
-  if (sharpen) transforms.push(`sharpen=${sharpen}`);
-
-  const transformString = transforms.join(',');
-  const originUrl = getR2DirectUrl(r2Key);
-
-  // Cloudflare Image Resizing URL format:
-  // {your-domain}/cdn-cgi/image/{transforms}/{origin-image-url}
-  return `${process.env.CLOUDFLARE_IMAGE_RESIZING_URL}/cdn-cgi/image/${transformString}/${originUrl}`;
+  return getR2DirectUrl(r2Key);
 }
 
 /**
- * Generate responsive image srcset for different screen sizes
+ * Get preview URL (for lightbox view)
+ * Uses pre-computed 1200x1200 WebP variant if available, falls back to original
  */
-export function getResponsiveImageSrcSet(r2Key: string): string {
-  const widths = [320, 640, 768, 1024, 1280, 1536];
-  const srcset = widths.map(width => {
-    const url = getCloudflareImageUrl(r2Key, { width, format: 'auto' });
-    return `${url} ${width}w`;
-  });
-  return srcset.join(', ');
+export function getPreviewUrl(
+  r2Key: string,
+  previewR2Key?: string | null,
+): string {
+  if (previewR2Key) {
+    return getR2DirectUrl(previewR2Key);
+  }
+  return getR2DirectUrl(r2Key);
 }
 
 /**
- * Generate thumbnail URL (for grid display)
+ * Get blur placeholder URL (for progressive loading)
+ * Uses thumbnail as the placeholder — at ~15KB it loads fast enough
  */
-export function getThumbnailUrl(r2Key: string, size: number = 200): string {
-  return getCloudflareImageUrl(r2Key, {
-    width: size,
-    height: size,
-    fit: 'cover',
-    format: 'auto',
-    quality: 75,
-  });
+export function getBlurPlaceholderUrl(
+  r2Key: string,
+  thumbnailR2Key?: string | null,
+): string {
+  return getThumbnailUrl(r2Key, 200, thumbnailR2Key);
 }
-
-/**
- * Generate preview/lightbox URL (full image view)
- */
-export function getPreviewUrl(r2Key: string): string {
-  return getCloudflareImageUrl(r2Key, {
-    width: 1200,
-    height: 1200,
-    fit: 'contain',
-    format: 'auto',
-    quality: 80,
-  });
-}
-
-/**
- * Generate blur placeholder URL (for progressive loading)
- */
-export function getBlurPlaceholderUrl(r2Key: string): string {
-  return getCloudflareImageUrl(r2Key, {
-    width: 40,
-    quality: 50,
-    blur: 20,
-    format: 'webp',
-  });
-}
-

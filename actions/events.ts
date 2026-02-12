@@ -193,7 +193,7 @@ export async function deleteEvent(eventId: string) {
   // 2. Fetch all R2 keys BEFORE deleting from DB (cascade will remove media rows)
   const { data: mediaRows } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key')
     .eq('event_id', eventId);
 
   // 3. Delete event from DB (cascades to albums → media)
@@ -214,6 +214,7 @@ export async function deleteEvent(eventId: string) {
     for (const row of mediaRows) {
       if (row.r2_key) r2Keys.push(row.r2_key);
       if (row.thumbnail_r2_key) r2Keys.push(row.thumbnail_r2_key);
+      if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
     }
     if (r2Keys.length > 0) {
       // Fire-and-forget — don't block the redirect on R2 cleanup

@@ -53,7 +53,7 @@ async function main() {
     console.log('🗄️  Fetching all media keys from Supabase...');
     const { data: mediaRows, error } = await supabase
         .from('media')
-        .select('r2_key, thumbnail_r2_key');
+        .select('r2_key, thumbnail_r2_key, preview_r2_key');
 
     if (error) {
         console.error('❌ Failed to fetch media from Supabase:', error);
@@ -64,6 +64,7 @@ async function main() {
     for (const row of mediaRows || []) {
         if (row.r2_key) supabaseKeys.add(row.r2_key);
         if (row.thumbnail_r2_key) supabaseKeys.add(row.thumbnail_r2_key);
+        if (row.preview_r2_key) supabaseKeys.add(row.preview_r2_key);
     }
     console.log(`   Found ${supabaseKeys.size} keys in Supabase`);
 

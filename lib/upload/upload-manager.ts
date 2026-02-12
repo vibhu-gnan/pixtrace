@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { generateImageVariants, canGenerateVariants } from './image-variants';
 
 export type UploadStatus = 'pending' | 'uploading' | 'completing' | 'done' | 'error';
 
@@ -103,43 +104,96 @@ async function uploadSingleFile(
   updateItem: (id: string, update: Partial<UploadItem>) => void
 ) {
   const { file, id } = item;
+  const isImage = file.type.startsWith('image/');
+  const canGenerate = isImage && canGenerateVariants(file.type);
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       updateItem(id, { status: 'uploading', progress: 0 });
 
-      // Step 1: Get presigned URL
+      // Step 1: Generate image variants (if applicable) while requesting presigned URLs
+      let variantsPromise: Promise<{ thumbnail: Blob; preview: Blob } | null> | null = null;
+      if (canGenerate) {
+        variantsPromise = generateImageVariants(file).catch((err) => {
+          console.warn('Variant generation failed, uploading original only:', err);
+          return null;
+        });
+      }
+
+      // Step 2: Get presigned URLs (original + variants if image)
+      const presignBody: any = {
+        eventId,
+        albumId,
+        filename: file.name,
+        contentType: file.type,
+        fileSize: file.size,
+      };
+
+      if (canGenerate) {
+        presignBody.variants = [
+          { suffix: '_thumb.webp', contentType: 'image/webp' },
+          { suffix: '_preview.webp', contentType: 'image/webp' },
+        ];
+      }
+
       const presignRes = await fetch('/api/upload/presigned-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId,
-          albumId,
-          filename: file.name,
-          contentType: file.type,
-          fileSize: file.size,
-        }),
+        body: JSON.stringify(presignBody),
       });
 
       if (!presignRes.ok) {
         throw new Error('Failed to get presigned URL');
       }
 
-      const { url, r2Key } = await presignRes.json();
-      updateItem(id, { r2Key, progress: 10 });
+      const presignData = await presignRes.json();
+      const { url, r2Key } = presignData;
+      updateItem(id, { r2Key, progress: 5 });
 
-      // Step 2: Upload to R2 via presigned URL
+      // Step 3: Upload original to R2 (progress 5-80%)
       await uploadWithProgress(url, file, file.type, (progress) => {
-        updateItem(id, { progress: 10 + progress * 0.8 });
+        updateItem(id, { progress: 5 + progress * 0.75 });
       });
+
+      updateItem(id, { progress: 80 });
+
+      // Step 4: Upload variants (progress 80-90%)
+      let thumbnailR2Key: string | undefined;
+      let previewR2Key: string | undefined;
+
+      if (canGenerate && variantsPromise && presignData.variants) {
+        const variants = await variantsPromise;
+        if (variants) {
+          const thumbVariant = presignData.variants.find((v: any) => v.suffix === '_thumb.webp');
+          const previewVariant = presignData.variants.find((v: any) => v.suffix === '_preview.webp');
+
+          // Upload thumbnail and preview in parallel
+          const variantUploads: Promise<void>[] = [];
+
+          if (thumbVariant) {
+            thumbnailR2Key = thumbVariant.r2Key;
+            variantUploads.push(
+              uploadBlob(thumbVariant.url, variants.thumbnail, 'image/webp')
+            );
+          }
+
+          if (previewVariant) {
+            previewR2Key = previewVariant.r2Key;
+            variantUploads.push(
+              uploadBlob(previewVariant.url, variants.preview, 'image/webp')
+            );
+          }
+
+          await Promise.all(variantUploads);
+        }
+      }
 
       updateItem(id, { status: 'completing', progress: 90 });
 
-      // Step 3: Create media record
-      // Get image dimensions if it's an image
+      // Step 5: Get image dimensions and create media record
       let width: number | undefined;
       let height: number | undefined;
-      if (file.type.startsWith('image/')) {
+      if (isImage) {
         const dims = await getImageDimensions(file);
         width = dims.width;
         height = dims.height;
@@ -158,6 +212,8 @@ async function uploadSingleFile(
           fileSize: file.size,
           width,
           height,
+          thumbnailR2Key,
+          previewR2Key,
         }),
       });
 
@@ -189,6 +245,9 @@ async function uploadSingleFile(
   }
 }
 
+/**
+ * Upload a file with XHR progress tracking (for original files)
+ */
 function uploadWithProgress(
   url: string,
   file: File,
@@ -253,6 +312,20 @@ function uploadWithProgress(
 
     xhr.send(file);
   });
+}
+
+/**
+ * Simple PUT upload for small blobs (variants). No progress tracking needed.
+ */
+async function uploadBlob(url: string, blob: Blob, contentType: string): Promise<void> {
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: blob,
+  });
+  if (!response.ok) {
+    throw new Error(`Variant upload failed with status ${response.status}`);
+  }
 }
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
