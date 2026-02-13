@@ -28,6 +28,7 @@ export async function generatePresignedUrl(
     Bucket: R2_BUCKET_NAME,
     Key: key,
     ContentType: contentType,
+    CacheControl: 'public, max-age=31536000, immutable',
   });
 
   const url = await getSignedUrl(r2Client, command, {

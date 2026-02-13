@@ -130,6 +130,13 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
 
   // ─── Effects ─────────────────────────────────────────────
 
+  // Register image caching service worker
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => { });
+    }
+  }, []);
+
   // Warn before reload/close during uploads
   useEffect(() => {
     if (!isUploading) return;
@@ -183,7 +190,7 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [eventId, selectedAlbum]);
 
   useEffect(() => {
@@ -273,11 +280,10 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors mb-6 ${
-          dragActive
+        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors mb-6 ${dragActive
             ? 'border-brand-500 bg-brand-50'
             : 'border-gray-300 hover:border-gray-400 bg-white'
-        }`}
+          }`}
       >
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           {/* Album selector */}
@@ -353,22 +359,20 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
           {/* View toggle icons */}
           <button
             onClick={handleBackToAlbums}
-            className={`p-1.5 rounded-md transition-colors ${
-              viewMode === 'albums'
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'albums'
                 ? 'text-brand-500 bg-brand-50'
                 : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-            }`}
+              }`}
             title="Albums view"
           >
             <ListIcon />
           </button>
           <button
             onClick={() => setViewMode('photos')}
-            className={`p-1.5 rounded-md transition-colors ${
-              viewMode === 'photos'
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'photos'
                 ? 'text-brand-500 bg-brand-50'
                 : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-            }`}
+              }`}
             title="Photos view"
           >
             <GridIcon />
