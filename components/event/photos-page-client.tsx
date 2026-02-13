@@ -105,12 +105,13 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
   const videoCount = useMemo(() => media.filter((m) => m.media_type === 'video').length, [media]);
   const albumCount = initialAlbums.length;
 
-  // Build a map of albumId → first image thumbnail URL for covers
+  // Build a map of albumId → first image preview URL for covers (fallback to thumbnail)
   const albumCoverMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of media) {
-      if (item.media_type === 'image' && item.thumbnail_url && !map.has(item.album_id)) {
-        map.set(item.album_id, item.thumbnail_url);
+      if (item.media_type === 'image' && !map.has(item.album_id)) {
+        const coverUrl = item.full_url || item.thumbnail_url;
+        if (coverUrl) map.set(item.album_id, coverUrl);
       }
     }
     return map;
@@ -281,8 +282,8 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors mb-6 ${dragActive
-            ? 'border-brand-500 bg-brand-50'
-            : 'border-gray-300 hover:border-gray-400 bg-white'
+          ? 'border-brand-500 bg-brand-50'
+          : 'border-gray-300 hover:border-gray-400 bg-white'
           }`}
       >
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -360,8 +361,8 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
           <button
             onClick={handleBackToAlbums}
             className={`p-1.5 rounded-md transition-colors ${viewMode === 'albums'
-                ? 'text-brand-500 bg-brand-50'
-                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              ? 'text-brand-500 bg-brand-50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
               }`}
             title="Albums view"
           >
@@ -370,8 +371,8 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
           <button
             onClick={() => setViewMode('photos')}
             className={`p-1.5 rounded-md transition-colors ${viewMode === 'photos'
-                ? 'text-brand-500 bg-brand-50'
-                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              ? 'text-brand-500 bg-brand-50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
               }`}
             title="Photos view"
           >

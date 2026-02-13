@@ -187,11 +187,10 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
                   setSelectionMode(true);
                 }
               }}
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                selectionMode
-                  ? 'bg-brand-500 text-white'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${selectionMode
+                ? 'bg-brand-500 text-white'
+                : 'text-gray-500 hover:bg-gray-100'
+                }`}
             >
               {selectionMode ? `${selectedIds.size} selected` : 'Select'}
             </button>
@@ -277,6 +276,8 @@ interface PhotoThumbnailProps {
 
 function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLongPress, onView }: PhotoThumbnailProps) {
   const [loaded, setLoaded] = useState(false);
+  // Fallback chain: preview → thumbnail → original
+  const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
 
   const handleClick = () => {
     if (selectionMode) {
@@ -291,12 +292,20 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
     onLongPress();
   };
 
+  const handleImageError = () => {
+    // Fallback: preview failed → try thumbnail → try original
+    if (imgSrc === item.full_url && item.thumbnail_url) {
+      setImgSrc(item.thumbnail_url);
+    } else if (imgSrc !== item.original_url) {
+      setImgSrc(item.original_url);
+    }
+  };
+
   if (item.media_type === 'video') {
     return (
       <div
-        className={`relative aspect-square rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden cursor-pointer ${
-          selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
-        }`}
+        className={`relative aspect-square rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden cursor-pointer ${selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
+          }`}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
@@ -306,9 +315,8 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
         </div>
         {selectionMode && (
           <div className="absolute top-2 left-2 z-10">
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-              selected ? 'bg-brand-500 border-brand-500' : 'border-white/80 bg-black/30'
-            }`}>
+            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? 'bg-brand-500 border-brand-500' : 'border-white/80 bg-black/30'
+              }`}>
               {selected && <CheckIcon className="text-white" />}
             </div>
           </div>
@@ -319,9 +327,8 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
 
   return (
     <div
-      className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${
-        selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
-      }`}
+      className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
+        }`}
       style={
         item.blur_url
           ? { backgroundImage: `url(${item.blur_url})`, backgroundSize: 'cover' }
@@ -331,22 +338,20 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
       onContextMenu={handleContextMenu}
     >
       <img
-        src={item.thumbnail_url}
+        src={imgSrc}
         alt={item.original_filename}
         loading="lazy"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${
-          loaded ? 'opacity-100' : 'opacity-0'
-        }`}
+        onError={handleImageError}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'
+          }`}
       />
-      <div className={`absolute inset-0 transition-colors ${
-        selected ? 'bg-brand-500/20' : 'bg-black/0 group-hover:bg-black/10'
-      }`} />
+      <div className={`absolute inset-0 transition-colors ${selected ? 'bg-brand-500/20' : 'bg-black/0 group-hover:bg-black/10'
+        }`} />
       {selectionMode && (
         <div className="absolute top-2 left-2 z-10">
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-            selected ? 'bg-brand-500 border-brand-500' : 'border-white/80 bg-black/30'
-          }`}>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? 'bg-brand-500 border-brand-500' : 'border-white/80 bg-black/30'
+            }`}>
             {selected && <CheckIcon className="text-white" />}
           </div>
         </div>
