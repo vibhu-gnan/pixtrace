@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUploadStore } from '@/lib/upload/upload-manager';
 import { UploadBanner } from './upload-banner';
@@ -197,13 +197,23 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
     router.refresh();
   }, [router]);
 
-  // Auto-refresh page after uploads complete
+  // Auto-refresh page: every 10 completed uploads + when all done
+  const doneCount = items.filter((i) => i.status === 'done').length;
+  const lastRefreshBatch = useRef(0);
+
   useEffect(() => {
-    if (!isUploading && items.some((i) => i.status === 'done')) {
-      const timer = setTimeout(() => router.refresh(), 500); // Reduced from 1500ms - cache already revalidated server-side
+    // Refresh every 10 completed uploads during upload
+    if (isUploading && doneCount > 0 && doneCount % 10 === 0 && doneCount !== lastRefreshBatch.current) {
+      lastRefreshBatch.current = doneCount;
+      router.refresh();
+    }
+    // Final refresh when all uploads complete
+    if (!isUploading && doneCount > 0) {
+      lastRefreshBatch.current = 0;
+      const timer = setTimeout(() => router.refresh(), 500);
       return () => clearTimeout(timer);
     }
-  }, [isUploading, items, router])
+  }, [isUploading, doneCount, router]);
 
   // ─── Handlers ────────────────────────────────────────────
 
