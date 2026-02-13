@@ -46,7 +46,7 @@ export default async function GalleryEventPage({
 
       {/* Gallery Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <GalleryPageClient media={media} albums={albums} />
+        <GalleryPageClient media={media} albums={albums} eventHash={eventHash} />
       </div>
 
       {/* Footer */}
