@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteObjects } from '@/lib/storage/r2-client';
-import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl } from '@/lib/storage/cloudflare-images';
+import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
 export interface MediaItem {
   id: string;
@@ -22,6 +22,7 @@ export interface MediaItem {
   thumbnail_url: string;
   blur_url: string;
   full_url: string;
+  original_url: string;
 }
 
 export async function getMedia(eventId: string): Promise<MediaItem[]> {
@@ -67,6 +68,7 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
     thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200, item.thumbnail_r2_key) : '',
     blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.thumbnail_r2_key) : '',
     full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
+    original_url: item.media_type === 'image' ? getOriginalUrl(item.r2_key) : '',
   }));
 }
 

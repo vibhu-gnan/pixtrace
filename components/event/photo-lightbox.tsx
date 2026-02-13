@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { MediaItem } from '@/actions/media';
-import { getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
 type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
@@ -51,15 +50,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
       setLoadingPhase('loading_original');
 
       const origImg = new Image();
-      origImg.crossOrigin = 'anonymous';
-      origImg.src = getOriginalUrl(currentPhoto.r2_key);
-      origImg.onload = () => {
-        setLoadingPhase('original');
-      };
-      origImg.onerror = () => {
-        console.error('Failed to load original image, staying on preview');
-        setLoadingPhase('preview');
-      };
+      origImg.src = currentPhoto.original_url;
 
       // Timeout: fall back to preview if original takes too long
       const loadTimeout = setTimeout(() => {
@@ -125,7 +116,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
       ? currentPhoto.thumbnail_url
       : loadingPhase === 'preview' || loadingPhase === 'loading_original'
       ? currentPhoto.full_url
-      : getOriginalUrl(currentPhoto.r2_key);
+      : currentPhoto.original_url;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
