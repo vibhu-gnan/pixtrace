@@ -6,6 +6,26 @@ import type { MediaItem } from '@/actions/media';
 
 type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
+// Cache loaded image URLs so navigating back is instant
+// Persists across lightbox open/close within the same page
+const imageCache = new Set<string>();
+
+function isImageCached(url: string): boolean {
+  return imageCache.has(url);
+}
+
+function cacheImage(url: string): void {
+  imageCache.add(url);
+}
+
+// Preload an image into browser cache silently
+function preloadImage(url: string): void {
+  if (!url || isImageCached(url)) return;
+  const img = new Image();
+  img.src = url;
+  img.onload = () => cacheImage(url);
+}
+
 interface PhotoLightboxProps {
   media: MediaItem[];
   initialIndex: number;
@@ -31,19 +51,33 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
       clearTimeout(timerRef.current);
     }
 
-    // Reset to thumbnail state
-    setLoadingPhase('thumbnail');
+    // Check if preview is already cached — skip straight to it
+    if (isImageCached(currentPhoto.full_url)) {
+      setLoadingPhase('preview');
+    } else {
+      setLoadingPhase('thumbnail');
+    }
 
-    // Immediately start preloading the preview variant
-    const previewImg = new Image();
-    previewImg.src = currentPhoto.full_url;
-    previewImg.onload = () => {
-      setLoadingPhase((current) => {
-        // Only upgrade to preview if we haven't already moved past it
-        if (current === 'thumbnail') return 'preview';
-        return current;
-      });
-    };
+    // Check if original is already cached — skip straight to it
+    if (isImageCached(currentPhoto.original_url)) {
+      setLoadingPhase('original');
+      // Still preload adjacent photos
+      preloadAdjacent();
+      return;
+    }
+
+    // Preload the preview variant
+    if (!isImageCached(currentPhoto.full_url)) {
+      const previewImg = new Image();
+      previewImg.src = currentPhoto.full_url;
+      previewImg.onload = () => {
+        cacheImage(currentPhoto.full_url);
+        setLoadingPhase((current) => {
+          if (current === 'thumbnail') return 'preview';
+          return current;
+        });
+      };
+    }
 
     // After 5 seconds, start loading the full original
     timerRef.current = setTimeout(() => {
@@ -62,6 +96,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
 
       origImg.onload = () => {
         clearTimeout(loadTimeout);
+        cacheImage(currentPhoto.original_url);
         setLoadingPhase('original');
       };
       origImg.onerror = () => {
@@ -71,12 +106,24 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
       };
     }, 5000);
 
+    // Preload adjacent photos (prev/next preview variants)
+    preloadAdjacent();
+
+    function preloadAdjacent() {
+      if (currentIndex > 0) {
+        preloadImage(media[currentIndex - 1].full_url);
+      }
+      if (currentIndex < media.length - 1) {
+        preloadImage(media[currentIndex + 1].full_url);
+      }
+    }
+
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [currentIndex, isOpen, currentPhoto]);
+  }, [currentIndex, isOpen, currentPhoto, media]);
 
   // Keyboard navigation
   useEffect(() => {
