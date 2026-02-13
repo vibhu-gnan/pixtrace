@@ -130,6 +130,42 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
 
   // ─── Effects ─────────────────────────────────────────────
 
+  // Warn before reload/close during uploads
+  useEffect(() => {
+    if (!isUploading) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Upload in progress. Are you sure you want to leave?';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isUploading]);
+
+  // Block Next.js client-side navigation during uploads
+  useEffect(() => {
+    if (!isUploading) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor && anchor.href && !anchor.href.includes('#')) {
+        const confirmed = window.confirm(
+          'Upload is still in progress. If you leave now, pending uploads will be lost.\n\nAre you sure you want to leave?'
+        );
+        if (!confirmed) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [isUploading]);
+
   // Sync dropdown albums from server props
   useEffect(() => {
     setDropdownAlbums(initialAlbums.map((a) => ({ id: a.id, name: a.name })));
