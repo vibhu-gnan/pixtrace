@@ -30,7 +30,8 @@ export async function createEvent(formData: FormData) {
   const name = formData.get('name') as string;
   const description = (formData.get('description') as string) || null;
   const eventDate = (formData.get('eventDate') as string) || null;
-  const isPublic = formData.has('isPublic');
+  // Events start as private drafts — published via "Publish Event" button
+  const isPublic = false;
 
   if (!name?.trim()) {
     return { error: 'Event name is required' };
@@ -226,4 +227,68 @@ export async function deleteEvent(eventId: string) {
 
   revalidatePath('/dashboard');
   redirect('/dashboard');
+}
+
+export async function publishEvent(eventId: string): Promise<{ error?: string; galleryUrl?: string; eventHash?: string }> {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Not authenticated' };
+
+  const supabase = createAdminClient();
+
+  // Verify ownership & get event_hash
+  const { data: event } = await supabase
+    .from('events')
+    .select('id, event_hash, is_public')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return { error: 'Event not found' };
+  if (event.is_public) {
+    return {
+      eventHash: event.event_hash,
+      galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL}/gallery/${event.event_hash}`,
+    };
+  }
+
+  const { error } = await supabase
+    .from('events')
+    .update({ is_public: true, updated_at: new Date().toISOString() })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error publishing event:', error);
+    return { error: 'Failed to publish event' };
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  revalidatePath('/dashboard');
+
+  return {
+    eventHash: event.event_hash,
+    galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL}/gallery/${event.event_hash}`,
+  };
+}
+
+export async function unpublishEvent(eventId: string): Promise<{ error?: string }> {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Not authenticated' };
+
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from('events')
+    .update({ is_public: false, updated_at: new Date().toISOString() })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error unpublishing event:', error);
+    return { error: 'Failed to unpublish event' };
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  revalidatePath('/dashboard');
+  return {};
 }

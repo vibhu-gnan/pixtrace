@@ -85,19 +85,7 @@ export default function NewEventPage() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="isPublic"
-            name="isPublic"
-            defaultChecked
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
-            disabled={loading}
-          />
-          <label htmlFor="isPublic" className="text-sm text-gray-700">
-            Make gallery publicly accessible (guests can view without login)
-          </label>
-        </div>
+        {/* Events are created as private drafts. Use "Publish Event" button to make public. */}
 
         <div className="flex items-center gap-3 pt-4 border-t">
           <button
