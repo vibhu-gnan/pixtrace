@@ -46,18 +46,37 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
       });
     };
 
-    // After 3 seconds, start loading the full original
+    // After 5 seconds, start loading the full original
     timerRef.current = setTimeout(() => {
       setLoadingPhase('loading_original');
 
       const origImg = new Image();
+      origImg.crossOrigin = 'anonymous';
       origImg.src = getOriginalUrl(currentPhoto.r2_key);
       origImg.onload = () => {
         setLoadingPhase('original');
       };
       origImg.onerror = () => {
-        console.error('Failed to load original image');
-        // Stay on preview if original fails
+        console.error('Failed to load original image, staying on preview');
+        setLoadingPhase('preview');
+      };
+
+      // Timeout: fall back to preview if original takes too long
+      const loadTimeout = setTimeout(() => {
+        if (origImg.complete) return;
+        origImg.src = ''; // Cancel the load
+        console.warn('Original image load timed out, staying on preview');
+        setLoadingPhase('preview');
+      }, 15000);
+
+      origImg.onload = () => {
+        clearTimeout(loadTimeout);
+        setLoadingPhase('original');
+      };
+      origImg.onerror = () => {
+        clearTimeout(loadTimeout);
+        console.error('Failed to load original image, staying on preview');
+        setLoadingPhase('preview');
       };
     }, 5000);
 

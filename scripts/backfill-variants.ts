@@ -69,7 +69,7 @@ async function generateThumbnail(imageBuffer: Buffer): Promise<Buffer> {
   return sharp(imageBuffer)
     .rotate() // Auto-rotate based on EXIF orientation
     .resize(200, 200, { fit: 'cover', position: 'centre' })
-    .webp({ quality: 50 })
+    .webp({ quality: 75 })
     .toBuffer();
 }
 

@@ -20,7 +20,7 @@ export async function generateImageVariants(file: File): Promise<ImageVariants> 
   const img = await loadImage(file);
 
   const [thumbnail, preview] = await Promise.all([
-    createCoverCrop(img, 200, 200, 0.50),
+    createCoverCrop(img, 200, 200, 0.75),
     createContainFit(img, 1200, 1200, 0.80),
   ]);
 
