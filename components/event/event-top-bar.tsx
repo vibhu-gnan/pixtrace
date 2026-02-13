@@ -100,6 +100,8 @@ export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
       <PublishModal
         eventId={event.id}
         eventName={event.name}
+        eventHash={event.event_hash}
+        isAlreadyPublished={isPublished}
         isOpen={showPublishModal}
         onClose={() => setShowPublishModal(false)}
       />

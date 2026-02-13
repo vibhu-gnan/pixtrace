@@ -7,11 +7,13 @@ import QRCode from 'qrcode';
 interface PublishModalProps {
     eventId: string;
     eventName: string;
+    eventHash: string;
+    isAlreadyPublished: boolean;
     isOpen: boolean;
     onClose: () => void;
 }
 
-export function PublishModal({ eventId, eventName, isOpen, onClose }: PublishModalProps) {
+export function PublishModal({ eventId, eventName, eventHash, isAlreadyPublished, isOpen, onClose }: PublishModalProps) {
     const [publishing, setPublishing] = useState(false);
     const [published, setPublished] = useState(false);
     const [galleryUrl, setGalleryUrl] = useState('');
@@ -21,7 +23,6 @@ export function PublishModal({ eventId, eventName, isOpen, onClose }: PublishMod
 
     useEffect(() => {
         if (!isOpen) {
-            // Reset state when closed
             setPublished(false);
             setGalleryUrl('');
             setError('');
@@ -29,8 +30,15 @@ export function PublishModal({ eventId, eventName, isOpen, onClose }: PublishMod
             return;
         }
 
-        // When opened, immediately publish
-        handlePublish();
+        if (isAlreadyPublished) {
+            // Already published — show link/QR instantly, no server call
+            const url = `${window.location.origin}/gallery/${eventHash}`;
+            setGalleryUrl(url);
+            setPublished(true);
+        } else {
+            // Not yet published — call server action
+            handlePublish();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
 
