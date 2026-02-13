@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { publishEvent } from '@/actions/events';
+import { publishEvent, unpublishEvent } from '@/actions/events';
 import QRCode from 'qrcode';
 
 interface PublishModalProps {
@@ -19,6 +19,8 @@ export function PublishModal({ eventId, eventName, eventHash, isAlreadyPublished
     const [galleryUrl, setGalleryUrl] = useState('');
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+    const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
+    const [unpublishing, setUnpublishing] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -202,6 +204,50 @@ export function PublishModal({ eventId, eventName, eventHash, isAlreadyPublished
                         >
                             Done
                         </button>
+
+                        {/* Unpublish section */}
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            {!showUnpublishConfirm ? (
+                                <button
+                                    onClick={() => setShowUnpublishConfirm(true)}
+                                    className="w-full text-sm text-red-500 hover:text-red-600 font-medium transition-colors"
+                                >
+                                    Unpublish Event
+                                </button>
+                            ) : (
+                                <div className="text-center">
+                                    <p className="text-sm text-gray-600 mb-3">
+                                        Are you sure? The gallery link will stop working and visitors will see a 404 page.
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowUnpublishConfirm(false)}
+                                            className="flex-1 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                                            disabled={unpublishing}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                setUnpublishing(true);
+                                                const result = await unpublishEvent(eventId);
+                                                if (result.error) {
+                                                    setError(result.error);
+                                                } else {
+                                                    onClose();
+                                                    window.location.reload();
+                                                }
+                                                setUnpublishing(false);
+                                            }}
+                                            className="flex-1 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                                            disabled={unpublishing}
+                                        >
+                                            {unpublishing ? 'Unpublishing...' : 'Yes, Unpublish'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
