@@ -9,10 +9,9 @@ import type { MediaItem } from '@/actions/media';
 
 interface GalleryGridProps {
     media: GalleryMediaItem[];
-    albumFilter: string | null;
 }
 
-export function GalleryGrid({ media, albumFilter }: GalleryGridProps) {
+export function GalleryGrid({ media }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -37,11 +36,7 @@ export function GalleryGrid({ media, albumFilter }: GalleryGridProps) {
         return () => window.removeEventListener('resize', updateColumns);
     }, []);
 
-    const filtered = albumFilter
-        ? media.filter((m) => m.album_id === albumFilter)
-        : media;
-
-    const images = filtered.filter((m) => m.media_type === 'image');
+    const images = media.filter((m) => m.media_type === 'image');
 
     // Build index map for lightbox (must be above early return to satisfy hooks rules)
     const indexMap = useMemo(() => {

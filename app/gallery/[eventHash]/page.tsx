@@ -8,7 +8,7 @@ export default async function GalleryEventPage({
   params: Promise<{ eventHash: string }>;
 }) {
   const { eventHash } = await params;
-  const { event, media, albums } = await getPublicGallery(eventHash);
+  const { event, media, albums, totalCount } = await getPublicGallery(eventHash);
 
   if (!event) {
     notFound();
@@ -64,11 +64,12 @@ export default async function GalleryEventPage({
       {/* ── Gallery Content ──────────────────────────────── */}
       <div id="gallery">
         <GalleryPageClient
-          media={media}
+          initialMedia={media}
           albums={albums}
           eventHash={eventHash}
           eventName={event.name}
           description={event.description}
+          totalCount={totalCount}
         />
       </div>
 

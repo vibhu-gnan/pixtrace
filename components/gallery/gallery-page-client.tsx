@@ -1,22 +1,99 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { GalleryGrid } from './gallery-grid';
+import { getPublicGalleryPage } from '@/actions/gallery';
 import type { GalleryMediaItem } from '@/actions/gallery';
 
 interface GalleryPageClientProps {
-    media: GalleryMediaItem[];
+    initialMedia: GalleryMediaItem[];
     albums: { id: string; name: string }[];
     eventHash: string;
     eventName: string;
     description: string | null;
+    totalCount: number;
 }
 
-export function GalleryPageClient({ media, albums, eventHash, eventName, description }: GalleryPageClientProps) {
+export function GalleryPageClient({
+    initialMedia,
+    albums,
+    eventHash,
+    eventName,
+    description,
+    totalCount,
+}: GalleryPageClientProps) {
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
+    const [media, setMedia] = useState<GalleryMediaItem[]>(initialMedia);
+    const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(initialMedia.length < totalCount);
+    const [error, setError] = useState('');
     const [revoked, setRevoked] = useState(false);
     const [copied, setCopied] = useState(false);
-    const barRef = useRef<HTMLDivElement>(null);
+    const sentinelRef = useRef<HTMLDivElement>(null);
+
+    // Reset when album changes
+    useEffect(() => {
+        if (activeAlbum === null) {
+            // Back to "All" — restore initial data
+            setMedia(initialMedia);
+            setHasMore(initialMedia.length < totalCount);
+        } else {
+            // Album selected — fetch from scratch
+            setMedia([]);
+            setHasMore(true);
+            setLoading(true);
+            getPublicGalleryPage(eventHash, 0, activeAlbum)
+                .then(({ media: newMedia, hasMore: more }) => {
+                    setMedia(newMedia);
+                    setHasMore(more);
+                })
+                .catch(() => setError('Failed to load photos'))
+                .finally(() => setLoading(false));
+        }
+    }, [activeAlbum, eventHash, initialMedia, totalCount]);
+
+    // Load more photos
+    const loadMore = useCallback(async () => {
+        if (loading || !hasMore) return;
+        setLoading(true);
+        setError('');
+        try {
+            const { media: newMedia, hasMore: more } = await getPublicGalleryPage(
+                eventHash,
+                media.length,
+                activeAlbum,
+            );
+            setMedia((prev) => {
+                // Deduplicate
+                const existingIds = new Set(prev.map((m) => m.id));
+                const unique = newMedia.filter((m) => !existingIds.has(m.id));
+                return [...prev, ...unique];
+            });
+            setHasMore(more);
+        } catch {
+            setError('Failed to load more photos. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    }, [loading, hasMore, eventHash, media.length, activeAlbum]);
+
+    // Intersection observer for infinite scroll
+    useEffect(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading) {
+                    loadMore();
+                }
+            },
+            { rootMargin: '600px' }, // Start loading 600px before user reaches bottom
+        );
+
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [hasMore, loading, loadMore]);
 
     // Heartbeat: check every 30s if the gallery is still public
     useEffect(() => {
@@ -58,12 +135,6 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
         }
     };
 
-    const handleDownloadAll = () => {
-        // Download the current page URL (browser will offer to save)
-        // For now, copy link as a useful action
-        handleCopyLink();
-    };
-
     // Revoked overlay
     if (revoked) {
         return (
@@ -81,15 +152,14 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
         );
     }
 
-    const images = media.filter(m => m.media_type === 'image');
+    const imageCount = activeAlbum === null
+        ? totalCount
+        : media.filter(m => m.media_type === 'image').length;
 
     return (
         <>
             {/* ── Sticky Info Bar ───────────────────────────────── */}
-            <div
-                ref={barRef}
-                className="sticky top-0 z-30 bg-white border-b border-gray-200"
-            >
+            <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-14">
                         {/* Left: Event name + description */}
@@ -104,12 +174,21 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
                             {/* Album tabs */}
                             {albums.length > 1 && (
                                 <nav className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                        onClick={() => setActiveAlbum(null)}
+                                        className={`px-3 py-1 text-xs font-medium tracking-wide uppercase whitespace-nowrap transition-colors ${activeAlbum === null
+                                            ? 'text-gray-900 border-b-2 border-gray-900'
+                                            : 'text-gray-400 hover:text-gray-600'
+                                            }`}
+                                    >
+                                        All
+                                    </button>
                                     {albums.map((album) => {
                                         const isActive = activeAlbum === album.id;
                                         return (
                                             <button
                                                 key={album.id}
-                                                onClick={() => setActiveAlbum(isActive ? null : album.id)}
+                                                onClick={() => setActiveAlbum(album.id)}
                                                 className={`px-3 py-1 text-xs font-medium tracking-wide uppercase whitespace-nowrap transition-colors ${isActive
                                                     ? 'text-gray-900 border-b-2 border-gray-900'
                                                     : 'text-gray-400 hover:text-gray-600'
@@ -125,15 +204,14 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
 
                         {/* Right: Action icons */}
                         <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                            {/* Photo count */}
                             <span className="text-xs text-gray-400 mr-2 hidden sm:block">
-                                {images.length} photos
+                                {imageCount} photos
                             </span>
 
-                            {/* Copy/Like */}
+                            {/* Copy link */}
                             <button
                                 onClick={handleCopyLink}
-                                className="p-2 rounded-full hover:bg-gray-100 transition-colors group relative"
+                                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                                 title="Copy link"
                             >
                                 {copied ? (
@@ -149,7 +227,7 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
 
                             {/* Download */}
                             <button
-                                onClick={handleDownloadAll}
+                                onClick={handleCopyLink}
                                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                                 title="Download"
                             >
@@ -175,7 +253,34 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div>
-                <GalleryGrid media={media} albumFilter={activeAlbum} />
+                <GalleryGrid media={media} />
+            </div>
+
+            {/* ── Infinite Scroll Sentinel + Loading ───────────── */}
+            <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center">
+                {loading && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" />
+                        </svg>
+                        <span className="text-sm">Loading more photos…</span>
+                    </div>
+                )}
+                {error && (
+                    <div className="text-center">
+                        <p className="text-sm text-red-500 mb-2">{error}</p>
+                        <button
+                            onClick={loadMore}
+                            className="text-sm text-blue-600 hover:underline font-medium"
+                        >
+                            Try again
+                        </button>
+                    </div>
+                )}
+                {!hasMore && !loading && media.length > 0 && (
+                    <p className="text-xs text-gray-300">You&apos;ve seen all {media.length} photos</p>
+                )}
             </div>
         </>
     );
