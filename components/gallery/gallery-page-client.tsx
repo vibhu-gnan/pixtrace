@@ -277,7 +277,12 @@ export function GalleryPageClient({
                     </div>
                 )}
                 {!hasMore && !loading && media.length > 0 && (
-                    <p className="text-xs text-gray-300">You&apos;ve seen all {media.length} photos</p>
+                    <button
+                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        className="mt-4 px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
+                    >
+                        Return to Top
+                    </button>
                 )}
             </div>
         </>
