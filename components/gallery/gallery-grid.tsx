@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { PhotoLightbox } from '@/components/event/photo-lightbox';
 import type { GalleryMediaItem } from '@/actions/gallery';
 import type { MediaItem } from '@/actions/media';
@@ -9,9 +9,11 @@ import type { MediaItem } from '@/actions/media';
 
 interface GalleryGridProps {
     media: GalleryMediaItem[];
+    eventHash?: string;
+    initialPhotoId?: string;
 }
 
-export function GalleryGrid({ media }: GalleryGridProps) {
+export function GalleryGrid({ media, eventHash, initialPhotoId }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -44,6 +46,19 @@ export function GalleryGrid({ media }: GalleryGridProps) {
         images.forEach((img, i) => map.set(img.id, i));
         return map;
     }, [images]);
+
+    // Auto-open lightbox if deep-link ?photo=id is provided
+    const deepLinkHandled = useRef(false);
+    useEffect(() => {
+        if (initialPhotoId && !deepLinkHandled.current && images.length > 0) {
+            const idx = indexMap.get(initialPhotoId);
+            if (idx !== undefined) {
+                deepLinkHandled.current = true;
+                setLightboxIndex(idx);
+                setLightboxOpen(true);
+            }
+        }
+    }, [initialPhotoId, indexMap, images.length]);
 
     // Convert to MediaItem format for the lightbox
     const lightboxMedia: MediaItem[] = useMemo(() => images.map((img) => ({
@@ -124,6 +139,7 @@ export function GalleryGrid({ media }: GalleryGridProps) {
                     initialIndex={lightboxIndex}
                     isOpen={lightboxOpen}
                     onClose={() => setLightboxOpen(false)}
+                    eventHash={eventHash}
                 />
             )}
         </>

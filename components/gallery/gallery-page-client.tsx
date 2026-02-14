@@ -14,6 +14,7 @@ interface GalleryPageClientProps {
     eventName: string;
     description: string | null;
     totalCount: number;
+    initialPhotoId?: string;
 }
 
 export function GalleryPageClient({
@@ -23,6 +24,7 @@ export function GalleryPageClient({
     eventName,
     description,
     totalCount,
+    initialPhotoId,
 }: GalleryPageClientProps) {
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
     const [media, setMedia] = useState<GalleryMediaItem[]>(initialMedia);
@@ -36,10 +38,13 @@ export function GalleryPageClient({
     // Store the timestamp of the last known media item to detect updates
     const [latestTimestamp, setLatestTimestamp] = useState<string | null>(
         initialMedia.length > 0 ? initialMedia[0].created_at || null : null
-    ); // Note: GalleryMediaItem needs created_at in interface? Actions return it?
-    // Let's check actions/gallery.ts again.
+    );
 
     const sentinelRef = useRef<HTMLDivElement>(null);
+    const loadingRef = useRef(false);
+    const latestTimestampRef = useRef(latestTimestamp);
+    const activeAlbumRef = useRef(activeAlbum);
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Refresh function
     const refreshGallery = useCallback(async () => {
@@ -63,8 +68,14 @@ export function GalleryPageClient({
         }
     }, [eventHash, activeAlbum]);
 
+    const refreshGalleryRef = useRef(refreshGallery);
+    useEffect(() => { latestTimestampRef.current = latestTimestamp; }, [latestTimestamp]);
+    useEffect(() => { activeAlbumRef.current = activeAlbum; }, [activeAlbum]);
+    useEffect(() => { refreshGalleryRef.current = refreshGallery; }, [refreshGallery]);
+
     // Reset when album changes
     useEffect(() => {
+        setError('');
         if (activeAlbum === null) {
             // Back to "All" — restore initial data (or fetch fresh if desired, but sticking to simple reset for now)
             // Actually, if we want real-time, better to fetch fresh even for "All" if we switched back.
@@ -88,13 +99,15 @@ export function GalleryPageClient({
 
     // Load more photos
     const loadMore = useCallback(async () => {
-        if (loading || !hasMore) return;
+        if (loadingRef.current || !hasMore) return;
+        loadingRef.current = true;
         setLoading(true);
         setError('');
         try {
+            const currentLength = media.length;
             const { media: newMedia, hasMore: more } = await getPublicGalleryPage(
                 eventHash,
-                media.length,
+                currentLength,
                 activeAlbum,
             );
             setMedia((prev) => {
@@ -108,8 +121,9 @@ export function GalleryPageClient({
             setError('Failed to load more photos. Please try again.');
         } finally {
             setLoading(false);
+            loadingRef.current = false;
         }
-    }, [loading, hasMore, eventHash, media.length, activeAlbum]);
+    }, [hasMore, eventHash, media.length, activeAlbum]);
 
     // Intersection observer for infinite scroll
     useEffect(() => {
@@ -130,6 +144,7 @@ export function GalleryPageClient({
     }, [hasMore, loading, loadMore]);
 
     // Heartbeat: check every 10s (faster updates)
+    // Uses refs to avoid restarting the interval when values change
     useEffect(() => {
         const interval = setInterval(async () => {
             try {
@@ -142,27 +157,22 @@ export function GalleryPageClient({
                     return;
                 }
 
-                // Check for updates
-                if (data.last_updated && latestTimestamp && data.last_updated > latestTimestamp) {
-                    // Update detected!
-                    setLatestTimestamp(data.last_updated); // Update strict tracker
+                const currentTimestamp = latestTimestampRef.current;
+                if (data.last_updated && currentTimestamp && data.last_updated > currentTimestamp) {
+                    setLatestTimestamp(data.last_updated);
 
-                    if (window.scrollY < 100 && !activeAlbum) {
-                        // At top and viewing all -> Auto refresh
-                        refreshGallery();
+                    if (window.scrollY < 100 && !activeAlbumRef.current) {
+                        refreshGalleryRef.current();
                     } else {
-                        // Scrolled down or filtered -> Show notification
                         setShowNewPhotos(true);
                     }
-                } else if (data.last_updated && !latestTimestamp) {
-                    // First Sync
+                } else if (data.last_updated && !currentTimestamp) {
                     setLatestTimestamp(data.last_updated);
                 }
-
             } catch { /* skip */ }
-        }, 10_000); // 10s interval
+        }, 10_000);
         return () => clearInterval(interval);
-    }, [eventHash, latestTimestamp, activeAlbum, refreshGallery]);
+    }, [eventHash]);
 
     const handleCopyLink = async () => {
         const url = window.location.href;
@@ -176,7 +186,8 @@ export function GalleryPageClient({
             document.body.removeChild(input);
         }
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     };
 
     const handleShare = async () => {
@@ -298,7 +309,7 @@ export function GalleryPageClient({
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className="px-1 pt-1">
-                <GalleryGrid media={media} />
+                <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} />
             </div>
 
             {/* ── Infinite Scroll Sentinel + Loading ───────────── */}

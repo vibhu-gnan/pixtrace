@@ -8,14 +8,23 @@ type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
 // Cache loaded image URLs so navigating back is instant
 // Persists across lightbox open/close within the same page
-const imageCache = new Set<string>();
+// Bounded FIFO cache to prevent unbounded memory growth
+const IMAGE_CACHE_MAX = 200;
+const imageCacheList: string[] = [];
+const imageCacheSet = new Set<string>();
 
 function isImageCached(url: string): boolean {
-  return imageCache.has(url);
+  return imageCacheSet.has(url);
 }
 
 function cacheImage(url: string): void {
-  imageCache.add(url);
+  if (imageCacheSet.has(url)) return;
+  if (imageCacheList.length >= IMAGE_CACHE_MAX) {
+    const evicted = imageCacheList.shift()!;
+    imageCacheSet.delete(evicted);
+  }
+  imageCacheList.push(url);
+  imageCacheSet.add(url);
 }
 
 // Preload an image into browser cache silently
@@ -31,17 +40,20 @@ interface PhotoLightboxProps {
   initialIndex: number;
   isOpen: boolean;
   onClose: () => void;
+  eventHash?: string;
 }
 
 const SWIPE_THRESHOLD = 50;
 const LIGHTBOX_STATE_KEY = 'pixtrace-lightbox';
 
-export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLightboxProps) {
+export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
+  const [linkCopied, setLinkCopied] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number | null>(null);
   const pushedStateRef = useRef(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentPhoto = media[currentIndex];
   const canGoPrev = currentIndex > 0;
@@ -166,16 +178,48 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
     onClose();
   }, [onClose]);
 
+  const handleSharePhoto = useCallback(async () => {
+    if (!currentPhoto) return;
+    const baseUrl = eventHash
+      ? `${window.location.origin}/gallery/${eventHash}`
+      : window.location.href.split('?')[0];
+    const shareUrl = `${baseUrl}?photo=${currentPhoto.id}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: currentPhoto.original_filename, url: shareUrl });
+        return;
+      } catch { /* cancelled or unsupported */ }
+    }
+
+    // Fallback: copy to clipboard
+    try { await navigator.clipboard.writeText(shareUrl); }
+    catch {
+      const input = document.createElement('input');
+      input.value = shareUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
+    setLinkCopied(true);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setLinkCopied(false), 2000);
+  }, [currentPhoto, eventHash]);
+
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft' && canGoPrev) {
+        e.preventDefault();
         handlePrevious();
       } else if (e.key === 'ArrowRight' && canGoNext) {
+        e.preventDefault();
         handleNext();
       } else if (e.key === 'Escape') {
+        e.preventDefault();
         handleClose();
       }
     };
@@ -221,14 +265,28 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
             if (e.target === e.currentTarget) handleClose();
           }}
         >
-          {/* Close button */}
-          <button
-            onClick={handleClose}
-            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-            aria-label="Close lightbox"
-          >
-            <CloseIcon className="text-white" />
-          </button>
+          {/* Top-right buttons */}
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            <button
+              onClick={handleSharePhoto}
+              className="relative w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              aria-label="Share photo"
+            >
+              <ShareIcon className="text-white" />
+              {linkCopied && (
+                <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-white bg-black/70 px-2 py-1 rounded whitespace-nowrap">
+                  Link copied
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleClose}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              aria-label="Close lightbox"
+            >
+              <CloseIcon className="text-white" />
+            </button>
+          </div>
 
 
 
@@ -307,6 +365,15 @@ function ChevronRightIcon({ className }: { className?: string }) {
   return (
     <svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function ShareIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
     </svg>
   );
 }

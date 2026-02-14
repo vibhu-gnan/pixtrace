@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         .eq('event_id', event.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
     return NextResponse.json({
         public: true,

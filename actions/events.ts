@@ -249,7 +249,7 @@ export async function publishEvent(eventId: string): Promise<{ error?: string; g
   if (event.is_public) {
     return {
       eventHash: event.event_hash,
-      galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL}/gallery/${event.event_hash}`,
+      galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/gallery/${event.event_hash}`,
     };
   }
 
@@ -269,7 +269,7 @@ export async function publishEvent(eventId: string): Promise<{ error?: string; g
 
   return {
     eventHash: event.event_hash,
-    galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL}/gallery/${event.event_hash}`,
+    galleryUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/gallery/${event.event_hash}`,
   };
 }
 

@@ -5,6 +5,7 @@ import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 
 type Props = {
   params: Promise<{ eventHash: string }>;
+  searchParams: Promise<{ photo?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -46,9 +47,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function GalleryEventPage({
   params,
+  searchParams,
 }: Props) {
   try {
     const { eventHash } = await params;
+    const { photo: initialPhotoId } = await searchParams;
     const { event, media, albums, totalCount } = await getPublicGallery(eventHash);
 
     if (!event) {
@@ -111,6 +114,7 @@ export default async function GalleryEventPage({
             eventName={event.name}
             description={event.description}
             totalCount={totalCount}
+            initialPhotoId={initialPhotoId}
           />
         </div>
 

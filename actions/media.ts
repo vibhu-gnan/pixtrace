@@ -126,6 +126,8 @@ export async function deleteMedia(mediaId: string, eventId: string) {
 }
 
 export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
+  if (!mediaIds?.length) return { success: true, deleted: 0 };
+
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
 
