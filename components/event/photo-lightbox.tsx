@@ -150,6 +150,26 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
     };
   }, [isOpen, onClose]);
 
+  const handlePrevious = useCallback(() => {
+    if (canGoPrev) {
+      setCurrentIndex((i) => i - 1);
+    }
+  }, [canGoPrev]);
+
+  const handleNext = useCallback(() => {
+    if (canGoNext) {
+      setCurrentIndex((i) => i + 1);
+    }
+  }, [canGoNext]);
+
+  const handleClose = useCallback(() => {
+    if (pushedStateRef.current && typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else {
+      onClose();
+    }
+  }, [onClose]);
+
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -166,19 +186,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentIndex, canGoPrev, canGoNext, handleClose]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handlePrevious = useCallback(() => {
-    if (canGoPrev) {
-      setCurrentIndex((i) => i - 1);
-    }
-  }, [canGoPrev]);
-
-  const handleNext = useCallback(() => {
-    if (canGoNext) {
-      setCurrentIndex((i) => i + 1);
-    }
-  }, [canGoNext]);
+  }, [isOpen, currentIndex, canGoPrev, canGoNext, handlePrevious, handleNext, handleClose]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -196,14 +204,6 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
     },
     [canGoNext, canGoPrev, handleNext, handlePrevious]
   );
-
-  const handleClose = useCallback(() => {
-    if (pushedStateRef.current && typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-    } else {
-      onClose();
-    }
-  }, [onClose]);
 
   if (!currentPhoto) return null;
 
