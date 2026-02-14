@@ -17,8 +17,8 @@ export interface EventData {
   cover_media_id: string | null;
   theme: Record<string, unknown>;
   is_public: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   albums?: { id: string; name: string; sort_order: number }[];
   media_count?: number;
 }
@@ -133,6 +133,8 @@ export async function getEvent(eventId: string): Promise<EventData | null> {
   return {
     ...event,
     media_count: count || 0,
+    created_at: event.created_at || new Date().toISOString(),
+    updated_at: event.updated_at || new Date().toISOString(),
   } as EventData;
 }
 
