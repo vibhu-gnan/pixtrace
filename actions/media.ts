@@ -65,8 +65,8 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
     height: item.height,
     processing_status: item.processing_status,
     created_at: item.created_at,
-    thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200, item.thumbnail_r2_key) : '',
-    blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.thumbnail_r2_key) : '',
+    thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
+    blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
     full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
     original_url: item.media_type === 'image' ? getOriginalUrl(item.r2_key) : '',
   }));

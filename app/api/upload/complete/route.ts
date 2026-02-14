@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         file_size: fileSize,
         width: width || null,
         height: height || null,
-        thumbnail_r2_key: thumbnailR2Key || null,
+        thumbnail_r2_key: null,
         preview_r2_key: previewR2Key || null,
         processing_status: 'completed',
       })

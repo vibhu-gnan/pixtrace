@@ -1,5 +1,4 @@
 export interface ImageVariants {
-  thumbnail: Blob; // ~200x200 cover-crop WebP
   preview: Blob;   // max 1200x1200 contain-fit WebP
 }
 
@@ -19,12 +18,11 @@ export function canGenerateVariants(mimeType: string): boolean {
 export async function generateImageVariants(file: File): Promise<ImageVariants> {
   const img = await loadImage(file);
 
-  const [thumbnail, preview] = await Promise.all([
-    createCoverCrop(img, 200, 200, 1.0),
+  const [preview] = await Promise.all([
     createContainFit(img, 1200, 1200, 0.80),
   ]);
 
-  return { thumbnail, preview };
+  return { preview };
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -41,44 +39,6 @@ function loadImage(file: File): Promise<HTMLImageElement> {
     };
     img.src = url;
   });
-}
-
-/**
- * Center-crop to target aspect ratio, then scale down to target dimensions.
- * Used for thumbnails (square crop).
- */
-async function createCoverCrop(
-  img: HTMLImageElement,
-  targetWidth: number,
-  targetHeight: number,
-  quality: number,
-): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
-  const ctx = canvas.getContext('2d')!;
-
-  const srcAspect = img.naturalWidth / img.naturalHeight;
-  const targetAspect = targetWidth / targetHeight;
-
-  let sx: number, sy: number, sw: number, sh: number;
-
-  if (srcAspect > targetAspect) {
-    // Source is wider — crop sides
-    sh = img.naturalHeight;
-    sw = sh * targetAspect;
-    sx = (img.naturalWidth - sw) / 2;
-    sy = 0;
-  } else {
-    // Source is taller — crop top/bottom
-    sw = img.naturalWidth;
-    sh = sw / targetAspect;
-    sx = 0;
-    sy = (img.naturalHeight - sh) / 2;
-  }
-
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-  return canvasToWebP(canvas, quality);
 }
 
 /**

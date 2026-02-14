@@ -112,7 +112,7 @@ async function uploadSingleFile(
       updateItem(id, { status: 'uploading', progress: 0 });
 
       // Step 1: Generate image variants (if applicable) while requesting presigned URLs
-      let variantsPromise: Promise<{ thumbnail: Blob; preview: Blob } | null> | null = null;
+      let variantsPromise: Promise<{ preview: Blob } | null> | null = null;
       if (canGenerate) {
         variantsPromise = generateImageVariants(file).catch((err) => {
           console.warn('Variant generation failed, uploading original only:', err);
@@ -131,7 +131,6 @@ async function uploadSingleFile(
 
       if (canGenerate) {
         presignBody.variants = [
-          { suffix: '_thumb.webp', contentType: 'image/webp' },
           { suffix: '_preview.webp', contentType: 'image/webp' },
         ];
       }
@@ -158,24 +157,15 @@ async function uploadSingleFile(
       updateItem(id, { progress: 80 });
 
       // Step 4: Upload variants (progress 80-90%)
-      let thumbnailR2Key: string | undefined;
       let previewR2Key: string | undefined;
 
       if (canGenerate && variantsPromise && presignData.variants) {
         const variants = await variantsPromise;
         if (variants) {
-          const thumbVariant = presignData.variants.find((v: any) => v.suffix === '_thumb.webp');
           const previewVariant = presignData.variants.find((v: any) => v.suffix === '_preview.webp');
 
-          // Upload thumbnail and preview in parallel
+          // Upload preview
           const variantUploads: Promise<void>[] = [];
-
-          if (thumbVariant) {
-            thumbnailR2Key = thumbVariant.r2Key;
-            variantUploads.push(
-              uploadBlob(thumbVariant.url, variants.thumbnail, 'image/webp')
-            );
-          }
 
           if (previewVariant) {
             previewR2Key = previewVariant.r2Key;
@@ -212,7 +202,6 @@ async function uploadSingleFile(
           fileSize: file.size,
           width,
           height,
-          thumbnailR2Key,
           previewR2Key,
         }),
       });
