@@ -47,17 +47,14 @@ export function GalleryPageClient({
     useEffect(() => {
         setError('');
         if (activeAlbum === null) {
-            // Back to "All" — restore initial data (or fetch fresh if desired, but sticking to simple reset for now)
-            // Actually, if we want real-time, better to fetch fresh even for "All" if we switched back.
-            // But preserving initial behavior:
             setMedia(initialMedia);
             setHasMore(initialMedia.length < totalCount);
         } else {
-            // Album selected — fetch from scratch
+            // Album selected — fetch from scratch (null cursor = start from newest)
             setMedia([]);
             setHasMore(true);
             setLoading(true);
-            getPublicGalleryPage(eventHash, 0, activeAlbum, albumNamesRef.current)
+            getPublicGalleryPage(eventHash, null, activeAlbum, albumNamesRef.current)
                 .then(({ media: newMedia, hasMore: more }) => {
                     setMedia(newMedia);
                     setHasMore(more);
@@ -67,17 +64,18 @@ export function GalleryPageClient({
         }
     }, [activeAlbum, eventHash, initialMedia, totalCount]);
 
-    // Load more photos
+    // Load more photos — cursor-based: pass created_at of last loaded item
     const loadMore = useCallback(async () => {
         if (loadingRef.current || !hasMore) return;
         loadingRef.current = true;
         setLoading(true);
         setError('');
         try {
-            const currentLength = media.length;
+            const lastItem = media[media.length - 1];
+            const cursor = lastItem?.created_at || null;
             const { media: newMedia, hasMore: more } = await getPublicGalleryPage(
                 eventHash,
-                currentLength,
+                cursor,
                 activeAlbum,
                 albumNamesRef.current,
             );
@@ -94,7 +92,7 @@ export function GalleryPageClient({
             setLoading(false);
             loadingRef.current = false;
         }
-    }, [hasMore, eventHash, media.length, activeAlbum]);
+    }, [hasMore, eventHash, media, activeAlbum]);
 
     // Intersection observer for infinite scroll
     useEffect(() => {
@@ -114,19 +112,30 @@ export function GalleryPageClient({
         return () => observer.disconnect();
     }, [hasMore, loading, loadMore]);
 
-    // Heartbeat: check every 5min if gallery is still public
+    // Heartbeat: check ~every 5min if gallery is still public
+    // Random jitter (±1 min) prevents all 2K clients from hitting at the same instant
     useEffect(() => {
-        const interval = setInterval(async () => {
+        let timeout: ReturnType<typeof setTimeout>;
+        let stopped = false;
+
+        const check = async () => {
             try {
                 const res = await fetch(`/api/gallery/check?hash=${eventHash}`);
                 const data = await res.json();
                 if (!data.public) {
                     setRevoked(true);
-                    clearInterval(interval);
+                    return; // stop scheduling
                 }
             } catch { /* skip */ }
-        }, 300_000);
-        return () => clearInterval(interval);
+            if (!stopped) {
+                const jitter = 240_000 + Math.random() * 120_000; // 4–6 min
+                timeout = setTimeout(check, jitter);
+            }
+        };
+
+        const initialDelay = 240_000 + Math.random() * 120_000;
+        timeout = setTimeout(check, initialDelay);
+        return () => { stopped = true; clearTimeout(timeout); };
     }, [eventHash]);
 
     const handleCopyLink = async () => {

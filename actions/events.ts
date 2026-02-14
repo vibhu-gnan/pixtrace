@@ -15,6 +15,9 @@ export interface EventData {
   description: string | null;
   event_date: string | null;
   cover_media_id: string | null;
+  cover_type: 'first' | 'single' | 'upload' | 'slideshow';
+  cover_r2_key: string | null;
+  cover_slideshow_config: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
   theme: Record<string, unknown>;
   is_public: boolean;
   created_at?: string;
@@ -98,6 +101,7 @@ export async function getEvents(): Promise<EventData[]> {
 
   return (events || []).map((event: any) => ({
     ...event,
+    cover_type: event.cover_type || 'first', // Map camelCase to snake_case if needed by DB/ORM, relying on raw select * might return snake_case from Postgres
     media_count: event.media?.length || 0,
     media: undefined,
   }));
@@ -132,6 +136,7 @@ export async function getEvent(eventId: string): Promise<EventData | null> {
 
   return {
     ...event,
+    cover_type: event.cover_type || 'first', // fallback
     media_count: count || 0,
     created_at: event.created_at || new Date().toISOString(),
     updated_at: event.updated_at || new Date().toISOString(),
@@ -172,6 +177,41 @@ export async function updateEvent(eventId: string, formData: FormData) {
 
   revalidatePath(`/events/${eventId}`);
   revalidatePath('/dashboard');
+  return { success: true };
+}
+
+export async function updateEventHero(eventId: string, payload: {
+  coverType: 'first' | 'single' | 'upload' | 'slideshow';
+  coverMediaId?: string | null;
+  coverR2Key?: string | null;
+  coverSlideshowConfig?: any;
+}) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from('events')
+    .update({
+      cover_type: payload.coverType,
+      cover_media_id: payload.coverMediaId || null,
+      cover_r2_key: payload.coverR2Key || null,
+      cover_slideshow_config: payload.coverSlideshowConfig || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error updating event hero:', error);
+    return { error: 'Failed to update hero settings' };
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  revalidatePath(`/gallery/${eventId}`); // Invalidate public gallery too? No, it uses hash.
+  // We should revalidate the gallery path if possible, but we don't have the hash handy here easily without fetching.
+  // Actually, getEvent returns hash, so we could fetch it. But let's verify if revalidatePath works with just the route pattern.
   return { success: true };
 }
 

@@ -36,19 +36,26 @@ export async function getPublicGallery(eventHash: string): Promise<{
     media: GalleryMediaItem[];
     albums: { id: string; name: string }[];
     totalCount: number;
+    hero: {
+        type: 'image' | 'slideshow';
+        urls: string[];
+    } | null;
 }> {
     const supabase = await createClient();
 
     // 1. Fetch the event (RLS ensures only public events are returned)
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('id, name, description, event_date')
+        .select(`
+            id, name, description, event_date,
+            cover_type, cover_media_id, cover_r2_key, cover_slideshow_config
+        `)
         .eq('event_hash', eventHash)
         .eq('is_public', true)
         .single();
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0 };
+        return { event: null, media: [], albums: [], totalCount: 0, hero: null };
     }
 
     // 2. Fetch albums for this event
@@ -74,7 +81,7 @@ export async function getPublicGallery(eventHash: string): Promise<{
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0 };
+        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, hero: null };
     }
 
     // Build album name lookup
@@ -85,22 +92,88 @@ export async function getPublicGallery(eventHash: string): Promise<{
 
     const media = mapMediaRows(mediaRows || [], albumMap);
 
+    // 5. Resolve Hero Content
+    let hero: { type: 'image' | 'slideshow'; urls: string[] } | null = null;
+    const coverType = event.cover_type || 'first';
+
+    try {
+        if (coverType === 'single' && event.cover_media_id) {
+            // Fetch single media item
+            const { data: coverMedia } = await supabase
+                .from('media')
+                .select('r2_key, preview_r2_key, media_type')
+                .eq('id', event.cover_media_id)
+                .single();
+
+            if (coverMedia && coverMedia.media_type === 'image') {
+                // Prioritize preview, then original, then generic fallback logic (though preview should exist)
+                // Using getPreviewUrl
+                const url = getPreviewUrl(coverMedia.r2_key, coverMedia.preview_r2_key);
+                hero = { type: 'image', urls: [url] };
+            }
+        } else if (coverType === 'upload' && event.cover_r2_key) {
+            // Use R2 key - we treat this as "original" quality for cover, 
+            // but we might want a utility that just returns the public URL.
+            // Assuming getOriginalUrl works for any R2 key in the public bucket
+            // logic is: `${R2_PUBLIC_URL}/${key}`
+            const url = getOriginalUrl(event.cover_r2_key);
+            hero = { type: 'image', urls: [url] };
+        } else if (coverType === 'slideshow' && event.cover_slideshow_config) {
+            const config = event.cover_slideshow_config as any;
+            let slideRows: any[] = [];
+
+            if (config.type === 'album' && config.albumId) {
+                const { data } = await supabase
+                    .from('media')
+                    .select('r2_key, preview_r2_key')
+                    .eq('album_id', config.albumId)
+                    .eq('media_type', 'image')
+                    .order('created_at', { ascending: false })
+                    .limit(10); // Limit slideshow to 10 recent/top items? or user selection?
+                slideRows = data || [];
+            } else if (config.type === 'custom' && config.mediaIds?.length) {
+                const { data } = await supabase
+                    .from('media')
+                    .select('r2_key, preview_r2_key')
+                    .in('id', config.mediaIds)
+                    .eq('media_type', 'image');
+                // Re-order based on input array? Postgres IN doesn't guarantee order.
+                // For now, just use what we get.
+                slideRows = data || [];
+            }
+
+            if (slideRows.length > 0) {
+                const urls = slideRows.map(r => getPreviewUrl(r.r2_key, r.preview_r2_key));
+                hero = { type: 'slideshow', urls };
+            }
+        }
+    } catch (e) {
+        console.error('Error resolving hero:', e);
+        // Fallback to null -> client uses first image
+    }
+
+    // Default 'first' falls back to client logic (using first media item),
+    // but we can also explicitly return it here if we wanted. 
+    // For now, null hero implies "use default/first".
+
     return {
         event,
         media,
         albums: (albums || []).map(a => ({ id: a.id, name: a.name })),
         totalCount: count || 0,
+        hero,
     };
 }
 
 /**
- * Fetch a page of media for a public gallery.
- * Used for infinite scroll — client calls this with increasing offsets.
+ * Fetch a page of media for a public gallery using cursor-based pagination.
+ * `cursor` is the `created_at` timestamp of the last loaded item.
+ * Cursor pagination is O(1) regardless of depth — no row scanning.
  * albumNames is passed from the client (already loaded on initial page) to avoid re-querying albums.
  */
 export async function getPublicGalleryPage(
     eventHash: string,
-    offset: number,
+    cursor?: string | null,
     albumId?: string | null,
     albumNames?: Record<string, string>,
 ): Promise<{
@@ -124,19 +197,23 @@ export async function getPublicGalleryPage(
     // Use album names from client instead of re-fetching
     const albumMap = new Map<string, string>(Object.entries(albumNames || {}));
 
-    // Build query
+    // Build query — cursor-based: "give me items older than this timestamp"
     let query = supabase
         .from('media')
         .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
         .order('created_at', { ascending: false });
 
+    if (cursor) {
+        query = query.lt('created_at', cursor);
+    }
+
     if (albumId) {
         query = query.eq('album_id', albumId);
     }
 
     // Fetch one extra to determine hasMore
-    const { data: mediaRows, error } = await query.range(offset, offset + PAGE_SIZE);
+    const { data: mediaRows, error } = await query.limit(PAGE_SIZE + 1);
 
     if (error) {
         console.error('Error fetching gallery page:', error);
