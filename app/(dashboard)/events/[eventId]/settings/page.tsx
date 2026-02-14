@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getEvent } from '@/actions/events';
 import { DeleteEventButton } from '@/components/dashboard/delete-event-button';
+import { EditEventDetails } from '@/components/dashboard/edit-event-details';
 import { QRCodeGenerator } from '@/components/dashboard/qr-code-generator';
 import { EventLinkActions } from '@/components/event/event-link-actions';
 
@@ -45,7 +46,16 @@ export default async function SettingsPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Event Details */}
         <div className="lg:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Event Details</h2>
+          <div className="flex items-center gap-2 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">Event Details</h2>
+            <EditEventDetails
+              eventId={eventId}
+              name={event.name}
+              description={event.description}
+              eventDate={event.event_date}
+              isPublic={event.is_public}
+            />
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
             <div>
