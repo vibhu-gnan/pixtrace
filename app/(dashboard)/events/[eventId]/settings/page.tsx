@@ -29,17 +29,19 @@ export default async function SettingsPage({
 
   const formattedDate = event.event_date
     ? new Date(event.event_date).toLocaleDateString('en-US', {
-        month: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+    })
+    : '\u2014';
+
+  const formattedCreatedAt = event.created_at
+    ? new Date(event.created_at).toLocaleDateString('en-US', {
         day: '2-digit',
+        month: 'short',
         year: 'numeric',
       })
     : '\u2014';
-
-  const formattedCreatedAt = new Date(event.created_at).toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
 
   return (
     <div>
