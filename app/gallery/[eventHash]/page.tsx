@@ -29,7 +29,7 @@ export default async function GalleryEventPage({
   return (
     <main className="min-h-screen bg-white">
       {/* ── Hero Section ─────────────────────────────────── */}
-      <section className="relative w-full h-[60vh] min-h-[400px] max-h-[600px] overflow-hidden">
+      <section className="relative w-full h-screen overflow-hidden">
         {coverUrl ? (
           <img
             src={coverUrl}
