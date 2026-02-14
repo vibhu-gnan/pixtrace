@@ -174,7 +174,7 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
             </div>
 
             {/* ── Photo Grid ───────────────────────────────────── */}
-            <div className="px-0.5 py-0.5">
+            <div>
                 <GalleryGrid media={media} albumFilter={activeAlbum} />
             </div>
         </>
