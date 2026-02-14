@@ -33,45 +33,10 @@ export function GalleryPageClient({
     const [error, setError] = useState('');
     const [revoked, setRevoked] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [showNewPhotos, setShowNewPhotos] = useState(false);
-
-    // Store the timestamp of the last known media item to detect updates
-    const [latestTimestamp, setLatestTimestamp] = useState<string | null>(
-        initialMedia.length > 0 ? initialMedia[0].created_at || null : null
-    );
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
-    const latestTimestampRef = useRef(latestTimestamp);
-    const activeAlbumRef = useRef(activeAlbum);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Refresh function
-    const refreshGallery = useCallback(async () => {
-        setLoading(true);
-        setError('');
-        setShowNewPhotos(false);
-        try {
-            const { media: newMedia, hasMore: more } = await getPublicGalleryPage(
-                eventHash,
-                0, // Reset to page 0
-                activeAlbum,
-            );
-            setMedia(newMedia);
-            setHasMore(more);
-            // Update latest timestamp from the new first item
-            /* We will update this via the check API or deriving from newMedia */
-        } catch {
-            setError('Failed to refresh photos');
-        } finally {
-            setLoading(false);
-        }
-    }, [eventHash, activeAlbum]);
-
-    const refreshGalleryRef = useRef(refreshGallery);
-    useEffect(() => { latestTimestampRef.current = latestTimestamp; }, [latestTimestamp]);
-    useEffect(() => { activeAlbumRef.current = activeAlbum; }, [activeAlbum]);
-    useEffect(() => { refreshGalleryRef.current = refreshGallery; }, [refreshGallery]);
 
     // Reset when album changes
     useEffect(() => {
@@ -143,34 +108,18 @@ export function GalleryPageClient({
         return () => observer.disconnect();
     }, [hasMore, loading, loadMore]);
 
-    // Heartbeat: check every 10s (faster updates)
-    // Uses refs to avoid restarting the interval when values change
+    // Heartbeat: check every 5min if gallery is still public
     useEffect(() => {
         const interval = setInterval(async () => {
             try {
                 const res = await fetch(`/api/gallery/check?hash=${eventHash}`);
                 const data = await res.json();
-
                 if (!data.public) {
                     setRevoked(true);
                     clearInterval(interval);
-                    return;
-                }
-
-                const currentTimestamp = latestTimestampRef.current;
-                if (data.last_updated && currentTimestamp && data.last_updated > currentTimestamp) {
-                    setLatestTimestamp(data.last_updated);
-
-                    if (window.scrollY < 100 && !activeAlbumRef.current) {
-                        refreshGalleryRef.current();
-                    } else {
-                        setShowNewPhotos(true);
-                    }
-                } else if (data.last_updated && !currentTimestamp) {
-                    setLatestTimestamp(data.last_updated);
                 }
             } catch { /* skip */ }
-        }, 10_000);
+        }, 300_000);
         return () => clearInterval(interval);
     }, [eventHash]);
 
@@ -285,27 +234,6 @@ export function GalleryPageClient({
                     </div>
                 </div>
             </div>
-
-            {/* ── New Photos Notification ───────────────────────── */}
-            {showNewPhotos && (
-                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-4 duration-300">
-                    <button
-                        onClick={() => {
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                            refreshGallery();
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-full shadow-lg hover:bg-blue-500 transition-colors"
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 2v6h-6" />
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-                            <path d="M3 22v-6h6" />
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-                        </svg>
-                        New photos available
-                    </button>
-                </div>
-            )}
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className="px-1 pt-1">
