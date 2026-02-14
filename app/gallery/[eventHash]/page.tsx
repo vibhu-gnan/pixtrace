@@ -85,12 +85,14 @@ export default async function GalleryEventPage({
               {formattedDate}
             </p>
           )}
-          <a
-            href="#gallery"
+          <button
+            onClick={() => {
+              document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' });
+            }}
             className="mt-6 px-6 py-2.5 border-2 border-white text-white text-sm font-semibold tracking-widest uppercase hover:bg-white hover:text-black transition-colors duration-300"
           >
             View Gallery
-          </a>
+          </button>
         </div>
       </section>
 

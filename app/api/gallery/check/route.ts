@@ -10,12 +10,28 @@ export async function GET(request: Request) {
     }
 
     const supabase = await createClient();
-    const { data } = await supabase
+    const { data: event } = await supabase
         .from('events')
-        .select('is_public')
+        .select('id, is_public')
         .eq('event_hash', hash)
         .eq('is_public', true)
         .single();
 
-    return NextResponse.json({ public: !!data });
+    if (!event) {
+        return NextResponse.json({ public: false });
+    }
+
+    // Get the timestamp of the latest media item
+    const { data: latestMedia } = await supabase
+        .from('media')
+        .select('created_at')
+        .eq('event_id', event.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+    return NextResponse.json({
+        public: true,
+        last_updated: latestMedia?.created_at || null
+    });
 }

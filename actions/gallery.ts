@@ -22,6 +22,7 @@ export interface GalleryMediaItem {
     blur_url: string;
     full_url: string;
     original_url: string;
+    created_at: string;
 }
 
 const PAGE_SIZE = 30;
@@ -66,7 +67,7 @@ export async function getPublicGallery(eventHash: string): Promise<{
     // 4. Fetch first page of media
     const { data: mediaRows, error: mediaError } = await supabase
         .from('media')
-        .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key')
+        .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
         .order('created_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
@@ -132,7 +133,7 @@ export async function getPublicGalleryPage(
     // Build query
     let query = supabase
         .from('media')
-        .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key')
+        .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
         .order('created_at', { ascending: false });
 
@@ -176,6 +177,7 @@ function mapMediaRows(
         blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
         full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
         original_url: item.media_type === 'image' ? getOriginalUrl(item.r2_key) : '',
+        created_at: item.created_at,
     }));
 }
 

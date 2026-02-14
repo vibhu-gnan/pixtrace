@@ -31,12 +31,44 @@ export function GalleryPageClient({
     const [error, setError] = useState('');
     const [revoked, setRevoked] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [showNewPhotos, setShowNewPhotos] = useState(false);
+
+    // Store the timestamp of the last known media item to detect updates
+    const [latestTimestamp, setLatestTimestamp] = useState<string | null>(
+        initialMedia.length > 0 ? initialMedia[0].created_at || null : null
+    ); // Note: GalleryMediaItem needs created_at in interface? Actions return it?
+    // Let's check actions/gallery.ts again.
+
     const sentinelRef = useRef<HTMLDivElement>(null);
+
+    // Refresh function
+    const refreshGallery = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        setShowNewPhotos(false);
+        try {
+            const { media: newMedia, hasMore: more } = await getPublicGalleryPage(
+                eventHash,
+                0, // Reset to page 0
+                activeAlbum,
+            );
+            setMedia(newMedia);
+            setHasMore(more);
+            // Update latest timestamp from the new first item
+            /* We will update this via the check API or deriving from newMedia */
+        } catch {
+            setError('Failed to refresh photos');
+        } finally {
+            setLoading(false);
+        }
+    }, [eventHash, activeAlbum]);
 
     // Reset when album changes
     useEffect(() => {
         if (activeAlbum === null) {
-            // Back to "All" — restore initial data
+            // Back to "All" — restore initial data (or fetch fresh if desired, but sticking to simple reset for now)
+            // Actually, if we want real-time, better to fetch fresh even for "All" if we switched back.
+            // But preserving initial behavior:
             setMedia(initialMedia);
             setHasMore(initialMedia.length < totalCount);
         } else {
@@ -97,20 +129,40 @@ export function GalleryPageClient({
         return () => observer.disconnect();
     }, [hasMore, loading, loadMore]);
 
-    // Heartbeat: check every 30s if the gallery is still public
+    // Heartbeat: check every 10s (faster updates)
     useEffect(() => {
         const interval = setInterval(async () => {
             try {
                 const res = await fetch(`/api/gallery/check?hash=${eventHash}`);
                 const data = await res.json();
+
                 if (!data.public) {
                     setRevoked(true);
                     clearInterval(interval);
+                    return;
                 }
+
+                // Check for updates
+                if (data.last_updated && latestTimestamp && data.last_updated > latestTimestamp) {
+                    // Update detected!
+                    setLatestTimestamp(data.last_updated); // Update strict tracker
+
+                    if (window.scrollY < 100 && !activeAlbum) {
+                        // At top and viewing all -> Auto refresh
+                        refreshGallery();
+                    } else {
+                        // Scrolled down or filtered -> Show notification
+                        setShowNewPhotos(true);
+                    }
+                } else if (data.last_updated && !latestTimestamp) {
+                    // First Sync
+                    setLatestTimestamp(data.last_updated);
+                }
+
             } catch { /* skip */ }
-        }, 30_000);
+        }, 10_000); // 10s interval
         return () => clearInterval(interval);
-    }, [eventHash]);
+    }, [eventHash, latestTimestamp, activeAlbum, refreshGallery]);
 
     const handleCopyLink = async () => {
         const url = window.location.href;
@@ -173,39 +225,41 @@ export function GalleryPageClient({
 
                             {/* Album tabs */}
                             {albums.length > 1 && (
-                                <nav className="flex items-center gap-1 flex-shrink-0">
-                                    <button
-                                        onClick={() => setActiveAlbum(null)}
-                                        className={`px-3 py-1 text-xs font-medium tracking-wide uppercase whitespace-nowrap transition-colors ${activeAlbum === null
-                                            ? 'text-gray-900 border-b-2 border-gray-900'
-                                            : 'text-gray-400 hover:text-gray-600'
-                                            }`}
-                                    >
-                                        All
-                                    </button>
-                                    {albums.map((album) => {
-                                        const isActive = activeAlbum === album.id;
-                                        return (
-                                            <button
-                                                key={album.id}
-                                                onClick={() => setActiveAlbum(album.id)}
-                                                className={`px-3 py-1 text-xs font-medium tracking-wide uppercase whitespace-nowrap transition-colors ${isActive
-                                                    ? 'text-gray-900 border-b-2 border-gray-900'
-                                                    : 'text-gray-400 hover:text-gray-600'
-                                                    }`}
-                                            >
-                                                {album.name}
-                                            </button>
-                                        );
-                                    })}
-                                </nav>
+                                <div className="relative group flex-shrink-0">
+                                    <nav className="flex items-center gap-2 pr-12">
+                                        <button
+                                            onClick={() => setActiveAlbum(null)}
+                                            className={`px-4 py-1.5 text-xs font-semibold tracking-wide uppercase whitespace-nowrap rounded-full transition-all ${activeAlbum === null
+                                                ? 'bg-gray-900 text-white shadow-sm'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                                                }`}
+                                        >
+                                            All
+                                        </button>
+                                        {albums.map((album) => {
+                                            const isActive = activeAlbum === album.id;
+                                            return (
+                                                <button
+                                                    key={album.id}
+                                                    onClick={() => setActiveAlbum(album.id)}
+                                                    className={`px-4 py-1.5 text-xs font-semibold tracking-wide uppercase whitespace-nowrap rounded-full transition-all ${isActive
+                                                        ? 'bg-gray-900 text-white shadow-sm'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                                                        }`}
+                                                >
+                                                    {album.name}
+                                                </button>
+                                            );
+                                        })}
+                                    </nav>
+                                    {/* Gradient to indicate scroll */}
+                                    <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+                                </div>
                             )}
                         </div>
 
                         {/* Right: Action icons */}
                         <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-
-
                             {/* Copy link */}
                             <button
                                 onClick={handleCopyLink}
@@ -248,6 +302,27 @@ export function GalleryPageClient({
                     </div>
                 </div>
             </div>
+
+            {/* ── New Photos Notification ───────────────────────── */}
+            {showNewPhotos && (
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <button
+                        onClick={() => {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            refreshGallery();
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-full shadow-lg hover:bg-blue-500 transition-colors"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 2v6h-6" />
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                            <path d="M3 22v-6h6" />
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
+                        New photos available
+                    </button>
+                </div>
+            )}
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className="px-1 pt-1">
