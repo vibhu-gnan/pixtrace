@@ -1,12 +1,45 @@
 import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 import { getPublicGallery } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 
+type Props = {
+  params: Promise<{ eventHash: string }>;
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { eventHash } = await params;
+  const { event, media } = await getPublicGallery(eventHash);
+
+  if (!event) {
+    return {
+      title: 'Gallery Not Found',
+    };
+  }
+
+  const coverImage = media.find((m) => m.media_type === 'image');
+  const coverUrl = coverImage?.full_url || coverImage?.original_url;
+
+  return {
+    title: `${event.name} | PIXTRACE Gallery`,
+    description: event.description || `View photos from ${event.name}`,
+    openGraph: {
+      title: event.name,
+      description: event.description || `View photos from ${event.name}`,
+      images: coverUrl ? [{ url: coverUrl }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: event.name,
+      description: event.description || `View photos from ${event.name}`,
+      images: coverUrl ? [coverUrl] : [],
+    },
+  };
+}
+
 export default async function GalleryEventPage({
   params,
-}: {
-  params: Promise<{ eventHash: string }>;
-}) {
+}: Props) {
   const { eventHash } = await params;
   const { event, media, albums, totalCount } = await getPublicGallery(eventHash);
 

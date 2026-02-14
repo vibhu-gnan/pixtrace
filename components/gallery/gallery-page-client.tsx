@@ -5,6 +5,8 @@ import { GalleryGrid } from './gallery-grid';
 import { getPublicGalleryPage } from '@/actions/gallery';
 import type { GalleryMediaItem } from '@/actions/gallery';
 
+import { GallerySkeleton } from './gallery-skeleton';
+
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
     albums: { id: string; name: string }[];
@@ -259,12 +261,8 @@ export function GalleryPageClient({
             {/* ── Infinite Scroll Sentinel + Loading ───────────── */}
             <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center">
                 {loading && (
-                    <div className="flex items-center gap-2 text-gray-400">
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" />
-                        </svg>
-                        <span className="text-sm">Loading more photos…</span>
+                    <div className="w-full">
+                        <GallerySkeleton />
                     </div>
                 )}
                 {error && (
