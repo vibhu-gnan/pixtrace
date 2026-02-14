@@ -9,10 +9,7 @@ export interface GalleryEvent {
     description: string | null;
     event_date: string | null;
     event_hash?: string;
-    cover_type?: string;
     cover_media_id?: string | null;
-    cover_r2_key?: string | null;
-    cover_slideshow_config?: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
 }
 
 export interface GalleryMediaItem {
@@ -48,7 +45,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     // 1. Fetch Event Details (by hash OR slug)
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('id, name, description, event_date, event_hash, cover_type, cover_media_id, cover_r2_key, cover_slideshow_config')
+        .select('id, name, description, event_date, event_hash, cover_media_id')
         .or(`event_hash.eq.${identifier},slug.eq.${identifier}`)
         .eq('is_public', true)
         .single();

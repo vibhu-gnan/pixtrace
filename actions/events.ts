@@ -15,9 +15,6 @@ export interface EventData {
   description: string | null;
   event_date: string | null;
   cover_media_id: string | null;
-  cover_type: 'first' | 'single' | 'upload' | 'slideshow';
-  cover_r2_key: string | null;
-  cover_slideshow_config: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
   theme: Record<string, unknown>;
   is_public: boolean;
   view_count?: number;
@@ -180,10 +177,7 @@ export async function updateEvent(eventId: string, formData: FormData) {
 }
 
 export async function updateEventHero(eventId: string, payload: {
-  coverType: 'first' | 'single' | 'upload' | 'slideshow';
   coverMediaId?: string | null;
-  coverR2Key?: string | null;
-  coverSlideshowConfig?: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
 }) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
@@ -193,10 +187,7 @@ export async function updateEventHero(eventId: string, payload: {
   const { error } = await supabase
     .from('events')
     .update({
-      cover_type: payload.coverType,
       cover_media_id: payload.coverMediaId || null,
-      cover_r2_key: payload.coverR2Key || null,
-      cover_slideshow_config: payload.coverSlideshowConfig || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', eventId)

@@ -3,7 +3,7 @@ import { getAlbums } from '@/actions/albums';
 import { getEvent } from '@/actions/events';
 import { PhotosPageClient } from '@/components/event/photos-page-client';
 import { notFound } from 'next/navigation';
-import { getOriginalUrl } from '@/lib/storage/cloudflare-images';
+
 
 export default async function PhotosPage({
   params,
@@ -20,14 +20,13 @@ export default async function PhotosPage({
     getAlbums(eventId),
   ]);
 
-  // Compute cover preview URL server-side (avoids client env var issues)
+  // Compute cover preview URL server-side
   let savedCoverPreviewUrl: string | null = null;
-  if (event.cover_type === 'upload' && event.cover_r2_key) {
-    savedCoverPreviewUrl = getOriginalUrl(event.cover_r2_key);
-  } else if (event.cover_type === 'single' && event.cover_media_id) {
+  if (event.cover_media_id) {
     const found = media.find(m => m.id === event.cover_media_id);
     savedCoverPreviewUrl = found?.thumbnail_url ?? null;
-  } else if (event.cover_type === 'first' && media.length > 0) {
+  }
+  if (!savedCoverPreviewUrl && media.length > 0) {
     const firstImage = media.find(m => m.media_type === 'image');
     savedCoverPreviewUrl = firstImage?.thumbnail_url ?? null;
   }

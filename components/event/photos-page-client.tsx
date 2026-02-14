@@ -110,7 +110,7 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
     event.cover_media_id ?? null
   );
   const [coverSlideshowSelectedIds, setCoverSlideshowSelectedIds] = useState<Set<string>>(
-    new Set(event.cover_slideshow_config?.mediaIds || [])
+    new Set()
   );
 
   // ─── Computed Values ─────────────────────────────────────

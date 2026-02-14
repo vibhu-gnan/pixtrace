@@ -20,9 +20,7 @@ export default async function EventLayout({
 
   // Compute cover preview URL for sidebar display
   let coverPreviewUrl: string | null = null;
-  if (event.cover_type === 'upload' && event.cover_r2_key) {
-    coverPreviewUrl = getOriginalUrl(event.cover_r2_key);
-  } else if (event.cover_type === 'single' && event.cover_media_id) {
+  if (event.cover_media_id) {
     const supabase = createAdminClient();
     const { data: mediaRow } = await supabase
       .from('media')
