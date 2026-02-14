@@ -111,8 +111,8 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
                                                 key={album.id}
                                                 onClick={() => setActiveAlbum(isActive ? null : album.id)}
                                                 className={`px-3 py-1 text-xs font-medium tracking-wide uppercase whitespace-nowrap transition-colors ${isActive
-                                                        ? 'text-gray-900 border-b-2 border-gray-900'
-                                                        : 'text-gray-400 hover:text-gray-600'
+                                                    ? 'text-gray-900 border-b-2 border-gray-900'
+                                                    : 'text-gray-400 hover:text-gray-600'
                                                     }`}
                                             >
                                                 {album.name}
@@ -174,7 +174,7 @@ export function GalleryPageClient({ media, albums, eventHash, eventName, descrip
             </div>
 
             {/* ── Photo Grid ───────────────────────────────────── */}
-            <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2">
+            <div className="px-0.5 py-0.5">
                 <GalleryGrid media={media} albumFilter={activeAlbum} />
             </div>
         </>
