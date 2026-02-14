@@ -22,7 +22,7 @@ export interface GalleryMediaItem {
     blur_url: string;
     full_url: string;
     original_url: string;
-    created_at: string;
+    created_at?: string;
 }
 
 const PAGE_SIZE = 30;
@@ -177,7 +177,7 @@ function mapMediaRows(
         blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
         full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
         original_url: item.media_type === 'image' ? getOriginalUrl(item.r2_key) : '',
-        created_at: item.created_at,
+        created_at: item.created_at || new Date().toISOString(), // Fallback for old items
     }));
 }
 
