@@ -33,10 +33,15 @@ interface PhotoLightboxProps {
   onClose: () => void;
 }
 
+const SWIPE_THRESHOLD = 50;
+const LIGHTBOX_STATE_KEY = 'pixtrace-lightbox';
+
 export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const pushedStateRef = useRef(false);
 
   const currentPhoto = media[currentIndex];
   const canGoPrev = currentIndex > 0;
@@ -125,6 +130,26 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
     };
   }, [currentIndex, isOpen, currentPhoto, media]);
 
+  // History: back button (browser/phone) closes lightbox instead of leaving page
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined' || !window.history) return;
+    if (pushedStateRef.current) return;
+
+    const state = { [LIGHTBOX_STATE_KEY]: true };
+    window.history.pushState(state, '', window.location.href);
+    pushedStateRef.current = true;
+
+    const handlePopState = () => {
+      pushedStateRef.current = false;
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose]);
+
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -135,13 +160,13 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
       } else if (e.key === 'ArrowRight' && canGoNext) {
         handleNext();
       } else if (e.key === 'Escape') {
-        onClose();
+        handleClose();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentIndex, canGoPrev, canGoNext]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, currentIndex, canGoPrev, canGoNext, handleClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePrevious = useCallback(() => {
     if (canGoPrev) {
@@ -155,6 +180,31 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
     }
   }, [canGoNext]);
 
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      if (touchStartX.current === null) return;
+      const endX = e.changedTouches[0].clientX;
+      const deltaX = touchStartX.current - endX;
+      touchStartX.current = null;
+      if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+      if (deltaX > 0 && canGoNext) handleNext();
+      else if (deltaX < 0 && canGoPrev) handlePrevious();
+    },
+    [canGoNext, canGoPrev, handleNext, handlePrevious]
+  );
+
+  const handleClose = useCallback(() => {
+    if (pushedStateRef.current && typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else {
+      onClose();
+    }
+  }, [onClose]);
+
   if (!currentPhoto) return null;
 
   // Determine which image to display based on loading phase
@@ -166,13 +216,18 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
         : currentPhoto.original_url;
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/95 z-50 backdrop-blur-sm" />
-        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4 focus:outline-none">
+        <Dialog.Content
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 focus:outline-none"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClose();
+          }}
+        >
           {/* Close button */}
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
             aria-label="Close lightbox"
           >
@@ -203,8 +258,12 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
             </button>
           )}
 
-          {/* Main image display */}
-          <div className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center">
+          {/* Main image display — touch area for swipe navigation */}
+          <div
+            className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center touch-none"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             <img
               src={displayImage}
               alt={currentPhoto.original_filename}
@@ -219,16 +278,6 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
                   Loading full resolution...
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Image filename and dimensions */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-black/50 text-white text-xs max-w-md truncate">
-            {currentPhoto.original_filename}
-            {currentPhoto.width && currentPhoto.height && (
-              <span className="ml-2 text-white/60">
-                {currentPhoto.width} x {currentPhoto.height}
-              </span>
             )}
           </div>
         </Dialog.Content>
