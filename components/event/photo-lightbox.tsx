@@ -163,11 +163,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
   }, [canGoNext]);
 
   const handleClose = useCallback(() => {
-    if (pushedStateRef.current && typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-    } else {
-      onClose();
-    }
+    onClose();
   }, [onClose]);
 
   // Keyboard navigation
@@ -258,11 +254,14 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
             </button>
           )}
 
-          {/* Main image display — touch area for swipe navigation */}
+          {/* Main image display — touch area for swipe; click empty sides to close */}
           <div
-            className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center touch-none"
+            className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center touch-none cursor-default"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) handleClose();
+            }}
           >
             <img
               src={displayImage}
