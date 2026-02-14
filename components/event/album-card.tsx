@@ -138,6 +138,85 @@ function DeleteConfirmModal({ albumName, mediaCount, onConfirm, onCancel, loadin
   );
 }
 
+// ─── Rename Album Modal ──────────────────────────────────────
+interface RenameAlbumModalProps {
+  album: AlbumData;
+  onConfirm: (formData: FormData) => void;
+  onCancel: () => void;
+  loading: boolean;
+  error?: string;
+}
+
+function RenameAlbumModal({ album, onConfirm, onCancel, loading, error }: RenameAlbumModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Edit Album
+        </h3>
+
+        <form action={onConfirm} className="space-y-4">
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+            <input
+              type="text"
+              name="name"
+              id="name"
+              defaultValue={album.name}
+              required
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              name="description"
+              id="description"
+              defaultValue={album.description || ''}
+              rows={3}
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
 // ─── Album Card Component ────────────────────────────────────
 
 interface AlbumCardProps {
@@ -150,19 +229,39 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
   const router = useRouter();
   const [from, to] = getGradient(album.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleDelete = async () => {
-    setDeleting(true);
+    setLoading(true);
     const result = await deleteAlbum(album.id, album.event_id);
     if (result.error) {
       console.error('Failed to delete album:', result.error);
-      setDeleting(false);
+      setLoading(false);
       setShowDeleteConfirm(false);
     } else {
       router.refresh();
       setShowDeleteConfirm(false);
-      setDeleting(false);
+      setLoading(false);
+    }
+  };
+
+  const handleRename = async (formData: FormData) => {
+    setLoading(true);
+    setError('');
+    // Dynamic import to avoid cycle if updateAlbum is in same file (it's not, just good practice)
+    const { updateAlbum } = await import('@/actions/albums');
+
+    const result = await updateAlbum(album.id, album.event_id, formData);
+
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      router.refresh();
+      setShowRenameModal(false);
+      setLoading(false);
     }
   };
 
@@ -198,6 +297,16 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
             className="absolute top-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.stopPropagation()}
           >
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRenameModal(true);
+              }}
+              className="p-1.5 rounded-full bg-white/80 text-blue-500 hover:bg-blue-50 hover:text-blue-600 backdrop-blur-sm transition-colors shadow-sm cursor-pointer"
+              aria-label="Edit album"
+            >
+              <EditIcon />
+            </span>
             <span
               className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm cursor-pointer"
               aria-label="Share"
@@ -251,7 +360,18 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
           mediaCount={album.media_count || 0}
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
-          loading={deleting}
+          loading={loading}
+        />
+      )}
+
+      {/* Rename modal */}
+      {showRenameModal && (
+        <RenameAlbumModal
+          album={album}
+          onConfirm={handleRename}
+          onCancel={() => { setShowRenameModal(false); setError(''); }}
+          loading={loading}
+          error={error}
         />
       )}
     </>
