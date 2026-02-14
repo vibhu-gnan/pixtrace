@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type { EventData } from '@/actions/events';
+import { deleteEvent } from '@/actions/events';
 
 // ─── SVG Icons ───────────────────────────────────────────────
 
@@ -34,6 +36,17 @@ function DotsIcon({ className }: { className?: string }) {
       <circle cx="12" cy="5" r="2" />
       <circle cx="12" cy="12" r="2" />
       <circle cx="12" cy="19" r="2" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
     </svg>
   );
 }
@@ -76,6 +89,8 @@ interface EventCardProps {
 
 export function EventCard({ event }: EventCardProps) {
   const [from, to] = getGradient(event.name);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const formattedDate = event.event_date
     ? new Date(event.event_date).toLocaleDateString('en-US', {
@@ -85,7 +100,18 @@ export function EventCard({ event }: EventCardProps) {
       })
     : null;
 
+  const handleDelete = async () => {
+    setDeleteLoading(true);
+    try {
+      await deleteEvent(event.id);
+    } catch {
+      setDeleteLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   return (
+    <>
     <Link
       href={`/events/${event.id}`}
       className="block rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg border border-gray-100 transition-all duration-200 group"
@@ -113,7 +139,11 @@ export function EventCard({ event }: EventCardProps) {
         </div>
 
         {/* Action icons — top right */}
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
             onClick={(e) => e.preventDefault()}
             className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
@@ -127,6 +157,18 @@ export function EventCard({ event }: EventCardProps) {
             aria-label="More options"
           >
             <DotsIcon />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowDeleteConfirm(true);
+            }}
+            className="p-1.5 rounded-full bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 backdrop-blur-sm transition-colors shadow-sm"
+            aria-label="Delete event"
+          >
+            <TrashIcon />
           </button>
         </div>
 
@@ -166,6 +208,36 @@ export function EventCard({ event }: EventCardProps) {
         </div>
       </div>
     </Link>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4">
+            <p className="text-sm text-gray-700">
+              Delete &quot;{event.name}&quot;? This will remove the event and all its photos. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteLoading}
+                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-500 disabled:opacity-50"
+              >
+                {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
