@@ -68,6 +68,7 @@ export const events = pgTable('events', {
     customCss?: string;
   }>().default(sql`'{}'::jsonb`),
   isPublic: boolean('is_public').default(true).notNull(),
+  viewCount: integer('view_count').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

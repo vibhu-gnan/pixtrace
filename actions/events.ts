@@ -20,6 +20,7 @@ export interface EventData {
   cover_slideshow_config: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
   theme: Record<string, unknown>;
   is_public: boolean;
+  view_count?: number;
   created_at?: string;
   updated_at?: string;
   albums?: { id: string; name: string; sort_order: number }[];

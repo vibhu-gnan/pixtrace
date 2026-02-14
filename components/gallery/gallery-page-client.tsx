@@ -43,6 +43,14 @@ export function GalleryPageClient({
         Object.fromEntries(albums.map(a => [a.id, a.name]))
     );
 
+    // Track gallery view — fire once on mount, non-blocking
+    useEffect(() => {
+        fetch(`/api/gallery/view?hash=${eventHash}`, {
+            method: 'POST',
+            keepalive: true, // survives page unload
+        }).catch(() => {}); // swallow errors — view counting is non-critical
+    }, [eventHash]);
+
     // Reset when album changes
     useEffect(() => {
         setError('');

@@ -121,6 +121,10 @@ export default async function SettingsPage({
                 <p className="text-base text-gray-900">{formattedCreatedAt}</p>
               </div>
               <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">Gallery Views</p>
+                <p className="text-base text-gray-900">{(event.view_count || 0).toLocaleString()}</p>
+              </div>
+              <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Status</p>
                 <p className="text-base text-gray-900">
                   {event.is_public ? (

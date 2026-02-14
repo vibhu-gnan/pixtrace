@@ -203,7 +203,9 @@ export function EventCard({ event }: EventCardProps) {
           </div>
           <div>
             <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Views</p>
-            <p className="text-base font-bold text-gray-900">&mdash;</p>
+            <p className="text-base font-bold text-gray-900">
+              {formatCount(event.view_count || 0)}
+            </p>
           </div>
         </div>
       </div>
