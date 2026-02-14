@@ -8,110 +8,120 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { eventHash } = await params;
-  const { event, media } = await getPublicGallery(eventHash);
+  try {
+    const { eventHash } = await params;
+    const { event, media } = await getPublicGallery(eventHash);
 
-  if (!event) {
+    if (!event) {
+      return {
+        title: 'Gallery Not Found',
+      };
+    }
+
+    const coverImage = media.find((m) => m.media_type === 'image');
+    const coverUrl = coverImage?.full_url || coverImage?.original_url;
+
     return {
-      title: 'Gallery Not Found',
+      title: `${event.name} | PIXTRACE Gallery`,
+      description: event.description || `View photos from ${event.name}`,
+      openGraph: {
+        title: event.name,
+        description: event.description || `View photos from ${event.name}`,
+        images: coverUrl ? [{ url: coverUrl }] : [],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: event.name,
+        description: event.description || `View photos from ${event.name}`,
+        images: coverUrl ? [coverUrl] : [],
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching metadata:', error);
+    return {
+      title: 'PIXTRACE Gallery',
     };
   }
-
-  const coverImage = media.find((m) => m.media_type === 'image');
-  const coverUrl = coverImage?.full_url || coverImage?.original_url;
-
-  return {
-    title: `${event.name} | PIXTRACE Gallery`,
-    description: event.description || `View photos from ${event.name}`,
-    openGraph: {
-      title: event.name,
-      description: event.description || `View photos from ${event.name}`,
-      images: coverUrl ? [{ url: coverUrl }] : [],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: event.name,
-      description: event.description || `View photos from ${event.name}`,
-      images: coverUrl ? [coverUrl] : [],
-    },
-  };
 }
 
 export default async function GalleryEventPage({
   params,
 }: Props) {
-  const { eventHash } = await params;
-  const { event, media, albums, totalCount } = await getPublicGallery(eventHash);
+  try {
+    const { eventHash } = await params;
+    const { event, media, albums, totalCount } = await getPublicGallery(eventHash);
 
-  if (!event) {
+    if (!event) {
+      notFound();
+    }
+
+    const formattedDate = event.event_date
+      ? new Date(event.event_date).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+      : null;
+
+    // Use the first image as the hero cover photo
+    const coverImage = media.find((m) => m.media_type === 'image');
+    const coverUrl = coverImage?.full_url || coverImage?.original_url || '';
+
+    return (
+      <main className="min-h-screen bg-white">
+        {/* ── Hero Section ─────────────────────────────────── */}
+        <section className="relative w-full h-screen overflow-hidden">
+          {coverUrl ? (
+            <img
+              src={coverUrl}
+              alt={event.name}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gray-800" />
+          )}
+          {/* Dark gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
+
+          {/* Centered event info */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10 px-4">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-center uppercase">
+              {event.name}
+            </h1>
+            {formattedDate && (
+              <p className="mt-2 text-sm sm:text-base text-white/80 tracking-wide">
+                {formattedDate}
+              </p>
+            )}
+            <a
+              href="#gallery"
+              className="mt-6 inline-block px-6 py-2.5 border-2 border-white text-white text-sm font-semibold tracking-widest uppercase hover:bg-white hover:text-black transition-colors duration-300"
+            >
+              View Gallery
+            </a>
+          </div>
+        </section>
+
+        {/* ── Gallery Content ──────────────────────────────── */}
+        <div id="gallery">
+          <GalleryPageClient
+            initialMedia={media}
+            albums={albums}
+            eventHash={eventHash}
+            eventName={event.name}
+            description={event.description}
+            totalCount={totalCount}
+          />
+        </div>
+
+        {/* Footer */}
+        <footer className="py-8 text-center border-t border-gray-100">
+          <p className="text-xs text-gray-400">Powered by PIXTRACE</p>
+        </footer>
+      </main>
+    );
+  } catch (error) {
+    console.error('Error in GalleryEventPage:', error);
     notFound();
   }
-
-  const formattedDate = event.event_date
-    ? new Date(event.event_date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    : null;
-
-  // Use the first image as the hero cover photo
-  const coverImage = media.find((m) => m.media_type === 'image');
-  const coverUrl = coverImage?.full_url || coverImage?.original_url || '';
-
-  return (
-    <main className="min-h-screen bg-white">
-      {/* ── Hero Section ─────────────────────────────────── */}
-      <section className="relative w-full h-screen overflow-hidden">
-        {coverUrl ? (
-          <img
-            src={coverUrl}
-            alt={event.name}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gray-800" />
-        )}
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
-
-        {/* Centered event info */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10 px-4">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-center uppercase">
-            {event.name}
-          </h1>
-          {formattedDate && (
-            <p className="mt-2 text-sm sm:text-base text-white/80 tracking-wide">
-              {formattedDate}
-            </p>
-          )}
-          <button
-            onClick={() => {
-              document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="mt-6 px-6 py-2.5 border-2 border-white text-white text-sm font-semibold tracking-widest uppercase hover:bg-white hover:text-black transition-colors duration-300"
-          >
-            View Gallery
-          </button>
-        </div>
-      </section>
-
-      {/* ── Gallery Content ──────────────────────────────── */}
-      <div id="gallery">
-        <GalleryPageClient
-          initialMedia={media}
-          albums={albums}
-          eventHash={eventHash}
-          eventName={event.name}
-          description={event.description}
-          totalCount={totalCount}
-        />
-      </div>
-
-      {/* Footer */}
-      <footer className="py-8 text-center border-t border-gray-100">
-        <p className="text-xs text-gray-400">Powered by PIXTRACE</p>
-      </footer>
-    </main>
-  );
 }
