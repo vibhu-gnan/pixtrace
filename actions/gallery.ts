@@ -8,6 +8,11 @@ export interface GalleryEvent {
     name: string;
     description: string | null;
     event_date: string | null;
+    event_hash?: string;
+    cover_type?: string;
+    cover_media_id?: string | null;
+    cover_r2_key?: string | null;
+    cover_slideshow_config?: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
 }
 
 export interface GalleryMediaItem {
@@ -31,26 +36,20 @@ const PAGE_SIZE = 30;
  * Fetch a public event and its first page of media by event_hash.
  * No auth required — RLS policies enforce is_public=true.
  */
-export async function getPublicGallery(eventHash: string): Promise<{
+export async function getPublicGallery(identifier: string): Promise<{
     event: GalleryEvent | null;
     media: GalleryMediaItem[];
     albums: { id: string; name: string }[];
     totalCount: number;
-    hero: {
-        type: 'image' | 'slideshow';
-        urls: string[];
-    } | null;
+    hero: { type: 'image' | 'slideshow'; urls: string[] } | null;
 }> {
     const supabase = await createClient();
 
-    // 1. Fetch the event (RLS ensures only public events are returned)
+    // 1. Fetch Event Details (by hash OR slug)
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select(`
-            id, name, description, event_date,
-            cover_type, cover_media_id, cover_r2_key, cover_slideshow_config
-        `)
-        .eq('event_hash', eventHash)
+        .select('id, name, description, event_date, event_hash, cover_type, cover_media_id, cover_r2_key, cover_slideshow_config')
+        .or(`event_hash.eq.${identifier},slug.eq.${identifier}`)
         .eq('is_public', true)
         .single();
 
@@ -92,76 +91,12 @@ export async function getPublicGallery(eventHash: string): Promise<{
 
     const media = mapMediaRows(mediaRows || [], albumMap);
 
-    // 5. Resolve Hero Content
-    let hero: { type: 'image' | 'slideshow'; urls: string[] } | null = null;
-    const coverType = event.cover_type || 'first';
-
-    try {
-        if (coverType === 'single' && event.cover_media_id) {
-            // Fetch single media item
-            const { data: coverMedia } = await supabase
-                .from('media')
-                .select('r2_key, preview_r2_key, media_type')
-                .eq('id', event.cover_media_id)
-                .single();
-
-            if (coverMedia && coverMedia.media_type === 'image') {
-                // Prioritize preview, then original, then generic fallback logic (though preview should exist)
-                // Using getPreviewUrl
-                const url = getPreviewUrl(coverMedia.r2_key, coverMedia.preview_r2_key);
-                hero = { type: 'image', urls: [url] };
-            }
-        } else if (coverType === 'upload' && event.cover_r2_key) {
-            // Use R2 key - we treat this as "original" quality for cover, 
-            // but we might want a utility that just returns the public URL.
-            // Assuming getOriginalUrl works for any R2 key in the public bucket
-            // logic is: `${R2_PUBLIC_URL}/${key}`
-            const url = getOriginalUrl(event.cover_r2_key);
-            hero = { type: 'image', urls: [url] };
-        } else if (coverType === 'slideshow' && event.cover_slideshow_config) {
-            const config = event.cover_slideshow_config as any;
-            let slideRows: any[] = [];
-
-            if (config.type === 'album' && config.albumId) {
-                const { data } = await supabase
-                    .from('media')
-                    .select('r2_key, preview_r2_key')
-                    .eq('album_id', config.albumId)
-                    .eq('media_type', 'image')
-                    .order('created_at', { ascending: false })
-                    .limit(10); // Limit slideshow to 10 recent/top items? or user selection?
-                slideRows = data || [];
-            } else if (config.type === 'custom' && config.mediaIds?.length) {
-                const { data } = await supabase
-                    .from('media')
-                    .select('r2_key, preview_r2_key')
-                    .in('id', config.mediaIds)
-                    .eq('media_type', 'image');
-                // Re-order based on input array? Postgres IN doesn't guarantee order.
-                // For now, just use what we get.
-                slideRows = data || [];
-            }
-
-            if (slideRows.length > 0) {
-                const urls = slideRows.map(r => getPreviewUrl(r.r2_key, r.preview_r2_key));
-                hero = { type: 'slideshow', urls };
-            }
-        }
-    } catch (e) {
-        console.error('Error resolving hero:', e);
-        // Fallback to null -> client uses first image
-    }
-
-    // Default 'first' falls back to client logic (using first media item),
-    // but we can also explicitly return it here if we wanted. 
-    // For now, null hero implies "use default/first".
-
     return {
         event,
         media,
         albums: (albums || []).map(a => ({ id: a.id, name: a.name })),
         totalCount: count || 0,
-        hero,
+        hero: null,
     };
 }
 

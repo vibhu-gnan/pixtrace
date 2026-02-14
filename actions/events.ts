@@ -102,7 +102,6 @@ export async function getEvents(): Promise<EventData[]> {
 
   return (events || []).map((event: any) => ({
     ...event,
-    cover_type: event.cover_type || 'first', // Map camelCase to snake_case if needed by DB/ORM, relying on raw select * might return snake_case from Postgres
     media_count: event.media?.length || 0,
     media: undefined,
   }));
@@ -137,7 +136,6 @@ export async function getEvent(eventId: string): Promise<EventData | null> {
 
   return {
     ...event,
-    cover_type: event.cover_type || 'first', // fallback
     media_count: count || 0,
     created_at: event.created_at || new Date().toISOString(),
     updated_at: event.updated_at || new Date().toISOString(),
@@ -185,7 +183,7 @@ export async function updateEventHero(eventId: string, payload: {
   coverType: 'first' | 'single' | 'upload' | 'slideshow';
   coverMediaId?: string | null;
   coverR2Key?: string | null;
-  coverSlideshowConfig?: any;
+  coverSlideshowConfig?: { type: 'album' | 'custom'; albumId?: string; mediaIds?: string[] } | null;
 }) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
@@ -210,9 +208,6 @@ export async function updateEventHero(eventId: string, payload: {
   }
 
   revalidatePath(`/events/${eventId}`);
-  revalidatePath(`/gallery/${eventId}`); // Invalidate public gallery too? No, it uses hash.
-  // We should revalidate the gallery path if possible, but we don't have the hash handy here easily without fetching.
-  // Actually, getEvent returns hash, so we could fetch it. But let's verify if revalidatePath works with just the route pattern.
   return { success: true };
 }
 

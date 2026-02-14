@@ -18,7 +18,7 @@ export async function uploadHeroImage(eventId: string, formData: FormData) {
         return { error: 'Invalid file type. Please upload an image.' };
     }
 
-    // Validate file size (e.g., max 10MB)
+    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
         return { error: 'File too large. Maximum size is 10MB.' };
     }
