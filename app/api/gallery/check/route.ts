@@ -17,9 +17,15 @@ export async function GET(request: Request) {
         .eq('is_public', true)
         .single();
 
-    if (!event) {
-        return NextResponse.json({ public: false });
-    }
+    const isPublic = !!event;
+    const res = NextResponse.json({ public: isPublic });
 
-    return NextResponse.json({ public: true });
+    // Edge-cache for 5 min — matches heartbeat interval so all concurrent
+    // viewers share a single cached response instead of each hitting Supabase.
+    res.headers.set(
+        'Cache-Control',
+        's-maxage=300, stale-while-revalidate=60',
+    );
+
+    return res;
 }

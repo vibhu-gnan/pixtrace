@@ -1,17 +1,25 @@
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { getPublicGallery } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
+
+// ISR: serve from edge cache, revalidate every hour
+export const revalidate = 3600;
 
 type Props = {
   params: Promise<{ eventHash: string }>;
   searchParams: Promise<{ photo?: string }>;
 };
 
+// Deduplicate getPublicGallery calls within the same request
+// (generateMetadata + page component share one result)
+const getCachedGallery = cache((eventHash: string) => getPublicGallery(eventHash));
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { eventHash } = await params;
-    const { event, media } = await getPublicGallery(eventHash);
+    const { event, media } = await getCachedGallery(eventHash);
 
     if (!event) {
       return {
@@ -52,7 +60,7 @@ export default async function GalleryEventPage({
   try {
     const { eventHash } = await params;
     const { photo: initialPhotoId } = await searchParams;
-    const { event, media, albums, totalCount } = await getPublicGallery(eventHash);
+    const { event, media, albums, totalCount } = await getCachedGallery(eventHash);
 
     if (!event) {
       notFound();

@@ -96,11 +96,13 @@ export async function getPublicGallery(eventHash: string): Promise<{
 /**
  * Fetch a page of media for a public gallery.
  * Used for infinite scroll — client calls this with increasing offsets.
+ * albumNames is passed from the client (already loaded on initial page) to avoid re-querying albums.
  */
 export async function getPublicGalleryPage(
     eventHash: string,
     offset: number,
     albumId?: string | null,
+    albumNames?: Record<string, string>,
 ): Promise<{
     media: GalleryMediaItem[];
     hasMore: boolean;
@@ -119,16 +121,8 @@ export async function getPublicGalleryPage(
         return { media: [], hasMore: false };
     }
 
-    // Fetch albums for name mapping
-    const { data: albums } = await supabase
-        .from('albums')
-        .select('id, name')
-        .eq('event_id', event.id);
-
-    const albumMap = new Map<string, string>();
-    for (const a of (albums || [])) {
-        albumMap.set(a.id, a.name);
-    }
+    // Use album names from client instead of re-fetching
+    const albumMap = new Map<string, string>(Object.entries(albumNames || {}));
 
     // Build query
     let query = supabase

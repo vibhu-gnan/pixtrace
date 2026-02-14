@@ -38,6 +38,11 @@ export function GalleryPageClient({
     const loadingRef = useRef(false);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Pre-compute album name map to pass to server action (avoids re-querying albums per scroll page)
+    const albumNamesRef = useRef<Record<string, string>>(
+        Object.fromEntries(albums.map(a => [a.id, a.name]))
+    );
+
     // Reset when album changes
     useEffect(() => {
         setError('');
@@ -52,7 +57,7 @@ export function GalleryPageClient({
             setMedia([]);
             setHasMore(true);
             setLoading(true);
-            getPublicGalleryPage(eventHash, 0, activeAlbum)
+            getPublicGalleryPage(eventHash, 0, activeAlbum, albumNamesRef.current)
                 .then(({ media: newMedia, hasMore: more }) => {
                     setMedia(newMedia);
                     setHasMore(more);
@@ -74,6 +79,7 @@ export function GalleryPageClient({
                 eventHash,
                 currentLength,
                 activeAlbum,
+                albumNamesRef.current,
             );
             setMedia((prev) => {
                 // Deduplicate
