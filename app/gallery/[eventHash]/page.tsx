@@ -16,41 +16,64 @@ export default async function GalleryEventPage({
 
   const formattedDate = event.event_date
     ? new Date(event.event_date).toLocaleDateString('en-US', {
-      weekday: 'long',
       month: 'long',
       day: 'numeric',
       year: 'numeric',
     })
     : null;
 
-  return (
-    <main className="min-h-screen bg-gray-50">
-      {/* Event Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Gallery</p>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">{event.name}</h1>
-            {event.description && (
-              <p className="text-gray-500 text-base max-w-xl mx-auto mb-2">{event.description}</p>
-            )}
-            {formattedDate && (
-              <p className="text-sm text-gray-400">{formattedDate}</p>
-            )}
-            <p className="text-xs text-gray-400 mt-3">
-              {media.filter(m => m.media_type === 'image').length} photos
-            </p>
-          </div>
-        </div>
-      </header>
+  // Use the first image as the hero cover photo
+  const coverImage = media.find((m) => m.media_type === 'image');
+  const coverUrl = coverImage?.full_url || coverImage?.original_url || '';
 
-      {/* Gallery Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <GalleryPageClient media={media} albums={albums} eventHash={eventHash} />
+  return (
+    <main className="min-h-screen bg-white">
+      {/* ── Hero Section ─────────────────────────────────── */}
+      <section className="relative w-full h-[60vh] min-h-[400px] max-h-[600px] overflow-hidden">
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt={event.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gray-800" />
+        )}
+        {/* Dark gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
+
+        {/* Centered event info */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10 px-4">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-center uppercase">
+            {event.name}
+          </h1>
+          {formattedDate && (
+            <p className="mt-2 text-sm sm:text-base text-white/80 tracking-wide">
+              {formattedDate}
+            </p>
+          )}
+          <a
+            href="#gallery"
+            className="mt-6 px-6 py-2.5 border-2 border-white text-white text-sm font-semibold tracking-widest uppercase hover:bg-white hover:text-black transition-colors duration-300"
+          >
+            View Gallery
+          </a>
+        </div>
+      </section>
+
+      {/* ── Gallery Content ──────────────────────────────── */}
+      <div id="gallery">
+        <GalleryPageClient
+          media={media}
+          albums={albums}
+          eventHash={eventHash}
+          eventName={event.name}
+          description={event.description}
+        />
       </div>
 
       {/* Footer */}
-      <footer className="py-6 text-center">
+      <footer className="py-8 text-center border-t border-gray-100">
         <p className="text-xs text-gray-400">Powered by PIXTRACE</p>
       </footer>
     </main>

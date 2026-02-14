@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PhotoLightbox } from '@/components/event/photo-lightbox';
 import type { GalleryMediaItem } from '@/actions/gallery';
 import type { MediaItem } from '@/actions/media';
 
-// ─── Gallery Grid ────────────────────────────────────────────
+// ─── Gallery Grid (Masonry) ───────────────────────────────────
 
 interface GalleryGridProps {
     media: GalleryMediaItem[];
@@ -15,6 +15,7 @@ interface GalleryGridProps {
 export function GalleryGrid({ media, albumFilter }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    const [columns, setColumns] = useState(4);
 
     // Register service worker for image caching
     useEffect(() => {
@@ -23,11 +24,51 @@ export function GalleryGrid({ media, albumFilter }: GalleryGridProps) {
         }
     }, []);
 
+    // Responsive column count
+    useEffect(() => {
+        function updateColumns() {
+            const w = window.innerWidth;
+            if (w < 640) setColumns(2);
+            else if (w < 768) setColumns(3);
+            else setColumns(4);
+        }
+        updateColumns();
+        window.addEventListener('resize', updateColumns);
+        return () => window.removeEventListener('resize', updateColumns);
+    }, []);
+
     const filtered = albumFilter
         ? media.filter((m) => m.album_id === albumFilter)
         : media;
 
     const images = filtered.filter((m) => m.media_type === 'image');
+
+    // Build index map for lightbox (must be above early return to satisfy hooks rules)
+    const indexMap = useMemo(() => {
+        const map = new Map<string, number>();
+        images.forEach((img, i) => map.set(img.id, i));
+        return map;
+    }, [images]);
+
+    // Convert to MediaItem format for the lightbox
+    const lightboxMedia: MediaItem[] = useMemo(() => images.map((img) => ({
+        id: img.id,
+        album_id: img.album_id,
+        event_id: '',
+        r2_key: '',
+        original_filename: img.original_filename,
+        media_type: img.media_type,
+        mime_type: null,
+        file_size: 0,
+        width: img.width,
+        height: img.height,
+        processing_status: 'completed',
+        created_at: '',
+        thumbnail_url: img.thumbnail_url,
+        blur_url: img.blur_url,
+        full_url: img.full_url,
+        original_url: img.original_url,
+    })), [images]);
 
     if (images.length === 0) {
         return (
@@ -45,38 +86,40 @@ export function GalleryGrid({ media, albumFilter }: GalleryGridProps) {
         );
     }
 
-    // Convert to MediaItem format for the lightbox (which expects MediaItem[])
-    const lightboxMedia: MediaItem[] = images.map((img) => ({
-        id: img.id,
-        album_id: img.album_id,
-        event_id: '',
-        r2_key: '',
-        original_filename: img.original_filename,
-        media_type: img.media_type,
-        mime_type: null,
-        file_size: 0,
-        width: img.width,
-        height: img.height,
-        processing_status: 'completed',
-        created_at: '',
-        thumbnail_url: img.thumbnail_url,
-        blur_url: img.blur_url,
-        full_url: img.full_url,
-        original_url: img.original_url,
-    }));
+    // Distribute images into columns for masonry layout
+    const columnArrays: GalleryMediaItem[][] = Array.from({ length: columns }, () => []);
+    const columnHeights = new Array(columns).fill(0);
+
+    images.forEach((img) => {
+        const minIdx = columnHeights.indexOf(Math.min(...columnHeights));
+        columnArrays[minIdx].push(img);
+        const w = img.width || 3;
+        const h = img.height || 4;
+        columnHeights[minIdx] += h / w;
+    });
+
+    function openLightbox(imageId: string) {
+        const idx = indexMap.get(imageId);
+        if (idx !== undefined) {
+            setLightboxIndex(idx);
+            setLightboxOpen(true);
+        }
+    }
 
     return (
         <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
-                {images.map((item, index) => (
-                    <GalleryThumbnail
-                        key={item.id}
-                        item={item}
-                        onClick={() => {
-                            setLightboxIndex(index);
-                            setLightboxOpen(true);
-                        }}
-                    />
+            {/* Masonry grid */}
+            <div className="flex gap-1" style={{ alignItems: 'flex-start' }}>
+                {columnArrays.map((col, colIdx) => (
+                    <div key={colIdx} className="flex-1 flex flex-col gap-1">
+                        {col.map((item) => (
+                            <MasonryThumbnail
+                                key={item.id}
+                                item={item}
+                                onClick={() => openLightbox(item.id)}
+                            />
+                        ))}
+                    </div>
                 ))}
             </div>
 
@@ -92,9 +135,9 @@ export function GalleryGrid({ media, albumFilter }: GalleryGridProps) {
     );
 }
 
-// ─── Gallery Thumbnail ───────────────────────────────────────
+// ─── Masonry Thumbnail ───────────────────────────────────────
 
-function GalleryThumbnail({
+function MasonryThumbnail({
     item,
     onClick,
 }: {
@@ -102,7 +145,6 @@ function GalleryThumbnail({
     onClick: () => void;
 }) {
     const [loaded, setLoaded] = useState(false);
-    // Fallback chain: preview → thumbnail → original
     const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
 
     const handleImageError = () => {
@@ -113,14 +155,20 @@ function GalleryThumbnail({
         }
     };
 
+    // Natural aspect ratio from metadata (fallback to 4:3)
+    const w = item.width || 4;
+    const h = item.height || 3;
+    const aspect = `${w} / ${h}`;
+
     return (
         <div
-            className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer"
-            style={
-                item.blur_url
+            className="relative overflow-hidden bg-gray-100 group cursor-pointer"
+            style={{
+                aspectRatio: aspect,
+                ...(item.blur_url
                     ? { backgroundImage: `url(${item.blur_url})`, backgroundSize: 'cover' }
-                    : undefined
-            }
+                    : {}),
+            }}
             onClick={onClick}
         >
             <img
@@ -129,8 +177,7 @@ function GalleryThumbnail({
                 loading="lazy"
                 onLoad={() => setLoaded(true)}
                 onError={handleImageError}
-                className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'
-                    }`}
+                className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
         </div>
