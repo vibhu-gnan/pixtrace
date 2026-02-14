@@ -162,8 +162,8 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
     loadingPhase === 'thumbnail'
       ? currentPhoto.thumbnail_url
       : loadingPhase === 'preview' || loadingPhase === 'loading_original'
-      ? currentPhoto.full_url
-      : currentPhoto.original_url;
+        ? currentPhoto.full_url
+        : currentPhoto.original_url;
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -179,10 +179,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
             <CloseIcon className="text-white" />
           </button>
 
-          {/* Image counter */}
-          <div className="absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full bg-black/50 text-white text-sm font-medium">
-            {currentIndex + 1} / {media.length}
-          </div>
+
 
           {/* Previous button */}
           {canGoPrev && (
@@ -211,9 +208,8 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose }: PhotoLig
             <img
               src={displayImage}
               alt={currentPhoto.original_filename}
-              className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${
-                loadingPhase === 'thumbnail' ? 'opacity-70' : 'opacity-100'
-              }`}
+              className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${loadingPhase === 'thumbnail' ? 'opacity-70' : 'opacity-100'
+                }`}
             />
 
             {/* Loading indicator during original load */}

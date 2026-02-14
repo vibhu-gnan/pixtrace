@@ -154,9 +154,7 @@ export function GalleryPageClient({
         );
     }
 
-    const imageCount = activeAlbum === null
-        ? totalCount
-        : media.filter(m => m.media_type === 'image').length;
+
 
     return (
         <>
@@ -206,9 +204,7 @@ export function GalleryPageClient({
 
                         {/* Right: Action icons */}
                         <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                            <span className="text-xs text-gray-400 mr-2 hidden sm:block">
-                                {imageCount} photos
-                            </span>
+
 
                             {/* Copy link */}
                             <button
