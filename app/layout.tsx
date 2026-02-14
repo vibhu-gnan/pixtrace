@@ -15,6 +15,19 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined') {
+                window.addEventListener('error', function(e) {
+                  if (e.message && e.message.includes('Loading chunk')) {
+                    window.location.reload();
+                  }
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
