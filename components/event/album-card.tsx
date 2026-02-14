@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { deleteAlbum } from '@/actions/albums';
+import { deleteAlbum, updateAlbum } from '@/actions/albums';
 import type { AlbumData } from '@/actions/albums';
 
 // ─── SVG Icons ───────────────────────────────────────────────
@@ -170,7 +170,8 @@ function RenameAlbumModal({ album, onConfirm, onCancel, loading, error }: Rename
               id="name"
               defaultValue={album.name}
               required
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="mt-1 block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+              autoFocus
             />
           </div>
 
@@ -181,7 +182,7 @@ function RenameAlbumModal({ album, onConfirm, onCancel, loading, error }: Rename
               id="description"
               defaultValue={album.description || ''}
               rows={3}
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="mt-1 block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
             />
           </div>
 
@@ -250,9 +251,6 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
   const handleRename = async (formData: FormData) => {
     setLoading(true);
     setError('');
-    // Dynamic import to avoid cycle if updateAlbum is in same file (it's not, just good practice)
-    const { updateAlbum } = await import('@/actions/albums');
-
     const result = await updateAlbum(album.id, album.event_id, formData);
 
     if (result.error) {
