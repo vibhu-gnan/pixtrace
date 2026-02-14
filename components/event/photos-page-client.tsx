@@ -10,8 +10,10 @@ import { AlbumCard } from './album-card';
 import { CreateAlbumCard } from './create-album-card';
 import { AlbumsEmptyState } from './albums-empty-state';
 import { CreateAlbumForm } from '@/components/dashboard/create-album-form';
+import { CoverBar } from './cover-bar';
 import type { MediaItem } from '@/actions/media';
 import type { AlbumData } from '@/actions/albums';
+import type { EventData } from '@/actions/events';
 
 // ─── Constants ───────────────────────────────────────────────
 
@@ -81,9 +83,11 @@ interface PhotosPageClientProps {
   eventName: string;
   media: MediaItem[];
   albums: AlbumData[];
+  event: EventData;
+  savedCoverPreviewUrl: string | null;
 }
 
-function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }: PhotosPageClientProps) {
+function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, event, savedCoverPreviewUrl }: PhotosPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const albumIdFromUrl = searchParams.get('album');
@@ -99,6 +103,15 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
   // Default to 'photos' view if there are photos, otherwise show albums
   const [viewMode, setViewMode] = useState<ViewMode>(media.length > 0 ? 'photos' : 'albums');
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
+
+  // ─── Cover Selection State ─────────────────────────────────
+  const [coverSelectionMode, setCoverSelectionMode] = useState<null | 'single' | 'slideshow-custom'>(null);
+  const [coverSingleSelectedId, setCoverSingleSelectedId] = useState<string | null>(
+    event.cover_media_id ?? null
+  );
+  const [coverSlideshowSelectedIds, setCoverSlideshowSelectedIds] = useState<Set<string>>(
+    new Set(event.cover_slideshow_config?.mediaIds || [])
+  );
 
   // ─── Computed Values ─────────────────────────────────────
   const photoCount = useMemo(() => media.filter((m) => m.media_type === 'image').length, [media]);
@@ -264,12 +277,62 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
     setActiveAlbumId(null);
   }, []);
 
+  // ─── Cover Selection Handlers ──────────────────────────────
+
+  const handleCoverPhotoClick = useCallback(
+    (mediaId: string) => {
+      if (coverSelectionMode === 'single') {
+        setCoverSingleSelectedId(mediaId);
+      } else if (coverSelectionMode === 'slideshow-custom') {
+        setCoverSlideshowSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(mediaId)) next.delete(mediaId);
+          else next.add(mediaId);
+          return next;
+        });
+      }
+    },
+    [coverSelectionMode]
+  );
+
+  // When entering cover selection mode while in albums view, auto-switch to photos
+  useEffect(() => {
+    if (coverSelectionMode && viewMode === 'albums') {
+      setViewMode('photos');
+    }
+  }, [coverSelectionMode, viewMode]);
+
+  // Compute the set of cover-selected IDs to pass to PhotoGrid
+  const coverSelectedIds = useMemo(() => {
+    if (coverSelectionMode === 'single') {
+      return coverSingleSelectedId ? new Set([coverSingleSelectedId]) : new Set<string>();
+    }
+    if (coverSelectionMode === 'slideshow-custom') {
+      return coverSlideshowSelectedIds;
+    }
+    return new Set<string>();
+  }, [coverSelectionMode, coverSingleSelectedId, coverSlideshowSelectedIds]);
+
   const pendingCount = items.filter((i) => i.status === 'pending').length;
 
   // ─── Render ──────────────────────────────────────────────
 
   return (
     <div>
+      {/* Cover Bar — gallery cover configuration */}
+      <CoverBar
+        event={event}
+        media={media.filter(m => m.media_type === 'image')}
+        albums={dropdownAlbums}
+        savedCoverPreviewUrl={savedCoverPreviewUrl}
+        coverSelectionMode={coverSelectionMode}
+        onEnterSelectionMode={setCoverSelectionMode}
+        coverSingleSelectedId={coverSingleSelectedId}
+        onCoverSingleSelectedChange={setCoverSingleSelectedId}
+        coverSlideshowSelectedIds={coverSlideshowSelectedIds}
+        onCoverSlideshowSelectedChange={setCoverSlideshowSelectedIds}
+      />
+
       {/* Upload Banner — shows during/after uploads */}
       <UploadBanner eventName={eventName} />
 
@@ -278,12 +341,15 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
 
       {/* Upload drop zone */}
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors mb-6 ${dragActive
-          ? 'border-brand-500 bg-brand-50'
-          : 'border-gray-300 hover:border-gray-400 bg-white'
+        onDragOver={coverSelectionMode ? undefined : (e) => { e.preventDefault(); setDragActive(true); }}
+        onDragLeave={coverSelectionMode ? undefined : () => setDragActive(false)}
+        onDrop={coverSelectionMode ? undefined : handleDrop}
+        className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors mb-6 ${
+          coverSelectionMode
+            ? 'border-gray-200 bg-gray-50 opacity-50 pointer-events-none'
+            : dragActive
+              ? 'border-brand-500 bg-brand-50'
+              : 'border-gray-300 hover:border-gray-400 bg-white'
           }`}
       >
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -421,7 +487,13 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums }:
         )
       ) : (
         // ─── Photos View ─────────────────────────────────────
-        <PhotoGrid media={filteredMedia} eventId={eventId} />
+        <PhotoGrid
+          media={filteredMedia}
+          eventId={eventId}
+          coverSelectionMode={coverSelectionMode}
+          coverSelectedIds={coverSelectedIds}
+          onCoverPhotoClick={coverSelectionMode ? handleCoverPhotoClick : undefined}
+        />
       )}
     </div>
   );

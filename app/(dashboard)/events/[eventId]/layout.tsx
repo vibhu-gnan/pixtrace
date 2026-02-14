@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getEvent } from '@/actions/events';
 import { EventLayoutShell } from '@/components/event/event-layout-shell';
+import { getOriginalUrl, getPreviewUrl } from '@/lib/storage/cloudflare-images';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export default async function EventLayout({
   children,
@@ -16,5 +18,25 @@ export default async function EventLayout({
     notFound();
   }
 
-  return <EventLayoutShell event={event}>{children}</EventLayoutShell>;
+  // Compute cover preview URL for sidebar display
+  let coverPreviewUrl: string | null = null;
+  if (event.cover_type === 'upload' && event.cover_r2_key) {
+    coverPreviewUrl = getOriginalUrl(event.cover_r2_key);
+  } else if (event.cover_type === 'single' && event.cover_media_id) {
+    const supabase = createAdminClient();
+    const { data: mediaRow } = await supabase
+      .from('media')
+      .select('r2_key, preview_r2_key')
+      .eq('id', event.cover_media_id)
+      .single();
+    if (mediaRow) {
+      coverPreviewUrl = getPreviewUrl(mediaRow.r2_key, mediaRow.preview_r2_key);
+    }
+  }
+
+  return (
+    <EventLayoutShell event={event} coverPreviewUrl={coverPreviewUrl}>
+      {children}
+    </EventLayoutShell>
+  );
 }

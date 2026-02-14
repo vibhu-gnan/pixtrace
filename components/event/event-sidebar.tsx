@@ -67,9 +67,10 @@ interface EventSidebarProps {
   eventId: string;
   open: boolean;
   onClose: () => void;
+  coverPreviewUrl: string | null;
 }
 
-export function EventSidebar({ eventId, open, onClose }: EventSidebarProps) {
+export function EventSidebar({ eventId, open, onClose, coverPreviewUrl }: EventSidebarProps) {
   const pathname = usePathname();
 
   const navItems = [
@@ -100,16 +101,31 @@ export function EventSidebar({ eventId, open, onClose }: EventSidebarProps) {
           </button>
         </div>
 
-        {/* Cover Page section */}
+        {/* Cover Page preview */}
         <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 text-center mb-2">Cover Page</p>
-          <div className="border-2 border-dashed border-gray-300 rounded-xl bg-gray-50/50 h-36 flex flex-col items-center justify-center">
-            <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZjNmNGY2Ii8+PHJlY3QgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNmM2Y0ZjYiLz48L3N2Zz4=')] rounded-lg flex items-center justify-center">
-              <button className="px-3 py-1.5 bg-brand-500 text-white text-xs font-medium rounded-lg hover:bg-brand-600 transition-colors shadow-sm">
-                Upload from computer
-              </button>
+          <p className="text-sm font-medium text-gray-700 text-center mb-2">Cover Photo</p>
+          <Link
+            href={`/events/${eventId}/photos`}
+            onClick={onClose}
+            className="block relative rounded-xl overflow-hidden h-36 bg-gray-100 border border-gray-200 hover:border-brand-400 transition-colors group"
+            title="Edit cover photo"
+          >
+            {coverPreviewUrl ? (
+              <img
+                src={coverPreviewUrl}
+                alt="Cover preview"
+                className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-gray-400">
+                <PhotoIcon />
+                <span className="text-xs">Set cover photo</span>
+              </div>
+            )}
+            <div className="absolute inset-0 flex items-end justify-center pb-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-xs bg-black/60 text-white px-2.5 py-1 rounded-full">Edit cover</span>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
 

@@ -1,12 +1,10 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { getEvent } from '@/actions/events';
 import { DeleteEventButton } from '@/components/dashboard/delete-event-button';
 import { EditEventDetails } from '@/components/dashboard/edit-event-details';
 import { QRCodeGenerator } from '@/components/dashboard/qr-code-generator';
 import { EventLinkActions } from '@/components/event/event-link-actions';
-import { HeroCoverSettings } from '@/components/dashboard/hero-cover-settings';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { getThumbnailUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images'; // For mapping media
 
 export default async function SettingsPage({
   params,
@@ -15,33 +13,6 @@ export default async function SettingsPage({
 }) {
   const { eventId } = await params;
   const event = await getEvent(eventId);
-
-  if (!event) {
-    notFound();
-  }
-
-  // Fetch full media list for selectors
-  const supabase = createAdminClient();
-  const { data: mediaRows } = await supabase
-    .from('media')
-    .select('id, r2_key, preview_r2_key, media_type, original_filename')
-    .eq('event_id', eventId)
-    .order('created_at', { ascending: false });
-
-  // Map to GalleryMediaItem shape expected by component
-  const allMedia = (mediaRows || []).map((m: any) => ({
-    id: m.id,
-    album_id: '', // Not needed for selector display mostly, but interface requires it
-    album_name: '',
-    original_filename: m.original_filename,
-    media_type: m.media_type,
-    width: 0,
-    height: 0,
-    thumbnail_url: m.media_type === 'image' ? getThumbnailUrl(m.r2_key, 200, m.preview_r2_key) : '',
-    blur_url: '',
-    full_url: '',
-    original_url: '',
-  }));
 
   if (!event) {
     notFound();
@@ -77,13 +48,22 @@ export default async function SettingsPage({
         {/* Main Settings Column */}
         <div className="lg:col-span-2 space-y-8">
 
-          {/* Hero Cover Settings */}
+          {/* Gallery Cover — redirects to Photos page */}
           <section>
-            <HeroCoverSettings
-              event={event}
-              media={allMedia}
-              albums={event.albums || []}
-            />
+            <div className="bg-white p-6 rounded-lg border border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Gallery Cover</h2>
+                <p className="text-sm text-gray-500">
+                  Cover photo settings are now managed from the Photos page.
+                </p>
+              </div>
+              <Link
+                href={`/events/${eventId}/photos`}
+                className="px-4 py-2 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors flex-shrink-0"
+              >
+                Go to Photos
+              </Link>
+            </div>
           </section>
 
           {/* Event Details */}

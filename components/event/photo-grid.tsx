@@ -103,9 +103,12 @@ function DeleteConfirmModal({ count, onConfirm, onCancel, loading }: DeleteConfi
 interface PhotoGridProps {
   media: MediaItem[];
   eventId?: string;
+  coverSelectionMode?: 'single' | 'slideshow-custom' | null;
+  coverSelectedIds?: Set<string>;
+  onCoverPhotoClick?: (mediaId: string) => void;
 }
 
-export function PhotoGrid({ media, eventId }: PhotoGridProps) {
+export function PhotoGrid({ media, eventId, coverSelectionMode, coverSelectedIds, onCoverPhotoClick }: PhotoGridProps) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
@@ -174,8 +177,24 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
 
   return (
     <div>
-      {/* Selection toolbar */}
-      {eventId && (
+      {/* Cover selection instruction banner */}
+      {coverSelectionMode && (
+        <div className="mb-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <span>
+            {coverSelectionMode === 'single'
+              ? 'Click any photo to set it as the gallery cover'
+              : 'Click photos to add or remove them from the slideshow'}
+          </span>
+        </div>
+      )}
+
+      {/* Selection toolbar — hidden during cover selection */}
+      {eventId && !coverSelectionMode && (
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <button
@@ -235,6 +254,9 @@ export function PhotoGrid({ media, eventId }: PhotoGridProps) {
               setLightboxIndex(idx);
               setLightboxOpen(true);
             }}
+            coverSelectionMode={coverSelectionMode ?? null}
+            isCoverSelected={coverSelectedIds?.has(item.id) ?? false}
+            onCoverClick={onCoverPhotoClick ? () => onCoverPhotoClick(item.id) : undefined}
           />
         ))}
       </div>
@@ -272,14 +294,21 @@ interface PhotoThumbnailProps {
   onSelect: () => void;
   onLongPress: () => void;
   onView: (index: number) => void;
+  coverSelectionMode: 'single' | 'slideshow-custom' | null;
+  isCoverSelected: boolean;
+  onCoverClick?: () => void;
 }
 
-function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLongPress, onView }: PhotoThumbnailProps) {
+function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLongPress, onView, coverSelectionMode, isCoverSelected, onCoverClick }: PhotoThumbnailProps) {
   const [loaded, setLoaded] = useState(false);
   // Fallback chain: preview → thumbnail → original
   const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
 
   const handleClick = () => {
+    if (coverSelectionMode) {
+      onCoverClick?.();
+      return;
+    }
     if (selectionMode) {
       onSelect();
     } else {
@@ -304,20 +333,28 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
   if (item.media_type === 'video') {
     return (
       <div
-        className={`relative aspect-square rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden cursor-pointer ${selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
-          }`}
+        className={`relative aspect-square rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden cursor-pointer ${
+          isCoverSelected && coverSelectionMode ? 'ring-2 ring-amber-400 ring-offset-1' : selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
+        }`}
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
+        onContextMenu={coverSelectionMode ? undefined : handleContextMenu}
       >
         <FilmIcon className="text-white/60" />
         <div className="absolute bottom-1 left-1 right-1">
           <p className="text-[10px] text-white/70 truncate px-1">{item.original_filename}</p>
         </div>
-        {selectionMode && (
+        {selectionMode && !coverSelectionMode && (
           <div className="absolute top-2 left-2 z-10">
             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? 'bg-brand-500 border-brand-500' : 'border-white/80 bg-black/30'
               }`}>
               {selected && <CheckIcon className="text-white" />}
+            </div>
+          </div>
+        )}
+        {isCoverSelected && coverSelectionMode && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center">
+              <CheckIcon className="text-white" />
             </div>
           </div>
         )}
@@ -327,15 +364,20 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
 
   return (
     <div
-      className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
-        }`}
+      className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${
+        isCoverSelected && coverSelectionMode
+          ? 'ring-2 ring-amber-400 ring-offset-1'
+          : selected
+            ? 'ring-2 ring-brand-500 ring-offset-1'
+            : ''
+      }`}
       style={
         item.blur_url
           ? { backgroundImage: `url(${item.blur_url})`, backgroundSize: 'cover' }
           : undefined
       }
       onClick={handleClick}
-      onContextMenu={handleContextMenu}
+      onContextMenu={coverSelectionMode ? undefined : handleContextMenu}
     >
       <img
         src={imgSrc}
@@ -346,13 +388,27 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
         className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'
           }`}
       />
-      <div className={`absolute inset-0 transition-colors ${selected ? 'bg-brand-500/20' : 'bg-black/0 group-hover:bg-black/10'
-        }`} />
-      {selectionMode && (
+      <div className={`absolute inset-0 transition-colors ${
+        isCoverSelected && coverSelectionMode
+          ? 'bg-amber-400/15'
+          : selected
+            ? 'bg-brand-500/20'
+            : 'bg-black/0 group-hover:bg-black/10'
+      }`} />
+      {/* Delete selection indicator */}
+      {selectionMode && !coverSelectionMode && (
         <div className="absolute top-2 left-2 z-10">
           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selected ? 'bg-brand-500 border-brand-500' : 'border-white/80 bg-black/30'
             }`}>
             {selected && <CheckIcon className="text-white" />}
+          </div>
+        </div>
+      )}
+      {/* Cover selection indicator */}
+      {isCoverSelected && coverSelectionMode && (
+        <div className="absolute top-2 right-2 z-10">
+          <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center">
+            <CheckIcon className="text-white" />
           </div>
         </div>
       )}

@@ -8,10 +8,11 @@ import { Footer } from '@/components/dashboard/footer';
 
 interface EventLayoutShellProps {
   event: EventData;
+  coverPreviewUrl?: string | null;
   children: React.ReactNode;
 }
 
-export function EventLayoutShell({ event, children }: EventLayoutShellProps) {
+export function EventLayoutShell({ event, coverPreviewUrl, children }: EventLayoutShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -21,6 +22,7 @@ export function EventLayoutShell({ event, children }: EventLayoutShellProps) {
         eventId={event.id}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        coverPreviewUrl={coverPreviewUrl ?? null}
       />
 
       {/* Main content area */}
