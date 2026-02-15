@@ -103,7 +103,7 @@ function DeleteConfirmModal({ count, onConfirm, onCancel, loading }: DeleteConfi
 interface PhotoGridProps {
   media: MediaItem[];
   eventId?: string;
-  coverSelectionMode?: 'single' | 'slideshow-custom' | null;
+  coverSelectionMode?: 'single' | 'slideshow-custom' | 'slideshow-mobile' | null;
   coverSelectedIds?: Set<string>;
   onCoverPhotoClick?: (mediaId: string) => void;
 }
@@ -294,7 +294,7 @@ interface PhotoThumbnailProps {
   onSelect: () => void;
   onLongPress: () => void;
   onView: (index: number) => void;
-  coverSelectionMode: 'single' | 'slideshow-custom' | null;
+  coverSelectionMode: 'single' | 'slideshow-custom' | 'slideshow-mobile' | null;
   isCoverSelected: boolean;
   onCoverClick?: () => void;
 }
@@ -364,10 +364,10 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
   return (
     <div
       className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${isCoverSelected && coverSelectionMode
-          ? 'ring-2 ring-amber-400 ring-offset-1'
-          : selected
-            ? 'ring-2 ring-brand-500 ring-offset-1'
-            : ''
+        ? 'ring-2 ring-amber-400 ring-offset-1'
+        : selected
+          ? 'ring-2 ring-brand-500 ring-offset-1'
+          : ''
         }`}
       style={
         item.blur_url
@@ -388,10 +388,10 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
           }`}
       />
       <div className={`absolute inset-0 transition-colors ${isCoverSelected && coverSelectionMode
-          ? 'bg-amber-400/15'
-          : selected
-            ? 'bg-brand-500/20'
-            : 'bg-black/0 group-hover:bg-black/10'
+        ? 'bg-amber-400/15'
+        : selected
+          ? 'bg-brand-500/20'
+          : 'bg-black/0 group-hover:bg-black/10'
         }`} />
       {/* Delete selection indicator */}
       {selectionMode && !coverSelectionMode && (
