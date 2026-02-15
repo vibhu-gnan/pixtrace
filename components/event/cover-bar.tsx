@@ -52,12 +52,14 @@ interface CoverBarProps {
   media: MediaItem[];
   albums: { id: string; name: string }[];
   savedCoverPreviewUrl: string | null;
-  coverSelectionMode: null | 'single' | 'slideshow-custom';
-  onEnterSelectionMode: (mode: null | 'single' | 'slideshow-custom') => void;
+  coverSelectionMode: null | 'single' | 'slideshow-custom' | 'slideshow-mobile';
+  onEnterSelectionMode: (mode: null | 'single' | 'slideshow-custom' | 'slideshow-mobile') => void;
   coverSingleSelectedId: string | null;
   onCoverSingleSelectedChange: (id: string | null) => void;
   coverSlideshowSelectedIds: Set<string>;
   onCoverSlideshowSelectedChange: (ids: Set<string>) => void;
+  coverMobileSlideshowSelectedIds: Set<string>;
+  onCoverMobileSlideshowSelectedChange: (ids: Set<string>) => void;
   heroMode: HeroMode;
   onHeroModeChange: (mode: HeroMode) => void;
 }
@@ -74,6 +76,8 @@ export function CoverBar({
   onCoverSingleSelectedChange,
   coverSlideshowSelectedIds,
   onCoverSlideshowSelectedChange,
+  coverMobileSlideshowSelectedIds,
+  onCoverMobileSlideshowSelectedChange,
   heroMode,
   onHeroModeChange,
 }: CoverBarProps) {
@@ -95,17 +99,19 @@ export function CoverBar({
     return savedCoverPreviewUrl;
   }, [heroMode, coverSingleSelectedId, images, savedCoverPreviewUrl]);
 
-  // Ordered array of slideshow selected IDs (preserving Set insertion order)
+  // Ordered arrays for desktop and mobile slideshow
   const slideshowOrderedIds = useMemo(() => [...coverSlideshowSelectedIds], [coverSlideshowSelectedIds]);
+  const mobileOrderedIds = useMemo(() => [...coverMobileSlideshowSelectedIds], [coverMobileSlideshowSelectedIds]);
 
   // Collapsed label
   const coverLabel = useMemo(() => {
     if (heroMode === 'slideshow') {
-      return `Slideshow (${coverSlideshowSelectedIds.size} photo${coverSlideshowSelectedIds.size !== 1 ? 's' : ''})`;
+      const mobileNote = coverMobileSlideshowSelectedIds.size > 0 ? ` + ${coverMobileSlideshowSelectedIds.size} mobile` : '';
+      return `Slideshow (${coverSlideshowSelectedIds.size} desktop${mobileNote})`;
     }
     if (heroMode === 'auto') return 'Auto (first 5 photos)';
     return event.cover_media_id ? 'Selected Photo' : 'First Photo (default)';
-  }, [heroMode, coverSlideshowSelectedIds.size, event.cover_media_id]);
+  }, [heroMode, coverSlideshowSelectedIds.size, coverMobileSlideshowSelectedIds.size, event.cover_media_id]);
 
   // ─── Handlers ──────────────────────────────────────────────
 
@@ -123,6 +129,7 @@ export function CoverBar({
       coverMediaId: heroMode === 'single' ? coverSingleSelectedId : undefined,
       heroMode,
       slideshowMediaIds: heroMode === 'slideshow' ? slideshowOrderedIds : undefined,
+      mobileSlideshowMediaIds: heroMode === 'slideshow' ? mobileOrderedIds : undefined,
       intervalMs: heroMode !== 'single' ? intervalMs : undefined,
     });
     setSaving(false);
@@ -145,6 +152,8 @@ export function CoverBar({
     onHeroModeChange(((event.theme as any)?.hero?.mode as HeroMode) ?? 'single');
     const savedIds = (event.theme as any)?.hero?.slideshowMediaIds;
     onCoverSlideshowSelectedChange(new Set(savedIds ?? []));
+    const savedMobileIds = (event.theme as any)?.hero?.mobileSlideshowMediaIds;
+    onCoverMobileSlideshowSelectedChange(new Set(savedMobileIds ?? []));
     setIntervalMs((event.theme as any)?.hero?.intervalMs ?? 5000);
   };
 
@@ -163,6 +172,12 @@ export function CoverBar({
     const next = new Set(coverSlideshowSelectedIds);
     next.delete(mediaId);
     onCoverSlideshowSelectedChange(next);
+  };
+
+  const handleRemoveFromMobileSlideshow = (mediaId: string) => {
+    const next = new Set(coverMobileSlideshowSelectedIds);
+    next.delete(mediaId);
+    onCoverMobileSlideshowSelectedChange(next);
   };
 
   // ─── Collapsed View ────────────────────────────────────────
@@ -298,52 +313,101 @@ export function CoverBar({
 
         {heroMode === 'slideshow' && (
           <>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-600">
-                {coverSelectionMode === 'slideshow-custom' ? (
-                  <span className="text-amber-700 font-medium">Click photos below to add/remove from slideshow</span>
-                ) : (
-                  <span>{coverSlideshowSelectedIds.size} photo{coverSlideshowSelectedIds.size !== 1 ? 's' : ''} selected</span>
-                )}
-              </p>
-              <button
-                onClick={() => onEnterSelectionMode(coverSelectionMode === 'slideshow-custom' ? null : 'slideshow-custom')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'slideshow-custom'
-                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-              >
-                {coverSelectionMode === 'slideshow-custom' ? 'Done Selecting' : 'Select Photos'}
-              </button>
+            {/* ── Desktop slideshow ─────────────────────────── */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🖥 Desktop / Landscape</span>
+                  <span className="text-xs text-gray-400">({coverSlideshowSelectedIds.size} photos)</span>
+                </div>
+                <button
+                  onClick={() => onEnterSelectionMode(coverSelectionMode === 'slideshow-custom' ? null : 'slideshow-custom')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'slideshow-custom'
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                  {coverSelectionMode === 'slideshow-custom' ? 'Done' : 'Select'}
+                </button>
+              </div>
+              {coverSelectionMode === 'slideshow-custom' && (
+                <p className="text-xs text-amber-700">Click photos below to add/remove</p>
+              )}
+              {slideshowOrderedIds.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {slideshowOrderedIds.map((id, index) => {
+                    const item = images.find(m => m.id === id);
+                    if (!item) return null;
+                    return (
+                      <div key={id} className="relative flex-shrink-0 w-16 h-12 rounded-md overflow-hidden bg-gray-100 group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.thumbnail_url} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
+                        <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">{index + 1}</span>
+                        <button onClick={() => handleRemoveFromSlideshow(id)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Selected photos strip */}
-            {slideshowOrderedIds.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {slideshowOrderedIds.map((id, index) => {
-                  const item = images.find(m => m.id === id);
-                  if (!item) return null;
-                  return (
-                    <div key={id} className="relative flex-shrink-0 w-16 h-12 rounded-md overflow-hidden bg-gray-100 group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.thumbnail_url} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
-                      <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">
-                        {index + 1}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveFromSlideshow(id)}
-                        className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <XIcon className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
+            {/* ── Mobile slideshow ──────────────────────────── */}
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📱 Mobile / Portrait</span>
+                  <span className="text-xs text-gray-400">
+                    {coverMobileSlideshowSelectedIds.size > 0
+                      ? `(${coverMobileSlideshowSelectedIds.size} photos)`
+                      : '(uses desktop if empty)'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => onEnterSelectionMode(coverSelectionMode === 'slideshow-mobile' ? null : 'slideshow-mobile')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'slideshow-mobile'
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                  {coverSelectionMode === 'slideshow-mobile' ? 'Done' : 'Select'}
+                </button>
               </div>
-            )}
+              {coverSelectionMode === 'slideshow-mobile' && (
+                <p className="text-xs text-blue-700">Click photos below to add/remove (portrait photos work best)</p>
+              )}
+              {mobileOrderedIds.length > 0 ? (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {mobileOrderedIds.map((id, index) => {
+                    const item = images.find(m => m.id === id);
+                    if (!item) return null;
+                    return (
+                      <div key={id} className="relative flex-shrink-0 w-10 h-14 rounded-md overflow-hidden bg-gray-100 group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.thumbnail_url} alt={`Mobile slide ${index + 1}`} className="w-full h-full object-cover" />
+                        <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">{index + 1}</span>
+                        <button onClick={() => handleRemoveFromMobileSlideshow(id)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => { onCoverMobileSlideshowSelectedChange(new Set()); }}
+                    className="flex-shrink-0 w-10 h-14 rounded-md border border-dashed border-gray-300 flex items-center justify-center text-xs text-gray-400 hover:bg-gray-50"
+                    title="Clear mobile slideshow (will use desktop)"
+                  >
+                    <XIcon />
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic">No mobile photos selected — desktop slideshow will be used on all devices</p>
+              )}
+            </div>
 
             {/* Interval selector */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
               <span className="text-sm text-gray-500">Change every:</span>
               <div className="flex gap-1">
                 {INTERVAL_OPTIONS.map(opt => (

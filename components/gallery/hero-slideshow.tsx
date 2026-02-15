@@ -4,10 +4,16 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface HeroSlideshowProps {
   slides: Array<{ url: string; mediaId: string }>;
+  mobileSlides?: Array<{ url: string; mediaId: string }>; // portrait/mobile override
   intervalMs?: number;
 }
 
-export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps) {
+export function HeroSlideshow({ slides, mobileSlides = [], intervalMs = 5000 }: HeroSlideshowProps) {
+  // Pick slide set based on viewport orientation/width — mobile portrait gets mobileSlides if configured
+  const isMobilePortrait = typeof window !== 'undefined'
+    ? window.innerWidth < 768 && window.innerHeight > window.innerWidth
+    : false;
+  const activeSlides = (isMobilePortrait && mobileSlides.length >= 2) ? mobileSlides : slides;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [nextIndex, setNextIndex] = useState<number | null>(null);
   const [loadedIndices, setLoadedIndices] = useState<Set<number>>(new Set([0]));
@@ -26,7 +32,7 @@ export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps)
     if (loadedRef.current.has(index) || preloadingRef.current.has(index)) return;
     preloadingRef.current.add(index);
     const img = new Image();
-    img.src = slides[index].url;
+    img.src = activeSlides[index].url;
     img.onload = () => {
       preloadingRef.current.delete(index);
       setLoadedIndices(prev => {
@@ -39,12 +45,12 @@ export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps)
     img.onerror = () => {
       preloadingRef.current.delete(index);
     };
-  }, [slides]);
+  }, [activeSlides]);
 
   // Advance to next slide
   const advance = useCallback(() => {
     setCurrentIndex(prev => {
-      const next = (prev + 1) % slides.length;
+      const next = (prev + 1) % activeSlides.length;
       if (!loadedRef.current.has(next)) return prev; // skip if not loaded
       setNextIndex(next);
       setTimeout(() => {
@@ -53,15 +59,15 @@ export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps)
       }, transitionDuration);
       return prev; // don't change yet — setTimeout will do it
     });
-  }, [slides.length]);
+  }, [activeSlides.length]);
 
   // Preload next image on mount and when currentIndex changes
   useEffect(() => {
-    const next = (currentIndex + 1) % slides.length;
+    const next = (currentIndex + 1) % activeSlides.length;
     preloadImage(next);
-    const afterNext = (currentIndex + 2) % slides.length;
+    const afterNext = (currentIndex + 2) % activeSlides.length;
     preloadImage(afterNext);
-  }, [currentIndex, slides.length, preloadImage]);
+  }, [currentIndex, activeSlides.length, preloadImage]);
 
   // Auto-advance timer
   useEffect(() => {
@@ -96,11 +102,11 @@ export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps)
   }, [advance, intervalMs]);
 
   // Don't render anything for single-slide (parent handles static SSR image)
-  if (slides.length <= 1) return null;
+  if (activeSlides.length <= 1) return null;
 
   return (
     <>
-      {slides.map((slide, i) => {
+      {activeSlides.map((slide, i) => {
         const isCurrent = i === currentIndex;
         const isNext = i === nextIndex;
         const isVisible = isCurrent || isNext;

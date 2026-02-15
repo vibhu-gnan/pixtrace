@@ -19,10 +19,11 @@ export interface GalleryEvent {
     event_hash?: string;
     cover_media_id?: string | null;
     theme?: {
-        logoUrl?: string; // Added logoUrl
+        logoUrl?: string;
         hero?: {
             mode?: HeroMode;
-            slideshowMediaIds?: string[];
+            slideshowMediaIds?: string[];        // desktop/landscape
+            mobileSlideshowMediaIds?: string[];  // portrait/mobile override
             intervalMs?: number;
         };
     };
@@ -58,6 +59,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     totalCount: number;
     coverUrl: string | null;
     heroSlides: HeroSlide[];
+    mobileHeroSlides: HeroSlide[];  // portrait/mobile override — empty means use heroSlides
     heroMode: HeroMode;
     heroIntervalMs: number;
 }> {
@@ -182,6 +184,26 @@ export async function getPublicGallery(identifier: string): Promise<{
         }
     }
 
+    // 7. Resolve mobile-specific slideshow (portrait phones) if configured
+    let mobileHeroSlides: HeroSlide[] = [];
+    if (heroMode === 'slideshow' && heroConfig?.mobileSlideshowMediaIds?.length) {
+        const { data: mobileMedia } = await (supabase
+            .from('media')
+            .select('id, r2_key, preview_r2_key')
+            .in('id', heroConfig.mobileSlideshowMediaIds)
+            .eq('event_id', event.id) as unknown as Promise<{ data: SlideRow[] | null; error: unknown }>);
+
+        const mobileMap = new Map((mobileMedia ?? []).map(m => [m.id, m]));
+        mobileHeroSlides = (heroConfig.mobileSlideshowMediaIds as string[])
+            .map((id: string) => {
+                const m = mobileMap.get(id);
+                if (!m) return null;
+                const url = getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key);
+                return { url, mediaId: id };
+            })
+            .filter((s): s is HeroSlide => s !== null);
+    }
+
     return {
         event,
         media,
@@ -189,6 +211,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         totalCount: count || 0,
         coverUrl,
         heroSlides,
+        mobileHeroSlides,
         heroMode,
         heroIntervalMs,
     };

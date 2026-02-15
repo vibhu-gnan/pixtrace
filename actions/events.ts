@@ -187,6 +187,7 @@ export async function updateEventHero(eventId: string, payload: {
   coverMediaId?: string | null;
   heroMode?: 'single' | 'slideshow' | 'auto';
   slideshowMediaIds?: string[];
+  mobileSlideshowMediaIds?: string[];
   intervalMs?: number;
 }) {
   const organizer = await getCurrentOrganizer();
@@ -211,6 +212,9 @@ export async function updateEventHero(eventId: string, payload: {
   const heroConfig: Record<string, unknown> = { mode: heroMode };
   if (heroMode === 'slideshow' && payload.slideshowMediaIds?.length) {
     heroConfig.slideshowMediaIds = payload.slideshowMediaIds;
+  }
+  if (heroMode === 'slideshow' && payload.mobileSlideshowMediaIds?.length) {
+    heroConfig.mobileSlideshowMediaIds = payload.mobileSlideshowMediaIds;
   }
   if (payload.intervalMs) {
     heroConfig.intervalMs = payload.intervalMs;

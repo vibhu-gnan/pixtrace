@@ -61,7 +61,7 @@ export default async function GalleryEventPage({
   try {
     const { eventHash } = await params;
     const { photo: initialPhotoId } = await searchParams;
-    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, heroIntervalMs } = await getCachedGallery(eventHash);
+    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs } = await getCachedGallery(eventHash);
 
     if (!event) {
       notFound();
@@ -118,7 +118,7 @@ export default async function GalleryEventPage({
 
           {/* Client slideshow — only activates with 2+ slides */}
           {hasSlideshow && (
-            <HeroSlideshow slides={heroSlides} intervalMs={heroIntervalMs} />
+            <HeroSlideshow slides={heroSlides} mobileSlides={mobileHeroSlides} intervalMs={heroIntervalMs} />
           )}
 
           {/* Dark gradient overlay */}

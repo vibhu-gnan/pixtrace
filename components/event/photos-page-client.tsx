@@ -105,12 +105,15 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
 
   // ─── Cover Selection State ─────────────────────────────────
-  const [coverSelectionMode, setCoverSelectionMode] = useState<null | 'single' | 'slideshow-custom'>(null);
+  const [coverSelectionMode, setCoverSelectionMode] = useState<null | 'single' | 'slideshow-custom' | 'slideshow-mobile'>(null);
   const [coverSingleSelectedId, setCoverSingleSelectedId] = useState<string | null>(
     event.cover_media_id ?? null
   );
   const [coverSlideshowSelectedIds, setCoverSlideshowSelectedIds] = useState<Set<string>>(
     new Set((event.theme as any)?.hero?.slideshowMediaIds ?? [])
+  );
+  const [coverMobileSlideshowSelectedIds, setCoverMobileSlideshowSelectedIds] = useState<Set<string>>(
+    new Set((event.theme as any)?.hero?.mobileSlideshowMediaIds ?? [])
   );
   const [heroMode, setHeroMode] = useState<'single' | 'slideshow' | 'auto'>(
     (event.theme as any)?.hero?.mode ?? 'single'
@@ -293,6 +296,13 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
           else next.add(mediaId);
           return next;
         });
+      } else if (coverSelectionMode === 'slideshow-mobile') {
+        setCoverMobileSlideshowSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(mediaId)) next.delete(mediaId);
+          else next.add(mediaId);
+          return next;
+        });
       }
     },
     [coverSelectionMode]
@@ -312,6 +322,9 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
     }
     if (coverSelectionMode === 'slideshow-custom') {
       return coverSlideshowSelectedIds;
+    }
+    if (coverSelectionMode === 'slideshow-mobile') {
+      return coverMobileSlideshowSelectedIds;
     }
     return new Set<string>();
   }, [coverSelectionMode, coverSingleSelectedId, coverSlideshowSelectedIds]);
@@ -334,6 +347,8 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
         onCoverSingleSelectedChange={setCoverSingleSelectedId}
         coverSlideshowSelectedIds={coverSlideshowSelectedIds}
         onCoverSlideshowSelectedChange={setCoverSlideshowSelectedIds}
+        coverMobileSlideshowSelectedIds={coverMobileSlideshowSelectedIds}
+        onCoverMobileSlideshowSelectedChange={setCoverMobileSlideshowSelectedIds}
         heroMode={heroMode}
         onHeroModeChange={setHeroMode}
       />
