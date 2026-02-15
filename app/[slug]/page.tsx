@@ -69,7 +69,7 @@ export default async function GallerySlugPage({
         const { slug } = await params;
         const { photo: initialPhotoId } = await searchParams;
 
-        const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, heroIntervalMs } = await getCachedGallery(slug);
+        const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = await getCachedGallery(slug);
 
         if (!event) {
             notFound();
@@ -108,7 +108,7 @@ export default async function GallerySlugPage({
 
                     {/* Client slideshow — only activates with 2+ slides */}
                     {hasSlideshow && (
-                        <HeroSlideshow slides={heroSlides} intervalMs={heroIntervalMs} />
+                        <HeroSlideshow slides={heroSlides} mobileSlides={mobileHeroSlides} intervalMs={heroIntervalMs} />
                     )}
 
                     {/* Dark gradient overlay */}
@@ -144,6 +144,7 @@ export default async function GallerySlugPage({
                         totalCount={totalCount}
                         initialPhotoId={initialPhotoId}
                         allowDownload={event.allow_download ?? true}
+                        photoOrder={photoOrder}
                     />
                 </div>
 

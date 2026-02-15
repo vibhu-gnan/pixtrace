@@ -61,7 +61,7 @@ export default async function GalleryEventPage({
   try {
     const { eventHash } = await params;
     const { photo: initialPhotoId } = await searchParams;
-    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs } = await getCachedGallery(eventHash);
+    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = await getCachedGallery(eventHash);
 
     if (!event) {
       notFound();
@@ -164,6 +164,7 @@ export default async function GalleryEventPage({
             totalCount={totalCount}
             initialPhotoId={initialPhotoId}
             allowDownload={event.allow_download ?? true}
+            photoOrder={photoOrder}
           />
         </div>
 

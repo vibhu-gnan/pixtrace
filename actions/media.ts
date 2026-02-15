@@ -61,7 +61,7 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
           .from('media')
           .select('*')
           .eq('event_id', eventId)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: true })
           .range(from, from + batchSize - 1);
         if (error) { console.error('Error fetching media batch:', error); return []; }
         return data || [];

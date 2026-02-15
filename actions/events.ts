@@ -25,6 +25,7 @@ export interface EventData {
   media_count?: number;
   allow_download?: boolean;
   allow_slideshow?: boolean;
+  photo_order?: 'oldest_first' | 'newest_first';
 }
 
 export async function createEvent(formData: FormData) {
@@ -91,8 +92,7 @@ export async function getEvents(): Promise<EventData[]> {
     .from('events')
     .select(`
       *,
-      albums (id, name, sort_order),
-      media (id)
+      albums (id, name, sort_order)
     `)
     .eq('organizer_id', organizer.id)
     .order('created_at', { ascending: false });
@@ -102,10 +102,23 @@ export async function getEvents(): Promise<EventData[]> {
     return [];
   }
 
-  return (events || []).map((event: any) => ({
+  if (!events || events.length === 0) return [];
+
+  // Fetch media counts for all events in parallel (avoids PostgREST 1000-row cap on nested relations)
+  const mediaCounts = await Promise.all(
+    events.map((event: any) =>
+      supabase
+        .from('media')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', event.id)
+        .then(({ count }) => ({ id: event.id, count: count || 0 }))
+    )
+  );
+  const countMap = Object.fromEntries(mediaCounts.map(({ id, count }) => [id, count]));
+
+  return events.map((event: any) => ({
     ...event,
-    media_count: event.media?.length || 0,
-    media: undefined,
+    media_count: countMap[event.id] ?? 0,
   }));
 }
 
@@ -136,11 +149,14 @@ export async function getEvent(eventId: string): Promise<EventData | null> {
     .select('id', { count: 'exact', head: true })
     .eq('event_id', eventId);
 
+  const theme = (event.theme as Record<string, unknown>) || {};
+  const rawOrder = theme.photo_order;
   return {
     ...event,
     media_count: count || 0,
     created_at: event.created_at || new Date().toISOString(),
     updated_at: event.updated_at || new Date().toISOString(),
+    photo_order: rawOrder === 'newest_first' ? 'newest_first' : 'oldest_first',
   } as EventData;
 }
 
@@ -427,6 +443,48 @@ export async function updateEventPermissions(eventId: string, payload: {
     revalidatePath(`/${evt.event_hash}`);
   }
   revalidatePath(`/events/${eventId}/permissions`);
+
+  return { success: true };
+}
+
+export async function updateEventPhotoOrder(eventId: string, order: 'oldest_first' | 'newest_first') {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const safeOrder = order === 'newest_first' ? 'newest_first' : 'oldest_first';
+
+  const supabase = createAdminClient();
+
+  const { data: currentEvent } = await supabase
+    .from('events')
+    .select('theme, event_hash')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!currentEvent) return { error: 'Event not found' };
+
+  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
+
+  const { error } = await supabase
+    .from('events')
+    .update({
+      theme: { ...currentTheme, photo_order: safeOrder },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error updating photo order:', error);
+    return { error: 'Failed to update photo order' };
+  }
+
+  revalidatePath(`/events/${eventId}/permissions`);
+  if (currentEvent.event_hash) {
+    revalidatePath(`/gallery/${currentEvent.event_hash}`);
+    revalidatePath(`/${currentEvent.event_hash}`);
+  }
 
   return { success: true };
 }

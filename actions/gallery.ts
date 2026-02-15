@@ -48,6 +48,11 @@ export interface GalleryMediaItem {
 
 const PAGE_SIZE = 30;
 
+function resolvePhotoOrder(theme: unknown): 'oldest_first' | 'newest_first' {
+    const val = (theme as Record<string, unknown> | null)?.photo_order;
+    return val === 'newest_first' ? 'newest_first' : 'oldest_first';
+}
+
 /**
  * Fetch a public event and its first page of media by event_hash.
  * No auth required — RLS policies enforce is_public=true.
@@ -62,6 +67,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     mobileHeroSlides: HeroSlide[];  // portrait/mobile override — empty means use heroSlides
     heroMode: HeroMode;
     heroIntervalMs: number;
+    photoOrder: 'oldest_first' | 'newest_first';
 }> {
     const supabase = getPublicClient();
 
@@ -86,7 +92,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         .single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
+        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first' };
     }
 
     // 2. Fetch albums for this event
@@ -102,17 +108,20 @@ export async function getPublicGallery(identifier: string): Promise<{
         .select('id', { count: 'exact', head: true })
         .eq('event_id', event.id);
 
-    // 4. Fetch first page of media
+    // 4. Fetch first page of media (order controlled by theme.photo_order)
+    const photoOrderSetting = resolvePhotoOrder(event.theme);
+    const ascending = photoOrderSetting !== 'newest_first';
+
     const { data: mediaRows, error: mediaError } = await (supabase
         .from('media')
         .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending })
         .range(0, PAGE_SIZE - 1) as unknown as Promise<{ data: MediaRow[] | null; error: unknown }>);
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
+        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first' };
     }
 
     // Build album name lookup
@@ -214,6 +223,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         mobileHeroSlides,
         heroMode,
         heroIntervalMs,
+        photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first',
     };
 }
 
@@ -228,6 +238,7 @@ export async function getPublicGalleryPage(
     cursor?: string | null,
     albumId?: string | null,
     albumNames?: Record<string, string>,
+    photoOrder?: 'oldest_first' | 'newest_first',
 ): Promise<{
     media: GalleryMediaItem[];
     hasMore: boolean;
@@ -256,15 +267,17 @@ export async function getPublicGalleryPage(
     // Use album names from client instead of re-fetching
     const albumMap = new Map<string, string>(Object.entries(albumNames || {}));
 
-    // Build query — cursor-based: "give me items newer than this timestamp" (oldest-first)
+    // Build query — cursor-based pagination respecting photo order
+    const ascending = photoOrder !== 'newest_first';
     let query = supabase
         .from('media')
         .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending });
 
     if (cursor) {
-        query = query.gt('created_at', cursor);
+        // oldest_first: next page = items AFTER cursor; newest_first: items BEFORE cursor
+        query = ascending ? query.gt('created_at', cursor) : query.lt('created_at', cursor);
     }
 
     if (albumId) {

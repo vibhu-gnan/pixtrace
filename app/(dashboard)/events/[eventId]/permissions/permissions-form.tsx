@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { updateEventPermissions } from '@/actions/events';
+import { updateEventPermissions, updateEventPhotoOrder } from '@/actions/events';
 
 // ─── Reusable UI Components ──────────────────────────────────
 
@@ -79,11 +79,13 @@ interface PermissionsFormProps {
     eventId: string;
     initialAllowDownload: boolean;
     initialAllowSlideshow: boolean;
+    initialPhotoOrder: 'oldest_first' | 'newest_first';
 }
 
-export default function PermissionsForm({ eventId, initialAllowDownload, initialAllowSlideshow }: PermissionsFormProps) {
+export default function PermissionsForm({ eventId, initialAllowDownload, initialAllowSlideshow, initialPhotoOrder }: PermissionsFormProps) {
     const [downloadAccess, setDownloadAccess] = useState<'everyone' | 'no_one'>(initialAllowDownload ? 'everyone' : 'no_one');
     const [slideshowEnabled, setSlideshowEnabled] = useState(initialAllowSlideshow);
+    const [photoOrder, setPhotoOrder] = useState<'oldest_first' | 'newest_first'>(initialPhotoOrder);
 
     // Future proofing UI state (not yet connected to real columns)
     const [allowDownloadRequest, setAllowDownloadRequest] = useState(false);
@@ -91,7 +93,9 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
     const [allowViewRequest, setAllowViewRequest] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
-    const [isPending, startTransition] = useTransition();
+    const [isDownloadPending, startDownloadTransition] = useTransition();
+    const [isSlideshowPending, startSlideshowTransition] = useTransition();
+    const [isPhotoOrderPending, startPhotoOrderTransition] = useTransition();
 
     // Optimistic updates could be added, but simple transition is fine for settings
 
@@ -101,7 +105,7 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
         setDownloadAccess(newVal);
         setError(null);
 
-        startTransition(async () => {
+        startDownloadTransition(async () => {
             try {
                 const result = await updateEventPermissions(eventId, { allowDownload: newVal === 'everyone' });
                 if (result.error) throw new Error(result.error);
@@ -118,7 +122,7 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
         setSlideshowEnabled(checked);
         setError(null);
 
-        startTransition(async () => {
+        startSlideshowTransition(async () => {
             try {
                 const result = await updateEventPermissions(eventId, { allowSlideshow: checked });
                 if (result.error) throw new Error(result.error);
@@ -126,6 +130,24 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                 console.error(err);
                 setSlideshowEnabled(prevVal);
                 setError('Failed to update slideshow settings');
+            }
+        });
+    };
+
+    const handlePhotoOrderChange = (value: string) => {
+        const newOrder = value as 'oldest_first' | 'newest_first';
+        const prevOrder = photoOrder;
+        setPhotoOrder(newOrder);
+        setError(null);
+
+        startPhotoOrderTransition(async () => {
+            try {
+                const result = await updateEventPhotoOrder(eventId, newOrder);
+                if (result.error) throw new Error(result.error);
+            } catch (err) {
+                console.error(err);
+                setPhotoOrder(prevOrder);
+                setError('Failed to update photo order');
             }
         });
     };
@@ -140,10 +162,10 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                     {error}
                 </div>
             )}
-            <div className={`max-w-3xl space-y-10 ${isPending ? 'opacity-70 pointer-events-none' : ''}`}>
+            <div className="max-w-3xl space-y-10">
 
                 {/* Download Section */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${isDownloadPending ? 'opacity-60 pointer-events-none' : ''}`}>
                     <div>
                         <h3 className="text-base font-semibold text-gray-900 mb-3">Download</h3>
                         <RadioGroup
@@ -190,7 +212,7 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                 </div>
 
                 {/* Slideshow Section */}
-                <div>
+                <div className={isSlideshowPending ? 'opacity-60 pointer-events-none' : ''}>
                     <h3 className="text-base font-semibold text-gray-900 mb-3">Slideshow</h3>
                     <div className="flex items-center gap-3 mb-2">
                         <Toggle checked={slideshowEnabled} onChange={handleSlideshowChange} />
@@ -198,6 +220,23 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                     </div>
                     <p className="text-sm text-gray-400">
                         Allow visitors to view the images in their collection as a slideshow.
+                    </p>
+                </div>
+
+                {/* Photo Order Section */}
+                <div className={isPhotoOrderPending ? 'opacity-60 pointer-events-none' : ''}>
+                    <h3 className="text-base font-semibold text-gray-900 mb-3">Photo Order</h3>
+                    <RadioGroup
+                        name="photoOrder"
+                        options={[
+                            { value: 'oldest_first', label: 'Oldest first' },
+                            { value: 'newest_first', label: 'Newest first' },
+                        ]}
+                        value={photoOrder}
+                        onChange={handlePhotoOrderChange}
+                    />
+                    <p className="text-sm text-gray-400 mt-2">
+                        Controls the order photos appear in the public gallery.
                     </p>
                 </div>
             </div>

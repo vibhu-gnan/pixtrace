@@ -16,6 +16,7 @@ interface GalleryPageClientProps {
     totalCount: number;
     initialPhotoId?: string;
     allowDownload?: boolean;
+    photoOrder?: 'oldest_first' | 'newest_first';
 }
 
 export function GalleryPageClient({
@@ -27,6 +28,7 @@ export function GalleryPageClient({
     totalCount,
     initialPhotoId,
     allowDownload,
+    photoOrder = 'oldest_first',
 }: GalleryPageClientProps) {
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
     const [media, setMedia] = useState<GalleryMediaItem[]>(initialMedia);
@@ -68,12 +70,12 @@ export function GalleryPageClient({
             hasMoreRef.current = initialMedia.length < totalCount;
             setHasMore(initialMedia.length < totalCount);
         } else {
-            // Album selected — fetch from scratch (null cursor = start from newest)
+            // Album selected — fetch from scratch (null cursor = start of sorted order)
             setMedia([]);
             hasMoreRef.current = true;
             setHasMore(true);
             setLoading(true);
-            getPublicGalleryPage(eventHash, null, activeAlbum, albumNamesRef.current)
+            getPublicGalleryPage(eventHash, null, activeAlbum, albumNamesRef.current, photoOrder)
                 .then(({ media: newMedia, hasMore: more }) => {
                     setMedia(newMedia);
                     setHasMore(more);
@@ -81,7 +83,7 @@ export function GalleryPageClient({
                 .catch(() => setError('Failed to load photos'))
                 .finally(() => setLoading(false));
         }
-    }, [activeAlbum, eventHash, initialMedia, totalCount]);
+    }, [activeAlbum, eventHash, initialMedia, totalCount, photoOrder]);
 
     // Load more photos — cursor-based, throttled to prevent rapid-fire
     const loadMore = useCallback(async () => {
@@ -101,6 +103,7 @@ export function GalleryPageClient({
                 cursor,
                 activeAlbum,
                 albumNamesRef.current,
+                photoOrder,
             );
             setMedia((prev) => {
                 // Deduplicate
@@ -116,7 +119,7 @@ export function GalleryPageClient({
             setLoading(false);
             loadingRef.current = false;
         }
-    }, [eventHash, media, activeAlbum]); // removed hasMore — use hasMoreRef instead
+    }, [eventHash, media, activeAlbum, photoOrder]); // removed hasMore — use hasMoreRef instead
 
     // Keep loadMoreRef pointing at the latest loadMore so the observer never goes stale
     loadMoreRef.current = loadMore;

@@ -18,6 +18,7 @@ export default async function PermissionsPage({ params }: { params: Promise<{ ev
         eventId={event.id}
         initialAllowDownload={event.allow_download ?? true}
         initialAllowSlideshow={event.allow_slideshow ?? true}
+        initialPhotoOrder={event.photo_order ?? 'oldest_first'}
       />
     </div>
   );
