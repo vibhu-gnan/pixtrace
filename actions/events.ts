@@ -198,7 +198,18 @@ export async function updateEventHero(eventId: string, payload: {
     return { error: 'Failed to update hero settings' };
   }
 
+  // Get event_hash to revalidate public gallery cache
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
   revalidatePath(`/events/${eventId}`);
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
+  }
   return { success: true };
 }
 

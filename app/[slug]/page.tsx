@@ -89,8 +89,10 @@ export default async function GallerySlugPage({
         // or just the simple fallback since user reverted hero changes.
         // The previous edit to `getPublicGallery` added `hero` return type.
 
-        // Simple fallback logic matching current /gallery/[hash] state
-        const coverImage = media.find((m) => m.media_type === 'image');
+        // Use cover_media_id if set, otherwise fall back to first image
+        const coverImage = (event.cover_media_id
+            ? media.find((m) => m.id === event.cover_media_id)
+            : null) || media.find((m) => m.media_type === 'image');
         const coverUrl = coverImage?.full_url || coverImage?.original_url || '';
 
         return (
