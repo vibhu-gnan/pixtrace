@@ -105,7 +105,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         .from('media')
         .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })
         .range(0, PAGE_SIZE - 1) as unknown as Promise<{ data: MediaRow[] | null; error: unknown }>);
 
     if (mediaError) {
@@ -233,15 +233,15 @@ export async function getPublicGalleryPage(
     // Use album names from client instead of re-fetching
     const albumMap = new Map<string, string>(Object.entries(albumNames || {}));
 
-    // Build query — cursor-based: "give me items older than this timestamp"
+    // Build query — cursor-based: "give me items newer than this timestamp" (oldest-first)
     let query = supabase
         .from('media')
         .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
     if (cursor) {
-        query = query.lt('created_at', cursor);
+        query = query.gt('created_at', cursor);
     }
 
     if (albumId) {
