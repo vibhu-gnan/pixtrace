@@ -52,20 +52,20 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
 
   if (!totalCount || totalCount === 0) return [];
 
-  // Build all range requests needed
-  const batches: Promise<any>[] = [];
+  // Build all range requests needed, run in parallel
+  const batches: Promise<any[]>[] = [];
   for (let from = 0; from < totalCount; from += batchSize) {
     batches.push(
-      supabase
-        .from('media')
-        .select('*')
-        .eq('event_id', eventId)
-        .order('created_at', { ascending: false })
-        .range(from, from + batchSize - 1)
-        .then(({ data, error }) => {
-          if (error) { console.error('Error fetching media batch:', error); return []; }
-          return data || [];
-        })
+      (async () => {
+        const { data, error } = await supabase
+          .from('media')
+          .select('*')
+          .eq('event_id', eventId)
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+        if (error) { console.error('Error fetching media batch:', error); return []; }
+        return data || [];
+      })()
     );
   }
 
