@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -19,11 +18,11 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
  *
  * NEVER use this client for writes or authenticated operations.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _publicClient: SupabaseClient<any> | null = null;
+type AnySupabaseClient = SupabaseClient<Record<string, unknown>>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getPublicClient(): SupabaseClient<any> {
+let _publicClient: AnySupabaseClient | null = null;
+
+export function getPublicClient(): AnySupabaseClient {
   if (_publicClient) return _publicClient;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,15 +32,14 @@ export function getPublicClient(): SupabaseClient<any> {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _publicClient = createClient<any>(url, anonKey, {
+  _publicClient = createClient(url, anonKey, {
     auth: {
       // Disable all session/token machinery — not needed for public reads
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
-  });
+  }) as AnySupabaseClient;
 
   return _publicClient;
 }
