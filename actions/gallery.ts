@@ -38,12 +38,11 @@ export async function getPublicGallery(identifier: string): Promise<{
     media: GalleryMediaItem[];
     albums: { id: string; name: string }[];
     totalCount: number;
-    hero: { type: 'image' | 'slideshow'; urls: string[] } | null;
     coverUrl: string | null;
 }> {
     const supabase = await createClient();
 
-    // 1. Fetch Event Details (by hash OR slug)
+    // 1. Fetch Event Details by hash
     const { data: event, error: eventError } = await supabase
         .from('events')
         .select('id, name, description, event_date, event_hash, cover_media_id')
@@ -52,7 +51,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         .single();
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, hero: null, coverUrl: null };
+        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null };
     }
 
     // 2. Fetch albums for this event
@@ -78,7 +77,7 @@ export async function getPublicGallery(identifier: string): Promise<{
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, hero: null, coverUrl: null };
+        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, coverUrl: null };
     }
 
     // Build album name lookup
@@ -114,7 +113,6 @@ export async function getPublicGallery(identifier: string): Promise<{
         media,
         albums: (albums || []).map(a => ({ id: a.id, name: a.name })),
         totalCount: count || 0,
-        hero: null,
         coverUrl,
     };
 }

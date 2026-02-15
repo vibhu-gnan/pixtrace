@@ -1,9 +1,12 @@
 /**
  * Image URL utilities
  *
- * Serves pre-computed image variants (thumbnail, preview) directly from R2.
- * Falls back to original R2 URL when variant keys are not available
+ * Serves pre-computed preview variants (1200x1200 WebP) from R2.
+ * Falls back to original R2 URL when preview is not available
  * (e.g., for older photos uploaded before variant generation was added).
+ *
+ * Note: Thumbnails are not generated separately — the preview variant
+ * is used for grid display, blur placeholders, and lightbox.
  */
 
 /**
@@ -23,15 +26,15 @@ export function getOriginalUrl(r2Key: string): string {
 
 /**
  * Get thumbnail URL (for grid display)
- * Uses pre-computed 200x200 WebP variant if available, falls back to original
+ * Uses the preview variant if available, falls back to original
  */
 export function getThumbnailUrl(
   r2Key: string,
-  size: number = 200,
-  thumbnailR2Key?: string | null,
+  _size: number = 200,
+  previewR2Key?: string | null,
 ): string {
-  if (thumbnailR2Key) {
-    return getR2DirectUrl(thumbnailR2Key);
+  if (previewR2Key) {
+    return getR2DirectUrl(previewR2Key);
   }
   return getR2DirectUrl(r2Key);
 }
@@ -52,11 +55,11 @@ export function getPreviewUrl(
 
 /**
  * Get blur placeholder URL (for progressive loading)
- * Uses thumbnail as the placeholder — at ~15KB it loads fast enough
+ * Uses preview variant as placeholder
  */
 export function getBlurPlaceholderUrl(
   r2Key: string,
-  thumbnailR2Key?: string | null,
+  previewR2Key?: string | null,
 ): string {
-  return getThumbnailUrl(r2Key, 200, thumbnailR2Key);
+  return getThumbnailUrl(r2Key, 200, previewR2Key);
 }

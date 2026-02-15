@@ -35,13 +35,6 @@ export const organizers = pgTable('organizers', {
   emailIdx: index('organizers_email_idx').on(table.email),
 }));
 
-export const coverTypeEnum = pgEnum('cover_type', [
-  'first',
-  'single',
-  'upload',
-  'slideshow'
-]);
-
 // Events
 export const events = pgTable('events', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -50,17 +43,7 @@ export const events = pgTable('events', {
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
   eventDate: timestamp('event_date'),
-
-  // Hero Cover Configuration
-  coverType: coverTypeEnum('cover_type').default('first').notNull(),
-  coverMediaId: uuid('cover_media_id'), // Used for 'single' mode
-  coverR2Key: text('cover_r2_key'),     // Used for 'upload' mode
-  coverSlideshowConfig: jsonb('cover_slideshow_config').$type<{
-    type: 'album' | 'custom';
-    albumId?: string;
-    mediaIds?: string[];
-  }>(), // Used for 'slideshow' mode
-
+  coverMediaId: uuid('cover_media_id'), // Self-reference, nullable
   // Theme customization (JSON)
   theme: jsonb('theme').$type<{
     primaryColor?: string;
@@ -68,7 +51,6 @@ export const events = pgTable('events', {
     customCss?: string;
   }>().default(sql`'{}'::jsonb`),
   isPublic: boolean('is_public').default(true).notNull(),
-  viewCount: integer('view_count').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
