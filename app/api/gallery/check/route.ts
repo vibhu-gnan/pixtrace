@@ -1,31 +1,43 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
+/**
+ * GET /api/gallery/check?hash=xxx
+ *
+ * Heartbeat: checks if a gallery is still public.
+ * Edge-cached for 5 min so 2K concurrent viewers share 1 DB query.
+ * Uses admin client (no cookie parsing needed for a public check).
+ */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const hash = searchParams.get('hash');
 
-    if (!hash) {
+    if (!hash || hash.length > 32) {
         return NextResponse.json({ public: false });
     }
 
-    const supabase = await createClient();
-    const { data: event } = await supabase
-        .from('events')
-        .select('id')
-        .eq('event_hash', hash)
-        .eq('is_public', true)
-        .single();
+    try {
+        const supabase = createAdminClient();
+        const { data: event } = await supabase
+            .from('events')
+            .select('id')
+            .eq('event_hash', hash)
+            .eq('is_public', true)
+            .single();
 
-    const isPublic = !!event;
-    const res = NextResponse.json({ public: isPublic });
+        const isPublic = !!event;
+        const res = NextResponse.json({ public: isPublic });
 
-    // Edge-cache for 5 min — matches heartbeat interval so all concurrent
-    // viewers share a single cached response instead of each hitting Supabase.
-    res.headers.set(
-        'Cache-Control',
-        's-maxage=300, stale-while-revalidate=60',
-    );
+        // Edge-cache for 5 min — all concurrent viewers share this response
+        res.headers.set(
+            'Cache-Control',
+            's-maxage=300, stale-while-revalidate=60',
+        );
 
-    return res;
+        return res;
+    } catch (e) {
+        // On error, assume public to avoid breaking the gallery
+        console.error('Gallery check error:', e);
+        return NextResponse.json({ public: true });
+    }
 }

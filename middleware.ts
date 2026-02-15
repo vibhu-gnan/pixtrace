@@ -2,31 +2,36 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { updateSession } from '@/lib/auth/middleware';
 
+// Routes that never need auth — skip supabase.auth.getUser() entirely
+const PUBLIC_PREFIXES = [
+  '/gallery',
+  '/api/gallery',
+  '/api/download',
+  '/sign-in',
+  '/sign-up',
+  '/auth/callback',
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Update session
-  const { user, response } = await updateSession(request);
+  // ─── Public routes: pass through without touching Supabase Auth ───
+  // This is critical for performance — 2K gallery viewers should NOT
+  // each trigger a supabase.auth.getUser() call on every request.
+  const isPublicRoute = PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
-  // Public routes - no auth required
-  const publicRoutes = [
-    '/gallery',
-    '/api/gallery',
-    '/sign-in',
-    '/sign-up',
-    '/auth/callback',
-    '/',
-  ];
+  // Short slug routes (e.g., /abc123 for gallery) — check if it looks like an event hash
+  // Event hashes are 12-char nanoid strings, no slashes after the first segment
+  const isSlugRoute = /^\/[a-zA-Z0-9_-]{6,32}$/.test(pathname);
 
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
-
-  // Allow public routes
-  if (isPublicRoute) {
-    return response;
+  if (isPublicRoute || isSlugRoute || pathname === '/') {
+    return NextResponse.next();
   }
 
-  // Protected routes - require authentication
-  if (!user && !isPublicRoute) {
+  // ─── Protected routes: authenticate ───
+  const { user, response } = await updateSession(request);
+
+  if (!user) {
     const signInUrl = new URL('/sign-in', request.url);
     signInUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(signInUrl);
@@ -37,6 +42,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

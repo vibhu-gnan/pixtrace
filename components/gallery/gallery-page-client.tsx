@@ -38,6 +38,7 @@ export function GalleryPageClient({
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
+    const lastLoadTimeRef = useRef(0);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Pre-compute album name map to pass to server action (avoids re-querying albums per scroll page)
@@ -45,12 +46,15 @@ export function GalleryPageClient({
         Object.fromEntries(albums.map(a => [a.id, a.name]))
     );
 
-    // Track gallery view — fire once on mount, non-blocking
+    // Track gallery view — fire exactly once, guarded against StrictMode double-mount
+    const viewTrackedRef = useRef(false);
     useEffect(() => {
+        if (viewTrackedRef.current) return;
+        viewTrackedRef.current = true;
         fetch(`/api/gallery/view?hash=${eventHash}`, {
             method: 'POST',
-            keepalive: true, // survives page unload
-        }).catch(() => { }); // swallow errors — view counting is non-critical
+            keepalive: true,
+        }).catch(() => { });
     }, [eventHash]);
 
     // Reset when album changes
@@ -74,9 +78,13 @@ export function GalleryPageClient({
         }
     }, [activeAlbum, eventHash, initialMedia, totalCount]);
 
-    // Load more photos — cursor-based: pass created_at of last loaded item
+    // Load more photos — cursor-based, throttled to prevent rapid-fire
     const loadMore = useCallback(async () => {
         if (loadingRef.current || !hasMore) return;
+        // Throttle: minimum 1s between requests
+        const now = Date.now();
+        if (now - lastLoadTimeRef.current < 1000) return;
+        lastLoadTimeRef.current = now;
         loadingRef.current = true;
         setLoading(true);
         setError('');
