@@ -67,13 +67,31 @@ export default async function GalleryEventPage({
       notFound();
     }
 
-    const formattedDate = event.event_date
-      ? new Date(event.event_date).toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })
-      : null;
+    const startDate = event.event_date ? new Date(event.event_date) : null;
+    const endDate = event.event_end_date ? new Date(event.event_end_date) : null;
+
+    let formattedDate = null;
+    if (startDate) {
+      if (endDate) {
+        const startMonth = startDate.toLocaleDateString('en-US', { month: 'long' });
+        const endMonth = endDate.toLocaleDateString('en-US', { month: 'long' });
+        const startDay = startDate.getDate();
+        const endDay = endDate.getDate();
+        const year = startDate.getFullYear();
+
+        if (startMonth === endMonth) {
+          formattedDate = `${startMonth} ${startDay} - ${endDay}, ${year}`;
+        } else {
+          formattedDate = `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+        }
+      } else {
+        formattedDate = startDate.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      }
+    }
 
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');

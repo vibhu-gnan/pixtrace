@@ -37,13 +37,21 @@ export default async function SettingsPage({
 
   const galleryUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/gallery/${eventData.event_hash}`;
 
-  const formattedDate = eventData.event_date
-    ? new Date(eventData.event_date).toLocaleDateString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: 'numeric',
-    })
-    : '\u2014';
+  const startDate = eventData.event_date ? new Date(eventData.event_date) : null;
+  const endDate = eventData.event_end_date ? new Date(eventData.event_end_date) : null;
+
+  let formattedDate = '\u2014';
+  if (startDate) {
+    if (endDate) {
+      formattedDate = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} \u2013 ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    } else {
+      formattedDate = startDate.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
+  }
 
   const formattedCreatedAt = eventData.created_at
     ? new Date(eventData.created_at).toLocaleDateString('en-US', {
@@ -100,6 +108,7 @@ export default async function SettingsPage({
                 name={eventData.name}
                 description={eventData.description}
                 eventDate={eventData.event_date}
+                eventEndDate={eventData.event_end_date}
                 isPublic={eventData.is_public}
               />
             </div>

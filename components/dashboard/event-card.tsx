@@ -92,13 +92,31 @@ export function EventCard({ event }: EventCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const formattedDate = event.event_date
-    ? new Date(event.event_date).toLocaleDateString('en-US', {
+  const startDate = event.event_date ? new Date(event.event_date) : null;
+  const endDate = (event as any).event_end_date ? new Date((event as any).event_end_date) : null;
+
+  let formattedDate = null;
+  if (startDate) {
+    if (endDate) {
+      const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
+      const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+      const startDay = startDate.getDate();
+      const endDay = endDate.getDate();
+      const year = startDate.getFullYear();
+
+      if (startMonth === endMonth) {
+        formattedDate = `${startMonth} ${startDay} - ${endDay}, ${year}`;
+      } else {
+        formattedDate = `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+      }
+    } else {
+      formattedDate = startDate.toLocaleDateString('en-US', {
         month: 'short',
         day: '2-digit',
         year: 'numeric',
-      })
-    : null;
+      });
+    }
+  }
 
   const handleDelete = async () => {
     setDeleteLoading(true);
@@ -112,104 +130,104 @@ export function EventCard({ event }: EventCardProps) {
 
   return (
     <>
-    <Link
-      href={`/events/${event.id}`}
-      className="block rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg border border-gray-100 transition-all duration-200 group"
-    >
-      {/* Cover image area */}
-      <div
-        className="relative h-48 overflow-hidden"
-        style={{
-          background: `linear-gradient(135deg, ${from}, ${to})`,
-        }}
+      <Link
+        href={`/events/${event.id}`}
+        className="block rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg border border-gray-100 transition-all duration-200 group"
       >
-        {/* Status badge — top left */}
-        <div className="absolute top-3 left-3 z-10">
-          {event.is_public ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/90 text-green-700 backdrop-blur-sm shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              ACTIVE
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/90 text-orange-600 backdrop-blur-sm shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-              DRAFT
-            </span>
-          )}
-        </div>
-
-        {/* Action icons — top right */}
+        {/* Cover image area */}
         <div
-          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => e.preventDefault()}
-          onMouseDown={(e) => e.stopPropagation()}
+          className="relative h-48 overflow-hidden"
+          style={{
+            background: `linear-gradient(135deg, ${from}, ${to})`,
+          }}
         >
-          <button
-            onClick={(e) => e.preventDefault()}
-            className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
-            aria-label="Share"
-          >
-            <ShareIcon />
-          </button>
-          <button
-            onClick={(e) => e.preventDefault()}
-            className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
-            aria-label="More options"
-          >
-            <DotsIcon />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowDeleteConfirm(true);
-            }}
-            className="p-1.5 rounded-full bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 backdrop-blur-sm transition-colors shadow-sm"
-            aria-label="Delete event"
-          >
-            <TrashIcon />
-          </button>
-        </div>
-
-        {/* Name overlay — bottom */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-12 bg-gradient-to-t from-black/60 to-transparent">
-          <h3 className="text-white font-bold text-lg leading-tight truncate">
-            {event.name}
-          </h3>
-          {event.description && (
-            <p className="text-white/70 text-xs mt-0.5 truncate">
-              {event.description}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Card body */}
-      <div className="p-4">
-        {/* Date row */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-          <CalendarIcon className="text-gray-400 flex-shrink-0" />
-          <span>{formattedDate || 'No date set'}</span>
-        </div>
-
-        {/* Stats row */}
-        <div className="flex items-center gap-8">
-          <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Photos</p>
-            <p className="text-base font-bold text-gray-900">
-              {formatCount(event.media_count || 0)}
-            </p>
+          {/* Status badge — top left */}
+          <div className="absolute top-3 left-3 z-10">
+            {event.is_public ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/90 text-green-700 backdrop-blur-sm shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                ACTIVE
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/90 text-orange-600 backdrop-blur-sm shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                DRAFT
+              </span>
+            )}
           </div>
-          <div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Views</p>
-            <p className="text-base font-bold text-gray-900">
-              {formatCount(event.view_count || 0)}
-            </p>
+
+          {/* Action icons — top right */}
+          <div
+            className="absolute top-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={(e) => e.preventDefault()}
+              className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
+              aria-label="Share"
+            >
+              <ShareIcon />
+            </button>
+            <button
+              onClick={(e) => e.preventDefault()}
+              className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
+              aria-label="More options"
+            >
+              <DotsIcon />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowDeleteConfirm(true);
+              }}
+              className="p-1.5 rounded-full bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 backdrop-blur-sm transition-colors shadow-sm"
+              aria-label="Delete event"
+            >
+              <TrashIcon />
+            </button>
+          </div>
+
+          {/* Name overlay — bottom */}
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-12 bg-gradient-to-t from-black/60 to-transparent">
+            <h3 className="text-white font-bold text-lg leading-tight truncate">
+              {event.name}
+            </h3>
+            {event.description && (
+              <p className="text-white/70 text-xs mt-0.5 truncate">
+                {event.description}
+              </p>
+            )}
           </div>
         </div>
-      </div>
-    </Link>
+
+        {/* Card body */}
+        <div className="p-4">
+          {/* Date row */}
+          <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+            <CalendarIcon className="text-gray-400 flex-shrink-0" />
+            <span>{formattedDate || 'No date set'}</span>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-8">
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Photos</p>
+              <p className="text-base font-bold text-gray-900">
+                {formatCount(event.media_count || 0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Views</p>
+              <p className="text-base font-bold text-gray-900">
+                {formatCount(event.view_count || 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Link>
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

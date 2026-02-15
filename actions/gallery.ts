@@ -15,6 +15,7 @@ export interface GalleryEvent {
     name: string;
     description: string | null;
     event_date: string | null;
+    event_end_date?: string | null;
     event_hash?: string;
     cover_media_id?: string | null;
     theme?: {
@@ -65,7 +66,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     // 1. Fetch Event Details by hash
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('id, name, description, event_date, event_hash, cover_media_id, theme, allow_download, allow_slideshow')
+        .select('id, name, description, event_date, event_end_date, event_hash, cover_media_id, theme, allow_download, allow_slideshow')
         .eq('event_hash', identifier)
         .eq('is_public', true)
         .single();

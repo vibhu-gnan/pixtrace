@@ -14,6 +14,7 @@ export interface EventData {
   name: string;
   description: string | null;
   event_date: string | null;
+  event_end_date: string | null;
   cover_media_id: string | null;
   theme: Record<string, unknown>;
   is_public: boolean;
@@ -33,6 +34,7 @@ export async function createEvent(formData: FormData) {
   const name = formData.get('name') as string;
   const description = (formData.get('description') as string) || null;
   const eventDate = (formData.get('eventDate') as string) || null;
+  const eventEndDate = (formData.get('eventEndDate') as string) || null;
   // Events start as private drafts — published via "Publish Event" button
   const isPublic = false;
 
@@ -51,6 +53,7 @@ export async function createEvent(formData: FormData) {
       name: name.trim(),
       description,
       event_date: eventDate || null,
+      event_end_date: eventEndDate || null,
       is_public: isPublic,
     })
     .select()
@@ -148,6 +151,7 @@ export async function updateEvent(eventId: string, formData: FormData) {
   const name = formData.get('name') as string;
   const description = (formData.get('description') as string) || null;
   const eventDate = (formData.get('eventDate') as string) || null;
+  const eventEndDate = (formData.get('eventEndDate') as string) || null;
   const isPublic = formData.has('isPublic');
 
   if (!name?.trim()) {
@@ -162,6 +166,7 @@ export async function updateEvent(eventId: string, formData: FormData) {
       name: name.trim(),
       description,
       event_date: eventDate || null,
+      event_end_date: eventEndDate || null,
       is_public: isPublic,
       updated_at: new Date().toISOString(),
     })

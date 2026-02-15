@@ -9,6 +9,7 @@ interface EditEventDetailsProps {
   name: string;
   description: string | null;
   eventDate: string | null;
+  eventEndDate: string | null;
   isPublic: boolean;
 }
 
@@ -21,7 +22,7 @@ function EditIcon({ className }: { className?: string }) {
   );
 }
 
-export function EditEventDetails({ eventId, name, description, eventDate, isPublic }: EditEventDetailsProps) {
+export function EditEventDetails({ eventId, name, description, eventDate, eventEndDate, isPublic }: EditEventDetailsProps) {
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,7 @@ export function EditEventDetails({ eventId, name, description, eventDate, isPubl
   };
 
   const eventDateValue = eventDate ? eventDate.slice(0, 10) : '';
+  const eventEndDateValue = eventEndDate ? eventEndDate.slice(0, 10) : '';
 
   return (
     <>
@@ -96,17 +98,31 @@ export function EditEventDetails({ eventId, name, description, eventDate, isPubl
                 />
               </div>
 
-              <div>
-                <label htmlFor="edit-event-date" className="block text-sm font-medium text-gray-700">
-                  Event Date
-                </label>
-                <input
-                  type="date"
-                  id="edit-event-date"
-                  name="eventDate"
-                  defaultValue={eventDateValue}
-                  className="mt-1 block w-full rounded-lg border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="edit-event-date" className="block text-sm font-medium text-gray-700">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="edit-event-date"
+                    name="eventDate"
+                    defaultValue={eventDateValue}
+                    className="mt-1 block w-full rounded-lg border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-event-end-date" className="block text-sm font-medium text-gray-700">
+                    End Date <span className="text-gray-400 font-normal text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    id="edit-event-end-date"
+                    name="eventEndDate"
+                    defaultValue={eventEndDateValue}
+                    className="mt-1 block w-full rounded-lg border-0 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">

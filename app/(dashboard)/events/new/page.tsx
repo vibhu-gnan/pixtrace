@@ -74,12 +74,25 @@ export default function NewEventPage() {
 
         <div>
           <label htmlFor="eventDate" className="block text-sm font-medium text-gray-700 mb-1">
-            Event Date
+            Event Start Date
           </label>
           <input
             type="date"
             id="eventDate"
             name="eventDate"
+            className="block w-full rounded-lg border-0 py-2.5 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-600 sm:text-sm"
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="eventEndDate" className="block text-sm font-medium text-gray-700 mb-1">
+            Event End Date <span className="text-gray-400 font-normal">(Optional)</span>
+          </label>
+          <input
+            type="date"
+            id="eventEndDate"
+            name="eventEndDate"
             className="block w-full rounded-lg border-0 py-2.5 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-600 sm:text-sm"
             disabled={loading}
           />
