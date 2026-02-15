@@ -27,21 +27,22 @@ body {
 }
 
 /* Ken Burns slideshow keyframes — 4 variants for visual variety */
+/* Ken Burns slideshow keyframes — 4 variants for visual variety */
 @keyframes kenBurns0 {
-  from { transform: scale(1.00) translate(0%, 0%); }
-  to   { transform: scale(1.08) translate(-1%, -1%); }
+  from { transform: scale(1.10) translate(0%, 0%); }
+  to   { transform: scale(1.20) translate(-1%, -1%); }
 }
 @keyframes kenBurns1 {
-  from { transform: scale(1.08) translate(-1%, 0%); }
-  to   { transform: scale(1.00) translate(0%, 1%); }
+  from { transform: scale(1.20) translate(-1%, 0%); }
+  to   { transform: scale(1.10) translate(0%, 1%); }
 }
 @keyframes kenBurns2 {
-  from { transform: scale(1.00) translate(1%, 0%); }
-  to   { transform: scale(1.08) translate(0%, -1%); }
+  from { transform: scale(1.10) translate(1%, 0%); }
+  to   { transform: scale(1.20) translate(0%, -1%); }
 }
 @keyframes kenBurns3 {
-  from { transform: scale(1.08) translate(0%, 1%); }
-  to   { transform: scale(1.00) translate(1%, 0%); }
+  from { transform: scale(1.20) translate(0%, 1%); }
+  to   { transform: scale(1.10) translate(1%, 0%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
