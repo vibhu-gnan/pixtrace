@@ -207,6 +207,48 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash 
     copyTimeoutRef.current = setTimeout(() => setLinkCopied(false), 2000);
   }, [currentPhoto, eventHash]);
 
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+
+  // Reset download states when photo changes
+  useEffect(() => {
+    setIsDownloading(false);
+    setDownloadSuccess(false);
+  }, [currentIndex]);
+
+  const handleDownload = useCallback(async () => {
+    if (!currentPhoto || isDownloading) return;
+
+    setIsDownloading(true);
+    setDownloadSuccess(false);
+
+    try {
+      // Create a temporary anchor to trigger forced download
+      const response = await fetch(currentPhoto.original_url);
+      if (!response.ok) throw new Error('Network response was not ok');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = currentPhoto.original_filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2000);
+    } catch (err) {
+      console.error('Download failed:', err);
+      // Fallback: open in new tab if blob download fails
+      window.open(currentPhoto.original_url, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [currentPhoto, isDownloading]);
+
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -267,6 +309,22 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash 
         >
           {/* Top-right buttons */}
           <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all ${downloadSuccess ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
+                } ${isDownloading ? 'cursor-wait opacity-80' : ''}`}
+              aria-label="Download photo"
+              title="Download original"
+            >
+              {isDownloading ? (
+                <SpinnerIcon className="animate-spin text-white" />
+              ) : downloadSuccess ? (
+                <CheckIcon className="text-white" />
+              ) : (
+                <DownloadIcon className="text-white" />
+              )}
+            </button>
             <button
               onClick={handleSharePhoto}
               className="relative w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
@@ -374,6 +432,32 @@ function ShareIcon({ className }: { className?: string }) {
     <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
       <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
