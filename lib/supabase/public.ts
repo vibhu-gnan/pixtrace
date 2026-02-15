@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Supabase public read-only client using the anon key.
@@ -9,20 +10,20 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
  *   - Does NOT run auth.getSession() or timezone introspection queries
  *   - Is a module-level singleton — created once per cold start, reused across requests
  *
- * Typed with `any` as the Database generic so all query results return
- * `any` data rather than `never` (which happens when no schema type is
- * provided to the untyped createClient overload).
+ * Uses `any` for the Database generic (same as createAdminClient) so all
+ * query results return typed data instead of `never`. The project does not
+ * have a generated Supabase schema type, so any is the correct choice here.
  *
  * RLS on the `events` table enforces is_public=true for all reads made
  * with the anon key, so no data leakage is possible.
  *
  * NEVER use this client for writes or authenticated operations.
  */
-type AnySupabaseClient = SupabaseClient<Record<string, unknown>>;
+// Using ReturnType of createAdminClient to get the same inferred type
+// that works throughout the rest of the codebase.
+let _publicClient: ReturnType<typeof createClient> | null = null;
 
-let _publicClient: AnySupabaseClient | null = null;
-
-export function getPublicClient(): AnySupabaseClient {
+export function getPublicClient(): ReturnType<typeof createClient> {
   if (_publicClient) return _publicClient;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,7 +40,7 @@ export function getPublicClient(): AnySupabaseClient {
       persistSession: false,
       detectSessionInUrl: false,
     },
-  }) as AnySupabaseClient;
+  });
 
   return _publicClient;
 }

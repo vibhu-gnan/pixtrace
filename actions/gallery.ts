@@ -63,24 +63,36 @@ export async function getPublicGallery(identifier: string): Promise<{
 }> {
     const supabase = getPublicClient();
 
+    // ── Local row types (supabase-js without a DB generic returns `never`
+    //    for untyped queries; explicit casts here keep the file type-safe) ──
+    type EventRow = GalleryEvent & { id: string };
+    type AlbumRow = { id: string; name: string; sort_order: number };
+    type MediaRow = {
+        id: string; album_id: string; r2_key: string; original_filename: string;
+        media_type: string; width: number | null; height: number | null;
+        thumbnail_r2_key: string | null; preview_r2_key: string | null; created_at: string;
+    };
+    type CoverRow = { r2_key: string; preview_r2_key: string | null };
+    type SlideRow = { id: string; r2_key: string; preview_r2_key: string | null };
+
     // 1. Fetch Event Details by hash
-    const { data: event, error: eventError } = await supabase
+    const { data: event, error: eventError } = await (supabase
         .from('events')
         .select('id, name, description, event_date, event_end_date, event_hash, cover_media_id, theme, allow_download, allow_slideshow')
         .eq('event_hash', identifier)
         .eq('is_public', true)
-        .single();
+        .single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
 
     if (eventError || !event) {
         return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
     }
 
     // 2. Fetch albums for this event
-    const { data: albums } = await supabase
+    const { data: albums } = await (supabase
         .from('albums')
         .select('id, name, sort_order')
         .eq('event_id', event.id)
-        .order('sort_order', { ascending: true });
+        .order('sort_order', { ascending: true }) as unknown as Promise<{ data: AlbumRow[] | null; error: unknown }>);
 
     // 3. Get total count of media
     const { count } = await supabase
@@ -89,16 +101,16 @@ export async function getPublicGallery(identifier: string): Promise<{
         .eq('event_id', event.id);
 
     // 4. Fetch first page of media
-    const { data: mediaRows, error: mediaError } = await supabase
+    const { data: mediaRows, error: mediaError } = await (supabase
         .from('media')
         .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
         .eq('event_id', event.id)
         .order('created_at', { ascending: false })
-        .range(0, PAGE_SIZE - 1);
+        .range(0, PAGE_SIZE - 1) as unknown as Promise<{ data: MediaRow[] | null; error: unknown }>);
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
+        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
     }
 
     // Build album name lookup
@@ -112,17 +124,15 @@ export async function getPublicGallery(identifier: string): Promise<{
     // 5. Resolve cover image URL (may not be in first page of media)
     let coverUrl: string | null = null;
     if (event.cover_media_id) {
-        // Check if it's already in the fetched page
         const inPage = media.find(m => m.id === event.cover_media_id);
         if (inPage) {
             coverUrl = inPage.full_url || inPage.original_url;
         } else {
-            // Fetch the cover media separately
-            const { data: coverRow } = await supabase
+            const { data: coverRow } = await (supabase
                 .from('media')
                 .select('r2_key, preview_r2_key')
                 .eq('id', event.cover_media_id)
-                .single();
+                .single() as unknown as Promise<{ data: CoverRow | null; error: unknown }>);
             if (coverRow) {
                 coverUrl = getPreviewUrl(coverRow.r2_key, coverRow.preview_r2_key) || getOriginalUrl(coverRow.r2_key);
             }
@@ -130,21 +140,19 @@ export async function getPublicGallery(identifier: string): Promise<{
     }
 
     // 6. Resolve hero slides based on hero mode
-    const heroConfig = (event.theme as any)?.hero;
+    const heroConfig = (event.theme as Record<string, any>)?.hero;
     const heroMode: HeroMode = heroConfig?.mode ?? 'single';
     const heroIntervalMs: number = heroConfig?.intervalMs ?? 5000;
     let heroSlides: HeroSlide[] = [];
 
     if (heroMode === 'slideshow' && heroConfig?.slideshowMediaIds?.length) {
-        // Fetch all slideshow media in one query
-        const { data: slideshowMedia } = await supabase
+        const { data: slideshowMedia } = await (supabase
             .from('media')
             .select('id, r2_key, preview_r2_key')
             .in('id', heroConfig.slideshowMediaIds)
-            .eq('event_id', event.id);
+            .eq('event_id', event.id) as unknown as Promise<{ data: SlideRow[] | null; error: unknown }>);
 
-        // Re-order to match saved order (DB doesn't guarantee order)
-        const mediaMap = new Map((slideshowMedia ?? []).map((m: any) => [m.id, m]));
+        const mediaMap = new Map((slideshowMedia ?? []).map(m => [m.id, m]));
         heroSlides = (heroConfig.slideshowMediaIds as string[])
             .map((id: string) => {
                 const m = mediaMap.get(id);
@@ -155,22 +163,20 @@ export async function getPublicGallery(identifier: string): Promise<{
             .filter((s): s is HeroSlide => s !== null);
 
     } else if (heroMode === 'auto') {
-        // Use first 5 images from the event
-        const { data: autoMedia } = await supabase
+        const { data: autoMedia } = await (supabase
             .from('media')
             .select('id, r2_key, preview_r2_key')
             .eq('event_id', event.id)
             .eq('media_type', 'image')
             .order('created_at', { ascending: true })
-            .limit(5);
+            .limit(5) as unknown as Promise<{ data: SlideRow[] | null; error: unknown }>);
 
-        heroSlides = (autoMedia ?? []).map((m: any) => ({
+        heroSlides = (autoMedia ?? []).map(m => ({
             url: getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key),
             mediaId: m.id,
         }));
 
     } else {
-        // mode === 'single' (or unset): wrap existing coverUrl
         if (coverUrl) {
             heroSlides = [{ url: coverUrl, mediaId: event.cover_media_id ?? '' }];
         }
@@ -205,13 +211,20 @@ export async function getPublicGalleryPage(
 }> {
     const supabase = getPublicClient();
 
+    type EventIdRow = { id: string };
+    type MediaRow = {
+        id: string; album_id: string; r2_key: string; original_filename: string;
+        media_type: string; width: number | null; height: number | null;
+        thumbnail_r2_key: string | null; preview_r2_key: string | null; created_at: string;
+    };
+
     // Verify event is still public
-    const { data: event } = await supabase
+    const { data: event } = await (supabase
         .from('events')
         .select('id')
         .eq('event_hash', eventHash)
         .eq('is_public', true)
-        .single();
+        .single() as unknown as Promise<{ data: EventIdRow | null; error: unknown }>);
 
     if (!event) {
         return { media: [], hasMore: false };
@@ -236,7 +249,7 @@ export async function getPublicGalleryPage(
     }
 
     // Fetch one extra to determine hasMore
-    const { data: mediaRows, error } = await query.limit(PAGE_SIZE + 1);
+    const { data: mediaRows, error } = await (query.limit(PAGE_SIZE + 1) as unknown as Promise<{ data: MediaRow[] | null; error: unknown }>);
 
     if (error) {
         console.error('Error fetching gallery page:', error);
