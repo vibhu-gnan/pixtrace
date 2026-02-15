@@ -18,6 +18,7 @@ export interface GalleryEvent {
     event_hash?: string;
     cover_media_id?: string | null;
     theme?: {
+        logoUrl?: string; // Added logoUrl
         hero?: {
             mode?: HeroMode;
             slideshowMediaIds?: string[];

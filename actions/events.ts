@@ -421,3 +421,51 @@ export async function updateEventPermissions(eventId: string, payload: {
 
   return { success: true };
 }
+
+export async function updateEventLogo(eventId: string, logoUrl: string | null) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const supabase = createAdminClient();
+
+  // Read current theme to avoid overwriting other keys
+  const { data: currentEvent } = await supabase
+    .from('events')
+    .select('theme')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!currentEvent) return { error: 'Event not found' };
+
+  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
+
+  const { error } = await supabase
+    .from('events')
+    .update({
+      theme: { ...currentTheme, logoUrl },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error updating event logo:', error);
+    return { error: 'Failed to update logo' };
+  }
+
+  // Get event_hash to revalidate public gallery
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
+  revalidatePath(`/events/${eventId}`);
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
+  }
+
+  return { success: true };
+}

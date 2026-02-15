@@ -1,4 +1,20 @@
-import { notFound } from 'next/navigation';
+import { EventLogoSettings } from '@/components/dashboard/event-logo-settings';
+
+// ... (imports remain)
+
+// ...
+
+// In return statement, after Gallery Cover section:
+
+{/* Logo Settings */ }
+<section>
+  <EventLogoSettings
+    eventId={event.id}
+    initialLogoUrl={(event.theme as any)?.logoUrl}
+  />
+</section>
+
+{/* Event Details */ }
 import Link from 'next/link';
 import { getEvent } from '@/actions/events';
 import { DeleteEventButton } from '@/components/dashboard/delete-event-button';
@@ -12,24 +28,25 @@ export default async function SettingsPage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
-  const event = await getEvent(eventId);
+  const eventData = await getEvent(eventId);
 
-  if (!event) {
+  if (!eventData) {
     notFound();
+    return null;
   }
 
-  const galleryUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/gallery/${event.event_hash}`;
+  const galleryUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/gallery/${eventData.event_hash}`;
 
-  const formattedDate = event.event_date
-    ? new Date(event.event_date).toLocaleDateString('en-US', {
+  const formattedDate = eventData.event_date
+    ? new Date(eventData.event_date).toLocaleDateString('en-US', {
       month: '2-digit',
       day: '2-digit',
       year: 'numeric',
     })
     : '\u2014';
 
-  const formattedCreatedAt = event.created_at
-    ? new Date(event.created_at).toLocaleDateString('en-US', {
+  const formattedCreatedAt = eventData.created_at
+    ? new Date(eventData.created_at).toLocaleDateString('en-US', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -41,7 +58,7 @@ export default async function SettingsPage({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <DeleteEventButton eventId={eventId} eventName={event.name} />
+        <DeleteEventButton eventId={eventId} eventName={eventData.name} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -66,23 +83,31 @@ export default async function SettingsPage({
             </div>
           </section>
 
+          {/* Logo Settings */}
+          <section>
+            <EventLogoSettings
+              eventId={eventData.id}
+              initialLogoUrl={(eventData.theme as any)?.logoUrl}
+            />
+          </section>
+
           {/* Event Details */}
           <section>
             <div className="flex items-center gap-2 mb-6">
               <h2 className="text-lg font-semibold text-gray-900">Event Details</h2>
               <EditEventDetails
                 eventId={eventId}
-                name={event.name}
-                description={event.description}
-                eventDate={event.event_date}
-                isPublic={event.is_public}
+                name={eventData.name}
+                description={eventData.description}
+                eventDate={eventData.event_date}
+                isPublic={eventData.is_public}
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Name</p>
-                <p className="text-base text-gray-900">{event.name}</p>
+                <p className="text-base text-gray-900">{eventData.name}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Date</p>
@@ -90,11 +115,11 @@ export default async function SettingsPage({
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Venue</p>
-                <p className="text-base text-gray-900">{event.description || '\u2014'}</p>
+                <p className="text-base text-gray-900">{eventData.description || '\u2014'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Level</p>
-                <p className="text-base text-gray-900">{event.is_public ? 'Public' : 'Private'}</p>
+                <p className="text-base text-gray-900">{eventData.is_public ? 'Public' : 'Private'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event created on</p>
@@ -102,12 +127,12 @@ export default async function SettingsPage({
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Gallery Views</p>
-                <p className="text-base text-gray-900">{(event.view_count || 0).toLocaleString()}</p>
+                <p className="text-base text-gray-900">{(eventData.view_count || 0).toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Status</p>
                 <p className="text-base text-gray-900">
-                  {event.is_public ? (
+                  {eventData.is_public ? (
                     <span className="inline-flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-green-500" />
                       Live
@@ -128,7 +153,7 @@ export default async function SettingsPage({
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Link</h2>
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <QRCodeGenerator url={galleryUrl} eventName={event.name} />
+            <QRCodeGenerator url={galleryUrl} eventName={eventData.name} />
 
             <EventLinkActions galleryUrl={galleryUrl} />
           </div>

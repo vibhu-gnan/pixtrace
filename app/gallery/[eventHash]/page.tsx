@@ -107,7 +107,16 @@ export default async function GalleryEventPage({
 
           {/* Centered event info */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20 px-4">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-center uppercase">
+            {/* Logo or Title */}
+            {event.theme?.logoUrl ? (
+              <img
+                src={event.theme.logoUrl}
+                alt={event.name}
+                className="mb-4 sm:mb-6 h-20 sm:h-24 md:h-32 max-w-[80vw] object-contain drop-shadow-lg"
+              />
+            ) : null}
+
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-center uppercase drop-shadow-md">
               {event.name}
             </h1>
             {formattedDate && (
