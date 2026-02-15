@@ -4,8 +4,8 @@ import { Metadata } from 'next';
 import { getPublicGallery } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 
-// ISR: serve from edge cache, revalidate every hour
-export const revalidate = 3600;
+// Dynamic — always fetch fresh data so cover changes reflect immediately
+export const dynamic = 'force-dynamic';
 
 type Props = {
     params: Promise<{ slug: string }>;
