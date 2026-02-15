@@ -96,7 +96,7 @@ export function EventLogoSettings({ eventId, initialLogoUrl }: EventLogoSettings
 
             <div className="space-y-4">
                 <p className="text-sm text-gray-500">
-                    Upload a logo to appear on your event's cover page.
+                    Upload a logo to appear on your event&apos;s cover page.
                     <br />
                     Recommended: Transparent PNG, max 5MB.
                 </p>

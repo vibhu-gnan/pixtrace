@@ -95,6 +95,7 @@ export default async function GallerySlugPage({
                 <section className="relative w-full h-screen overflow-hidden">
                     {/* SSR: first image rendered statically for LCP */}
                     {firstSlideUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                             src={firstSlideUrl}
                             alt={event.name}

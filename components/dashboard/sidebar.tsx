@@ -125,11 +125,10 @@ export function Sidebar({ organizer, open, onClose }: SidebarProps) {
               key={item.label}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
                   ? 'bg-brand-500 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              }`}
+                }`}
             >
               <Icon className={isActive ? 'text-white' : 'text-gray-400'} />
               <span>{item.label}</span>
@@ -164,6 +163,7 @@ export function Sidebar({ organizer, open, onClose }: SidebarProps) {
       {/* User Profile */}
       <div className="border-t border-gray-100 px-4 py-4 flex items-center gap-3">
         {organizer.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={organizer.avatar_url}
             alt=""

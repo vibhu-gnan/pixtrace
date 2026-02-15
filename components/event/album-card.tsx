@@ -275,6 +275,7 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
           }}
         >
           {coverUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={coverUrl}
               alt={album.name}

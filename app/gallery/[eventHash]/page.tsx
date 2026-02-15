@@ -105,6 +105,7 @@ export default async function GalleryEventPage({
         <section className="relative w-full h-screen overflow-hidden">
           {/* SSR: first image rendered statically for LCP */}
           {firstSlideUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={firstSlideUrl}
               alt={event.name}
@@ -127,6 +128,7 @@ export default async function GalleryEventPage({
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20 px-4">
             {/* Logo or Title */}
             {event.theme?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={event.theme.logoUrl}
                 alt={event.name}
