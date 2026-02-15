@@ -19,7 +19,7 @@ const getCachedGallery = cache((eventHash: string) => getPublicGallery(eventHash
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { eventHash } = await params;
-    const { event, media } = await getCachedGallery(eventHash);
+    const { event, media, coverUrl: resolvedCoverUrl } = await getCachedGallery(eventHash);
 
     if (!event) {
       return {
@@ -27,8 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       };
     }
 
-    const coverImage = media.find((m) => m.media_type === 'image');
-    const coverUrl = coverImage?.full_url || coverImage?.original_url;
+    const fallbackImage = media.find((m) => m.media_type === 'image');
+    const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url;
 
     return {
       title: `${event.name} | PIXTRACE Gallery`,
@@ -60,7 +60,7 @@ export default async function GalleryEventPage({
   try {
     const { eventHash } = await params;
     const { photo: initialPhotoId } = await searchParams;
-    const { event, media, albums, totalCount } = await getCachedGallery(eventHash);
+    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl } = await getCachedGallery(eventHash);
 
     if (!event) {
       notFound();
@@ -74,11 +74,9 @@ export default async function GalleryEventPage({
       })
       : null;
 
-    // Use cover_media_id if set, otherwise fall back to first image
-    const coverImage = (event.cover_media_id
-      ? media.find((m) => m.id === event.cover_media_id)
-      : null) || media.find((m) => m.media_type === 'image');
-    const coverUrl = coverImage?.full_url || coverImage?.original_url || '';
+    // Use resolved cover URL, or fall back to first image in media
+    const fallbackImage = media.find((m) => m.media_type === 'image');
+    const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
 
     return (
       <main className="min-h-screen bg-white">

@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         // Ignore if slug is a known static route or file (though Next.js routing handles most)
         if (slug.includes('.')) return {};
 
-        const { event, media } = await getCachedGallery(slug);
+        const { event, media, coverUrl: resolvedCoverUrl } = await getCachedGallery(slug);
 
         if (!event) {
             return {
@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             };
         }
 
-        const coverImage = media.find((m) => m.media_type === 'image');
-        const coverUrl = coverImage?.full_url || coverImage?.original_url;
+        const fallbackImage = media.find((m) => m.media_type === 'image');
+        const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url;
 
         return {
             title: `${event.name} | PIXTRACE Gallery`,
@@ -68,7 +68,7 @@ export default async function GallerySlugPage({
         const { slug } = await params;
         const { photo: initialPhotoId } = await searchParams;
 
-        const { event, media, albums, totalCount, hero } = await getCachedGallery(slug);
+        const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl } = await getCachedGallery(slug);
 
         if (!event) {
             notFound();
@@ -82,18 +82,9 @@ export default async function GallerySlugPage({
             })
             : null;
 
-        // Determine hero content (Copied logic from /gallery/[hash] for consistency if hero feature re-enabled, 
-        // but simplified to just cover url if hero object is missing/basic)
-        // Actually, getPublicGallery now returns hero object structure (even if null) per my previous edit? 
-        // No, I updated getPublicGallery to return it, but maybe I should stick to the robust logic used in previous task
-        // or just the simple fallback since user reverted hero changes.
-        // The previous edit to `getPublicGallery` added `hero` return type.
-
-        // Use cover_media_id if set, otherwise fall back to first image
-        const coverImage = (event.cover_media_id
-            ? media.find((m) => m.id === event.cover_media_id)
-            : null) || media.find((m) => m.media_type === 'image');
-        const coverUrl = coverImage?.full_url || coverImage?.original_url || '';
+        // Use resolved cover URL, or fall back to first image in media
+        const fallbackImage = media.find((m) => m.media_type === 'image');
+        const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
 
         return (
             <main className="min-h-screen bg-white">

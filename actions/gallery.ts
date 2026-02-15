@@ -39,6 +39,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     albums: { id: string; name: string }[];
     totalCount: number;
     hero: { type: 'image' | 'slideshow'; urls: string[] } | null;
+    coverUrl: string | null;
 }> {
     const supabase = await createClient();
 
@@ -51,7 +52,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         .single();
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, hero: null };
+        return { event: null, media: [], albums: [], totalCount: 0, hero: null, coverUrl: null };
     }
 
     // 2. Fetch albums for this event
@@ -77,7 +78,7 @@ export async function getPublicGallery(identifier: string): Promise<{
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, hero: null };
+        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, hero: null, coverUrl: null };
     }
 
     // Build album name lookup
@@ -88,12 +89,33 @@ export async function getPublicGallery(identifier: string): Promise<{
 
     const media = mapMediaRows(mediaRows || [], albumMap);
 
+    // 5. Resolve cover image URL (may not be in first page of media)
+    let coverUrl: string | null = null;
+    if (event.cover_media_id) {
+        // Check if it's already in the fetched page
+        const inPage = media.find(m => m.id === event.cover_media_id);
+        if (inPage) {
+            coverUrl = inPage.full_url || inPage.original_url;
+        } else {
+            // Fetch the cover media separately
+            const { data: coverRow } = await supabase
+                .from('media')
+                .select('r2_key, preview_r2_key')
+                .eq('id', event.cover_media_id)
+                .single();
+            if (coverRow) {
+                coverUrl = getPreviewUrl(coverRow.r2_key, coverRow.preview_r2_key) || getOriginalUrl(coverRow.r2_key);
+            }
+        }
+    }
+
     return {
         event,
         media,
         albums: (albums || []).map(a => ({ id: a.id, name: a.name })),
         totalCount: count || 0,
         hero: null,
+        coverUrl,
     };
 }
 
