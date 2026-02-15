@@ -415,22 +415,13 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [currentIndex, isOpen, currentPhoto, media]);
 
-  // History: back button closes lightbox
-  useEffect(() => {
-    if (!isOpen || typeof window === 'undefined' || !window.history) return;
-    if (pushedStateRef.current) return;
-
-    window.history.pushState({ [LIGHTBOX_STATE_KEY]: true }, '', window.location.href);
-    pushedStateRef.current = true;
-
-    const handlePopState = () => {
-      pushedStateRef.current = false;
-      onClose();
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [isOpen, onClose]);
+  // Stable refs so popstate/keyboard effects never need to re-register
+  const onCloseRef = useRef(onClose);
+  const canGoPrevRef = useRef(canGoPrev);
+  const canGoNextRef = useRef(canGoNext);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => { canGoPrevRef.current = canGoPrev; }, [canGoPrev]);
+  useEffect(() => { canGoNextRef.current = canGoNext; }, [canGoNext]);
 
   const handlePrevious = useCallback(() => {
     if (canGoPrev) setCurrentIndex((i) => i - 1);
@@ -445,8 +436,26 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       pushedStateRef.current = false;
       try { window.history.back(); } catch { /* SSR guard */ }
     }
-    onClose();
-  }, [onClose]);
+    onCloseRef.current();
+  }, []);
+
+  // History: back button closes lightbox — registered once, reads onClose via ref
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined' || !window.history) return;
+    if (pushedStateRef.current) return;
+
+    window.history.pushState({ [LIGHTBOX_STATE_KEY]: true }, '', window.location.href);
+    pushedStateRef.current = true;
+
+    const handlePopState = () => {
+      pushedStateRef.current = false;
+      onCloseRef.current();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // onClose accessed via ref — no need to re-register when it changes
 
   const handleSharePhoto = useCallback(async () => {
     if (!currentPhoto) return;
@@ -505,17 +514,26 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     }
   }, [currentPhoto, isDownloading]);
 
-  // Keyboard navigation
+  // Keep latest nav callbacks in refs so keyboard handler never goes stale
+  const handlePreviousRef = useRef(handlePrevious);
+  const handleNextRef = useRef(handleNext);
+  const handleCloseRef = useRef(handleClose);
+  useEffect(() => { handlePreviousRef.current = handlePrevious; }, [handlePrevious]);
+  useEffect(() => { handleNextRef.current = handleNext; }, [handleNext]);
+  useEffect(() => { handleCloseRef.current = handleClose; }, [handleClose]);
+
+  // Keyboard navigation — registered once per open, reads state via refs
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' && canGoPrev) { e.preventDefault(); handlePrevious(); }
-      else if (e.key === 'ArrowRight' && canGoNext) { e.preventDefault(); handleNext(); }
-      else if (e.key === 'Escape') { e.preventDefault(); handleClose(); }
+      if (e.key === 'ArrowLeft' && canGoPrevRef.current) { e.preventDefault(); handlePreviousRef.current(); }
+      else if (e.key === 'ArrowRight' && canGoNextRef.current) { e.preventDefault(); handleNextRef.current(); }
+      else if (e.key === 'Escape') { e.preventDefault(); handleCloseRef.current(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentIndex, canGoPrev, canGoNext, handlePrevious, handleNext, handleClose]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // all callbacks/state accessed via refs
 
   // Swipe navigation — only when NOT zoomed.
   // Touch zoom/pan is handled entirely by native listeners in useImageZoom,
