@@ -694,6 +694,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
               if (e.target === e.currentTarget && !zoom.isZoomed) handleClose();
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={displayImage}
               alt={currentPhoto.original_filename}

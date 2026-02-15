@@ -184,6 +184,7 @@ function MasonryThumbnail({
             }}
             onClick={onClick}
         >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
                 src={imgSrc}
                 alt={item.original_filename}

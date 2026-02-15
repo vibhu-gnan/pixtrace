@@ -111,11 +111,14 @@ export function EventSidebar({ eventId, open, onClose, coverPreviewUrl }: EventS
             title="Edit cover photo"
           >
             {coverPreviewUrl ? (
-              <img
-                src={coverPreviewUrl}
-                alt="Cover preview"
-                className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverPreviewUrl}
+                  alt="Cover preview"
+                  className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                />
+              </>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-gray-400">
                 <PhotoIcon />
@@ -140,11 +143,10 @@ export function EventSidebar({ eventId, open, onClose, coverPreviewUrl }: EventS
               key={item.label}
               href={item.href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-brand-500 text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
-              }`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+                }`}
             >
               <Icon className={isActive ? 'text-white' : 'text-gray-400'} />
               <span>{item.label}</span>

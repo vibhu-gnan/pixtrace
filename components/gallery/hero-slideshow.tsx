@@ -117,6 +117,7 @@ export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps)
               zIndex: isNext ? 2 : 1,
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={slide.url}
               alt=""

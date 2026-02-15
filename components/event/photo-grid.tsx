@@ -333,9 +333,8 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
   if (item.media_type === 'video') {
     return (
       <div
-        className={`relative aspect-square rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden cursor-pointer ${
-          isCoverSelected && coverSelectionMode ? 'ring-2 ring-amber-400 ring-offset-1' : selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
-        }`}
+        className={`relative aspect-square rounded-lg bg-gray-900 flex items-center justify-center overflow-hidden cursor-pointer ${isCoverSelected && coverSelectionMode ? 'ring-2 ring-amber-400 ring-offset-1' : selected ? 'ring-2 ring-brand-500 ring-offset-1' : ''
+          }`}
         onClick={handleClick}
         onContextMenu={coverSelectionMode ? undefined : handleContextMenu}
       >
@@ -364,13 +363,12 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
 
   return (
     <div
-      className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${
-        isCoverSelected && coverSelectionMode
+      className={`relative aspect-square rounded-lg overflow-hidden bg-gray-100 group cursor-pointer ${isCoverSelected && coverSelectionMode
           ? 'ring-2 ring-amber-400 ring-offset-1'
           : selected
             ? 'ring-2 ring-brand-500 ring-offset-1'
             : ''
-      }`}
+        }`}
       style={
         item.blur_url
           ? { backgroundImage: `url(${item.blur_url})`, backgroundSize: 'cover' }
@@ -379,6 +377,7 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
       onClick={handleClick}
       onContextMenu={coverSelectionMode ? undefined : handleContextMenu}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imgSrc}
         alt={item.original_filename}
@@ -388,13 +387,12 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
         className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'
           }`}
       />
-      <div className={`absolute inset-0 transition-colors ${
-        isCoverSelected && coverSelectionMode
+      <div className={`absolute inset-0 transition-colors ${isCoverSelected && coverSelectionMode
           ? 'bg-amber-400/15'
           : selected
             ? 'bg-brand-500/20'
             : 'bg-black/0 group-hover:bg-black/10'
-      }`} />
+        }`} />
       {/* Delete selection indicator */}
       {selectionMode && !coverSelectionMode && (
         <div className="absolute top-2 left-2 z-10">

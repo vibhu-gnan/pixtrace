@@ -1,20 +1,6 @@
 import { EventLogoSettings } from '@/components/dashboard/event-logo-settings';
+import { notFound } from 'next/navigation';
 
-// ... (imports remain)
-
-// ...
-
-// In return statement, after Gallery Cover section:
-
-{/* Logo Settings */ }
-<section>
-  <EventLogoSettings
-    eventId={event.id}
-    initialLogoUrl={(event.theme as any)?.logoUrl}
-  />
-</section>
-
-{/* Event Details */ }
 import Link from 'next/link';
 import { getEvent } from '@/actions/events';
 import { DeleteEventButton } from '@/components/dashboard/delete-event-button';

@@ -172,7 +172,10 @@ export function CoverBar({
       <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
           {currentPreviewUrl ? (
-            <img src={currentPreviewUrl} alt="Cover" className="w-full h-full object-cover" />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={currentPreviewUrl} alt="Cover" className="w-full h-full object-cover" />
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-400">
               <ImageIcon />
@@ -228,11 +231,10 @@ export function CoverBar({
           <button
             key={tab.key}
             onClick={() => handleModeChange(tab.key)}
-            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-              heroMode === tab.key
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${heroMode === tab.key
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
           >
             {tab.label}
           </button>
@@ -246,11 +248,14 @@ export function CoverBar({
             <div className="flex items-center gap-3">
               <div className="w-12 h-9 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
                 {coverSingleSelectedId ? (
-                  <img
-                    src={images.find(m => m.id === coverSingleSelectedId)?.thumbnail_url}
-                    alt="Selected"
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={images.find(m => m.id === coverSingleSelectedId)?.thumbnail_url}
+                      alt="Selected"
+                      className="w-full h-full object-cover"
+                    />
+                  </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300">
                     <ImageIcon />
@@ -272,11 +277,10 @@ export function CoverBar({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onEnterSelectionMode(coverSelectionMode === 'single' ? null : 'single')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  coverSelectionMode === 'single'
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'single'
+                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 {coverSelectionMode === 'single' ? 'Cancel Selection' : 'Select from Gallery'}
               </button>
@@ -304,11 +308,10 @@ export function CoverBar({
               </p>
               <button
                 onClick={() => onEnterSelectionMode(coverSelectionMode === 'slideshow-custom' ? null : 'slideshow-custom')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  coverSelectionMode === 'slideshow-custom'
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'slideshow-custom'
+                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 {coverSelectionMode === 'slideshow-custom' ? 'Done Selecting' : 'Select Photos'}
               </button>
@@ -322,6 +325,7 @@ export function CoverBar({
                   if (!item) return null;
                   return (
                     <div key={id} className="relative flex-shrink-0 w-16 h-12 rounded-md overflow-hidden bg-gray-100 group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={item.thumbnail_url} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
                       <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">
                         {index + 1}
@@ -346,11 +350,10 @@ export function CoverBar({
                   <button
                     key={opt.value}
                     onClick={() => setIntervalMs(opt.value)}
-                    className={`px-2.5 py-1 text-sm font-medium rounded-md transition-colors ${
-                      intervalMs === opt.value
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    className={`px-2.5 py-1 text-sm font-medium rounded-md transition-colors ${intervalMs === opt.value
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -365,6 +368,7 @@ export function CoverBar({
             <div className="flex -space-x-2">
               {images.slice(0, 5).map((img, i) => (
                 <div key={img.id} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white bg-gray-100" style={{ zIndex: 5 - i }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.thumbnail_url} alt="" className="w-full h-full object-cover" />
                 </div>
               ))}
@@ -384,11 +388,10 @@ export function CoverBar({
                 <button
                   key={opt.value}
                   onClick={() => setIntervalMs(opt.value)}
-                  className={`px-2.5 py-1 text-sm font-medium rounded-md transition-colors ${
-                    intervalMs === opt.value
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  className={`px-2.5 py-1 text-sm font-medium rounded-md transition-colors ${intervalMs === opt.value
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
                 >
                   {opt.label}
                 </button>
