@@ -46,7 +46,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     const { data: event, error: eventError } = await supabase
         .from('events')
         .select('id, name, description, event_date, event_hash, cover_media_id')
-        .or(`event_hash.eq.${identifier},slug.eq.${identifier}`)
+        .eq('event_hash', identifier)
         .eq('is_public', true)
         .single();
 
