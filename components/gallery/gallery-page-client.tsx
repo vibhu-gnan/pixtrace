@@ -40,6 +40,9 @@ export function GalleryPageClient({
     const loadingRef = useRef(false);
     const lastLoadTimeRef = useRef(0);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Refs mirror state so the IntersectionObserver callback never goes stale
+    const hasMoreRef = useRef(initialMedia.length < totalCount);
+    const loadMoreRef = useRef<(() => void) | null>(null);
 
     // Pre-compute album name map to pass to server action (avoids re-querying albums per scroll page)
     const albumNamesRef = useRef<Record<string, string>>(
@@ -62,10 +65,12 @@ export function GalleryPageClient({
         setError('');
         if (activeAlbum === null) {
             setMedia(initialMedia);
+            hasMoreRef.current = initialMedia.length < totalCount;
             setHasMore(initialMedia.length < totalCount);
         } else {
             // Album selected — fetch from scratch (null cursor = start from newest)
             setMedia([]);
+            hasMoreRef.current = true;
             setHasMore(true);
             setLoading(true);
             getPublicGalleryPage(eventHash, null, activeAlbum, albumNamesRef.current)
@@ -80,7 +85,7 @@ export function GalleryPageClient({
 
     // Load more photos — cursor-based, throttled to prevent rapid-fire
     const loadMore = useCallback(async () => {
-        if (loadingRef.current || !hasMore) return;
+        if (loadingRef.current || !hasMoreRef.current) return;
         // Throttle: minimum 1s between requests
         const now = Date.now();
         if (now - lastLoadTimeRef.current < 1000) return;
@@ -103,6 +108,7 @@ export function GalleryPageClient({
                 const unique = newMedia.filter((m) => !existingIds.has(m.id));
                 return [...prev, ...unique];
             });
+            hasMoreRef.current = more;
             setHasMore(more);
         } catch {
             setError('Failed to load more photos. Please try again.');
@@ -110,25 +116,30 @@ export function GalleryPageClient({
             setLoading(false);
             loadingRef.current = false;
         }
-    }, [hasMore, eventHash, media, activeAlbum]);
+    }, [eventHash, media, activeAlbum]); // removed hasMore — use hasMoreRef instead
 
-    // Intersection observer for infinite scroll
+    // Keep loadMoreRef pointing at the latest loadMore so the observer never goes stale
+    loadMoreRef.current = loadMore;
+
+    // Intersection observer — created ONCE, never torn down on re-renders.
+    // Uses refs for hasMore/loadMore so it never needs to be recreated.
     useEffect(() => {
         const sentinel = sentinelRef.current;
         if (!sentinel) return;
 
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loading) {
-                    loadMore();
+                if (entries[0].isIntersecting) {
+                    loadMoreRef.current?.();
                 }
             },
-            { rootMargin: '600px' }, // Start loading 600px before user reaches bottom
+            { rootMargin: '600px' },
         );
 
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [hasMore, loading, loadMore]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // intentionally empty — observer is stable, state accessed via refs
 
     // Heartbeat: check ~every 5min if gallery is still public
     // Random jitter (±1 min) prevents all 2K clients from hitting at the same instant
