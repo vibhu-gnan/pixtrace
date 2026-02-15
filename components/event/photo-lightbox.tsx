@@ -384,14 +384,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
                 }`}
             />
 
-            {/* Loading indicator during original load */}
-            {loadingPhase === 'loading_original' && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm text-white text-sm">
-                  Loading full resolution...
-                </div>
-              </div>
-            )}
+            {/* Original load happens silently in background */}
           </div>
         </Dialog.Content>
       </Dialog.Portal>
