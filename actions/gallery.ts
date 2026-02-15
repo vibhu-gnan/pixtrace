@@ -69,7 +69,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         .select('id, name, description, event_date, event_end_date, event_hash, cover_media_id, theme, allow_download, allow_slideshow')
         .eq('event_hash', identifier)
         .eq('is_public', true)
-        .single();
+        .single() as unknown as { data: GalleryEvent | null; error: any };
 
     if (eventError || !event) {
         return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
@@ -211,7 +211,7 @@ export async function getPublicGalleryPage(
         .select('id')
         .eq('event_hash', eventHash)
         .eq('is_public', true)
-        .single();
+        .single() as unknown as { data: { id: string } | null; error: any };
 
     if (!event) {
         return { media: [], hasMore: false };
