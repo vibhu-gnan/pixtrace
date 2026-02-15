@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Verify event belongs to organizer
+    // Verify event belongs to organizer — fetch event_hash at same time
+    // so we can revalidate the public gallery without a second DB round-trip
     const { data: event } = await supabase
       .from('events')
-      .select('id')
+      .select('id, event_hash')
       .eq('id', eventId)
       .eq('organizer_id', organizer.id)
       .single();
@@ -72,9 +73,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Revalidate Next.js cache to show new photos immediately
+    // Revalidate dashboard paths
     revalidatePath(`/events/${eventId}/photos`);
     revalidatePath(`/events/${eventId}`);
+
+    // Revalidate public gallery so new photos appear immediately
+    // (without this, ISR cache could serve stale content for up to 1 hour)
+    if (event.event_hash) {
+      revalidatePath(`/gallery/${event.event_hash}`);
+    }
 
     return NextResponse.json({ media });
   } catch (error) {

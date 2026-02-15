@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/auth';
+import { getPublicClient } from '@/lib/supabase/public';
 import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
 export interface HeroSlide {
@@ -61,7 +61,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     heroMode: HeroMode;
     heroIntervalMs: number;
 }> {
-    const supabase = await createClient();
+    const supabase = getPublicClient();
 
     // 1. Fetch Event Details by hash
     const { data: event, error: eventError } = await supabase
@@ -203,7 +203,7 @@ export async function getPublicGalleryPage(
     media: GalleryMediaItem[];
     hasMore: boolean;
 }> {
-    const supabase = await createClient();
+    const supabase = getPublicClient();
 
     // Verify event is still public
     const { data: event } = await supabase
