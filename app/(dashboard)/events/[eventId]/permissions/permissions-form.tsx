@@ -38,8 +38,8 @@ function RadioGroup({
                 <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
                     <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${value === opt.value
-                                ? 'border-brand-500' // Ensure this color exists in your tailwind config or use proper hex/utility
-                                : 'border-gray-300'
+                            ? 'border-brand-500' // Ensure this color exists in your tailwind config or use proper hex/utility
+                            : 'border-gray-300'
                             }`}
                         onClick={() => onChange(opt.value)}
                     >
@@ -90,27 +90,56 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
     const [viewAccess, setViewAccess] = useState('everyone');
     const [allowViewRequest, setAllowViewRequest] = useState(false);
 
+    const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
 
     // Optimistic updates could be added, but simple transition is fine for settings
 
     const handleDownloadChange = (value: string) => {
         const newVal = value as 'everyone' | 'no_one';
+        const prevVal = downloadAccess;
         setDownloadAccess(newVal);
+        setError(null);
+
         startTransition(async () => {
-            await updateEventPermissions(eventId, { allowDownload: newVal === 'everyone' });
+            try {
+                const result = await updateEventPermissions(eventId, { allowDownload: newVal === 'everyone' });
+                if (result.error) throw new Error(result.error);
+            } catch (err) {
+                console.error(err);
+                setDownloadAccess(prevVal);
+                setError('Failed to update download permissions');
+            }
         });
     };
 
     const handleSlideshowChange = (checked: boolean) => {
+        const prevVal = slideshowEnabled;
         setSlideshowEnabled(checked);
+        setError(null);
+
         startTransition(async () => {
-            await updateEventPermissions(eventId, { allowSlideshow: checked });
+            try {
+                const result = await updateEventPermissions(eventId, { allowSlideshow: checked });
+                if (result.error) throw new Error(result.error);
+            } catch (err) {
+                console.error(err);
+                setSlideshowEnabled(prevVal);
+                setError('Failed to update slideshow settings');
+            }
         });
     };
 
     return (
         <div>
+            {error && (
+                <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-700 text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    {error}
+                </div>
+            )}
             <div className={`max-w-3xl space-y-10 ${isPending ? 'opacity-70 pointer-events-none' : ''}`}>
 
                 {/* Download Section */}

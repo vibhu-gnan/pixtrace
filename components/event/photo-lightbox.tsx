@@ -224,26 +224,21 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     setDownloadSuccess(false);
 
     try {
-      // Create a temporary anchor to trigger forced download
-      const response = await fetch(currentPhoto.original_url);
-      if (!response.ok) throw new Error('Network response was not ok');
+      // Use the proxy route to avoid CORS issues and force download with correct filename
+      const downloadUrl = `/api/download?url=${encodeURIComponent(currentPhoto.original_url)}&filename=${encodeURIComponent(currentPhoto.original_filename)}`;
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = currentPhoto.original_filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = currentPhoto.original_filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 2000);
-    } catch (err) {
-      console.error('Download failed:', err);
-      // Fallback: open in new tab if blob download fails
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback: open in new tab
       window.open(currentPhoto.original_url, '_blank');
     } finally {
       setIsDownloading(false);
