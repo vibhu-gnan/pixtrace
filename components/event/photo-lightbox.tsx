@@ -180,6 +180,7 @@ function useImageZoom() {
 
         if (isDoubleTap) {
           g.lastTapTime = 0;
+          g.isPanning = false;
           if (g.scale > 1.05) {
             g.scale = 1; g.posX = 0; g.posY = 0;
           } else {
@@ -202,6 +203,7 @@ function useImageZoom() {
 
         g.lastTapTime = now;
 
+        // Always arm pan here — scale may already be > 1 (e.g. after pinch or double-tap)
         if (g.scale > 1.05) {
           g.isPanning = true;
           g.panStartX = e.touches[0].clientX;
@@ -218,19 +220,22 @@ function useImageZoom() {
       if (e.touches.length === 2 && g.isPinching && g.lastPinchDist !== null) {
         e.preventDefault();
         const dist = getDistance(e.touches[0], e.touches[1]);
-        const newScale = clamp(g.lastPinchScale * (dist / g.lastPinchDist), MIN_SCALE, MAX_SCALE);
+        const mid = getMidpoint(e.touches[0], e.touches[1]);
+        // Incremental: scale by ratio of current to previous distance
+        const scaleRatio = dist / g.lastPinchDist;
+        const newScale = clamp(g.scale * scaleRatio, MIN_SCALE, MAX_SCALE);
+        const actualRatio = newScale / g.scale;
 
         if (newScale <= 1) {
           g.scale = 1; g.posX = 0; g.posY = 0;
         } else {
-          // Anchor zoom to pinch midpoint
           const rect = el.getBoundingClientRect();
-          const mid = getMidpoint(e.touches[0], e.touches[1]);
-          const anchorX = g.lastPinchMidX - rect.left - rect.width / 2;
-          const anchorY = g.lastPinchMidY - rect.top - rect.height / 2;
-          const scaleDelta = newScale / g.lastPinchScale;
-          const newPosX = anchorX - scaleDelta * (anchorX - g.pinchOriginX * g.lastPinchScale) / newScale;
-          const newPosY = anchorY - scaleDelta * (anchorY - g.pinchOriginY * g.lastPinchScale) / newScale;
+          // Pinch midpoint relative to container center (in image-space coords)
+          const anchorX = (g.lastPinchMidX - rect.left - rect.width / 2) / g.scale;
+          const anchorY = (g.lastPinchMidY - rect.top - rect.height / 2) / g.scale;
+          // Zoom toward anchor: keep point under fingers stationary
+          const newPosX = anchorX + (g.posX - anchorX) * actualRatio;
+          const newPosY = anchorY + (g.posY - anchorY) * actualRatio;
           // Also pan with midpoint drift
           const driftX = (mid.x - g.lastPinchMidX) / newScale;
           const driftY = (mid.y - g.lastPinchMidY) / newScale;
@@ -239,6 +244,10 @@ function useImageZoom() {
           g.posX = clamped.x;
           g.posY = clamped.y;
         }
+        // Advance for next frame
+        g.lastPinchDist = dist;
+        g.lastPinchMidX = mid.x;
+        g.lastPinchMidY = mid.y;
         commit(false);
       } else if (e.touches.length === 1 && g.isPanning) {
         e.preventDefault();
@@ -616,6 +625,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
         <Dialog.Overlay className="fixed inset-0 bg-black/95 z-50 backdrop-blur-sm" />
         <Dialog.Content
           className="fixed inset-0 z-50 flex items-center justify-center p-4 focus:outline-none"
+          style={{ touchAction: 'none' }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
         >
           {/* Top-right buttons */}
