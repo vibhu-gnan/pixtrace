@@ -52,314 +52,269 @@ function getMidpoint(t1: Touch, t2: Touch) {
 }
 
 function useImageZoom() {
-  // Use a single ref object for all mutable gesture state to avoid stale closures entirely.
-  // React state is only used for values that must trigger a re-render.
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const gestureRef = useRef({
+
+  // ALL mutable state lives here — never in closures, never in React state except for render
+  const g = useRef({
     scale: 1,
+    // posX/posY are in SCREEN pixels (not image-space). transform = translate(posX, posY) scale(scale)
     posX: 0,
     posY: 0,
     // pinch
-    lastPinchDist: null as number | null,
-    lastPinchScale: 1,
+    isPinching: false,
+    lastPinchDist: 0,
     lastPinchMidX: 0,
     lastPinchMidY: 0,
-    pinchOriginX: 0,  // posX at pinch start
-    pinchOriginY: 0,  // posY at pinch start
-    isPinching: false,
-    // pan
+    // pan (touch)
+    isPanning: false,
     panStartX: 0,
     panStartY: 0,
     panOriginX: 0,
     panOriginY: 0,
-    isPanning: false,
     // double-tap
     lastTapTime: 0,
     // mouse drag
     isMouseDragging: false,
-    mousePanStartX: 0,
-    mousePanStartY: 0,
-    mousePanOriginX: 0,
-    mousePanOriginY: 0,
+    mouseDragStartX: 0,
+    mouseDragStartY: 0,
+    mouseDragOriginX: 0,
+    mouseDragOriginY: 0,
   });
 
-  // Only these drive re-renders
-  const [renderScale, setRenderScale] = useState(1);
-  const [renderPos, setRenderPos] = useState({ x: 0, y: 0 });
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [renderTransform, setRenderTransform] = useState({ scale: 1, x: 0, y: 0, animate: false });
 
-  const isZoomed = renderScale > 1.05;
+  const isZoomed = renderTransform.scale > 1.05;
 
-  // Commit gesture state → React state (triggers re-render)
-  const commit = useCallback((animate: boolean) => {
-    const g = gestureRef.current;
-    setRenderScale(g.scale);
-    setRenderPos({ x: g.posX, y: g.posY });
-    setIsAnimating(animate);
+  // Push g → React render. Call after mutating g.
+  const flush = useCallback((animate: boolean) => {
+    setRenderTransform({ scale: g.current.scale, x: g.current.posX, y: g.current.posY, animate });
   }, []);
 
-  // Compute pan bounds from actual container & scale
-  const getBounds = useCallback((s: number) => {
+  // Clamp posX/posY so image never pans off-screen.
+  // Since transform = translate(x,y) scale(s), the image overflows by (s-1)/2 * containerSize px on each side.
+  const clampPos = useCallback((x: number, y: number, s: number) => {
     const el = containerRef.current;
-    if (!el || s <= 1) return { maxX: 0, maxY: 0 };
-    const rect = el.getBoundingClientRect();
-    // How many extra pixels the scaled image overflows on each axis
-    const maxX = Math.max(0, (rect.width * (s - 1)) / (2 * s));
-    const maxY = Math.max(0, (rect.height * (s - 1)) / (2 * s));
-    return { maxX, maxY };
-  }, []);
-
-  const constrainPos = useCallback((x: number, y: number, s: number) => {
-    if (s <= 1) return { x: 0, y: 0 };
-    const { maxX, maxY } = getBounds(s);
+    if (!el || s <= 1) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    const maxX = (r.width  * (s - 1)) / 2;
+    const maxY = (r.height * (s - 1)) / 2;
     return { x: clamp(x, -maxX, maxX), y: clamp(y, -maxY, maxY) };
-  }, [getBounds]);
+  }, []);
 
   const resetZoom = useCallback(() => {
-    const g = gestureRef.current;
-    g.scale = 1;
-    g.posX = 0;
-    g.posY = 0;
-    g.lastPinchDist = null;
-    g.isPinching = false;
-    g.isPanning = false;
-    g.isMouseDragging = false;
-    commit(true);
-  }, [commit]);
+    g.current.scale = 1;
+    g.current.posX = 0;
+    g.current.posY = 0;
+    g.current.isPinching = false;
+    g.current.isPanning = false;
+    g.current.isMouseDragging = false;
+    flush(true);
+  }, [flush]);
 
-  // ─── Non-passive native event listeners ─────────────────
+  // ─── Attach native (non-passive) listeners once on mount ──
+  // All handlers read from g.current so no stale closure issues.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    // ── Wheel (desktop zoom) ──────────────────────────────
+    // ── Wheel ────────────────────────────────────────────
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const g = gestureRef.current;
-      const factor = e.deltaMode === 1 ? 30 : 1; // line vs px
+      const factor = e.deltaMode === 1 ? 30 : 1;
       const delta = -(e.deltaY * factor) * 0.005;
-      const newScale = clamp(g.scale * (1 + delta), MIN_SCALE, MAX_SCALE);
-
+      const newScale = clamp(g.current.scale * (1 + delta), MIN_SCALE, MAX_SCALE);
       if (newScale <= 1) {
-        g.scale = 1; g.posX = 0; g.posY = 0;
+        g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
       } else {
-        // Zoom toward cursor position
+        // Zoom toward cursor: anchor = cursor pos relative to container centre
         const rect = el.getBoundingClientRect();
-        const cursorX = e.clientX - rect.left - rect.width / 2;
-        const cursorY = e.clientY - rect.top - rect.height / 2;
-        const scaleDelta = newScale / g.scale;
-        const newPosX = cursorX - scaleDelta * (cursorX - g.posX * g.scale) / newScale;
-        const newPosY = cursorY - scaleDelta * (cursorY - g.posY * g.scale) / newScale;
-        g.scale = newScale;
-        const clamped = constrainPos(newPosX, newPosY, newScale);
-        g.posX = clamped.x;
-        g.posY = clamped.y;
+        const ax = e.clientX - rect.left - rect.width / 2;
+        const ay = e.clientY - rect.top - rect.height / 2;
+        // New pos = ax - (ax - oldPos) * (newScale/oldScale)
+        const ratio = newScale / g.current.scale;
+        const nx = ax - (ax - g.current.posX) * ratio;
+        const ny = ay - (ay - g.current.posY) * ratio;
+        g.current.scale = newScale;
+        const c = clampPos(nx, ny, newScale);
+        g.current.posX = c.x; g.current.posY = c.y;
       }
-      commit(false);
+      flush(false);
     };
 
-    // ── Touch ─────────────────────────────────────────────
+    // ── Touch Start ──────────────────────────────────────
     const onTouchStart = (e: TouchEvent) => {
-      const g = gestureRef.current;
-
       if (e.touches.length === 2) {
         e.preventDefault();
-        g.isPinching = true;
-        g.isPanning = false;
-        g.lastPinchDist = getDistance(e.touches[0], e.touches[1]);
-        g.lastPinchScale = g.scale;
-        g.pinchOriginX = g.posX;
-        g.pinchOriginY = g.posY;
+        g.current.isPinching = true;
+        g.current.isPanning = false;
+        g.current.lastPinchDist = getDistance(e.touches[0], e.touches[1]);
         const mid = getMidpoint(e.touches[0], e.touches[1]);
-        g.lastPinchMidX = mid.x;
-        g.lastPinchMidY = mid.y;
+        g.current.lastPinchMidX = mid.x;
+        g.current.lastPinchMidY = mid.y;
       } else if (e.touches.length === 1) {
         e.preventDefault();
         const now = Date.now();
-        const isDoubleTap = (now - g.lastTapTime) < DOUBLE_TAP_TIMEOUT;
-
+        const isDoubleTap = (now - g.current.lastTapTime) < DOUBLE_TAP_TIMEOUT;
         if (isDoubleTap) {
-          g.lastTapTime = 0;
-          g.isPanning = false;
-          if (g.scale > 1.05) {
-            g.scale = 1; g.posX = 0; g.posY = 0;
+          g.current.lastTapTime = 0;
+          g.current.isPanning = false;
+          if (g.current.scale > 1.05) {
+            g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
           } else {
             const rect = el.getBoundingClientRect();
-            const tapX = e.touches[0].clientX - rect.left - rect.width / 2;
-            const tapY = e.touches[0].clientY - rect.top - rect.height / 2;
+            const ax = e.touches[0].clientX - rect.left - rect.width / 2;
+            const ay = e.touches[0].clientY - rect.top - rect.height / 2;
             const s = DOUBLE_TAP_SCALE;
-            const clamped = constrainPos(
-              -(tapX * (s - 1)) / s,
-              -(tapY * (s - 1)) / s,
-              s
-            );
-            g.scale = s;
-            g.posX = clamped.x;
-            g.posY = clamped.y;
+            // zoom toward tap point
+            const nx = ax - (ax - 0) * s;
+            const ny = ay - (ay - 0) * s;
+            g.current.scale = s;
+            const c = clampPos(nx, ny, s);
+            g.current.posX = c.x; g.current.posY = c.y;
           }
-          commit(true);
+          flush(true);
           return;
         }
-
-        g.lastTapTime = now;
-
-        // Always arm pan here — scale may already be > 1 (e.g. after pinch or double-tap)
-        if (g.scale > 1.05) {
-          g.isPanning = true;
-          g.panStartX = e.touches[0].clientX;
-          g.panStartY = e.touches[0].clientY;
-          g.panOriginX = g.posX;
-          g.panOriginY = g.posY;
+        g.current.lastTapTime = now;
+        if (g.current.scale > 1.05) {
+          g.current.isPanning = true;
+          g.current.panStartX = e.touches[0].clientX;
+          g.current.panStartY = e.touches[0].clientY;
+          g.current.panOriginX = g.current.posX;
+          g.current.panOriginY = g.current.posY;
         }
       }
     };
 
+    // ── Touch Move ──────────────────────────────────────
     const onTouchMove = (e: TouchEvent) => {
-      const g = gestureRef.current;
-
-      if (e.touches.length === 2 && g.isPinching && g.lastPinchDist !== null) {
+      if (e.touches.length === 2 && g.current.isPinching) {
         e.preventDefault();
         const dist = getDistance(e.touches[0], e.touches[1]);
         const mid = getMidpoint(e.touches[0], e.touches[1]);
-        // Incremental: scale by ratio of current to previous distance
-        const scaleRatio = dist / g.lastPinchDist;
-        const newScale = clamp(g.scale * scaleRatio, MIN_SCALE, MAX_SCALE);
-        const actualRatio = newScale / g.scale;
+        const ratio = dist / g.current.lastPinchDist;
+        const newScale = clamp(g.current.scale * ratio, MIN_SCALE, MAX_SCALE);
+        const actualRatio = newScale / g.current.scale;
 
         if (newScale <= 1) {
-          g.scale = 1; g.posX = 0; g.posY = 0;
+          g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
         } else {
           const rect = el.getBoundingClientRect();
-          // Pinch midpoint relative to container center (in image-space coords)
-          const anchorX = (g.lastPinchMidX - rect.left - rect.width / 2) / g.scale;
-          const anchorY = (g.lastPinchMidY - rect.top - rect.height / 2) / g.scale;
-          // Zoom toward anchor: keep point under fingers stationary
-          const newPosX = anchorX + (g.posX - anchorX) * actualRatio;
-          const newPosY = anchorY + (g.posY - anchorY) * actualRatio;
-          // Also pan with midpoint drift
-          const driftX = (mid.x - g.lastPinchMidX) / newScale;
-          const driftY = (mid.y - g.lastPinchMidY) / newScale;
-          g.scale = newScale;
-          const clamped = constrainPos(newPosX + driftX, newPosY + driftY, newScale);
-          g.posX = clamped.x;
-          g.posY = clamped.y;
+          // anchor = pinch midpoint relative to container centre
+          const ax = g.current.lastPinchMidX - rect.left - rect.width / 2;
+          const ay = g.current.lastPinchMidY - rect.top - rect.height / 2;
+          // pan drift from midpoint movement
+          const driftX = mid.x - g.current.lastPinchMidX;
+          const driftY = mid.y - g.current.lastPinchMidY;
+          const nx = ax - (ax - g.current.posX) * actualRatio + driftX;
+          const ny = ay - (ay - g.current.posY) * actualRatio + driftY;
+          g.current.scale = newScale;
+          const c = clampPos(nx, ny, newScale);
+          g.current.posX = c.x; g.current.posY = c.y;
         }
-        // Advance for next frame
-        g.lastPinchDist = dist;
-        g.lastPinchMidX = mid.x;
-        g.lastPinchMidY = mid.y;
-        commit(false);
-      } else if (e.touches.length === 1 && g.isPanning) {
+        g.current.lastPinchDist = dist;
+        g.current.lastPinchMidX = mid.x;
+        g.current.lastPinchMidY = mid.y;
+        flush(false);
+      } else if (e.touches.length === 1 && g.current.isPanning) {
         e.preventDefault();
-        const dx = (e.touches[0].clientX - g.panStartX) / g.scale;
-        const dy = (e.touches[0].clientY - g.panStartY) / g.scale;
-        const clamped = constrainPos(g.panOriginX + dx, g.panOriginY + dy, g.scale);
-        g.posX = clamped.x;
-        g.posY = clamped.y;
-        commit(false);
+        const dx = e.touches[0].clientX - g.current.panStartX;
+        const dy = e.touches[0].clientY - g.current.panStartY;
+        const c = clampPos(g.current.panOriginX + dx, g.current.panOriginY + dy, g.current.scale);
+        g.current.posX = c.x; g.current.posY = c.y;
+        flush(false);
       }
     };
 
+    // ── Touch End ───────────────────────────────────────
     const onTouchEnd = (e: TouchEvent) => {
-      const g = gestureRef.current;
-
       if (e.touches.length === 0) {
-        g.isPinching = false;
-        g.isPanning = false;
-        g.lastPinchDist = null;
-        // Snap back to 1 if nearly at base scale
-        if (g.scale < 1.08) {
-          g.scale = 1; g.posX = 0; g.posY = 0;
-          commit(true);
+        g.current.isPinching = false;
+        g.current.isPanning = false;
+        if (g.current.scale < 1.08) {
+          g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
+          flush(true);
         }
-      } else if (e.touches.length === 1 && g.isPinching) {
-        // Finger lifted during pinch — transition to pan mode
-        g.isPinching = false;
-        if (g.scale > 1.05) {
-          g.isPanning = true;
-          g.panStartX = e.touches[0].clientX;
-          g.panStartY = e.touches[0].clientY;
-          g.panOriginX = g.posX;
-          g.panOriginY = g.posY;
+      } else if (e.touches.length === 1 && g.current.isPinching) {
+        g.current.isPinching = false;
+        if (g.current.scale > 1.05) {
+          g.current.isPanning = true;
+          g.current.panStartX = e.touches[0].clientX;
+          g.current.panStartY = e.touches[0].clientY;
+          g.current.panOriginX = g.current.posX;
+          g.current.panOriginY = g.current.posY;
         }
       }
     };
 
-    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('wheel',      onWheel,      { passive: false });
     el.addEventListener('touchstart', onTouchStart, { passive: false });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd, { passive: false });
-
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    el.addEventListener('touchend',   onTouchEnd,   { passive: false });
     return () => {
-      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('wheel',      onWheel);
       el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchmove',  onTouchMove);
+      el.removeEventListener('touchend',   onTouchEnd);
     };
-  }, [commit, constrainPos]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — all state via g.current ref
 
-  // ─── Mouse drag (desktop pan when zoomed) ───────────────
+  // ─── Mouse drag (desktop) ──────────────────────────────
+  const mouseDragCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => { mouseDragCleanupRef.current?.(); }, []);
+
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    const g = gestureRef.current;
-    if (g.scale > 1.05) {
+    if (g.current.scale > 1.05) {
       resetZoom();
     } else {
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const clickX = e.clientX - rect.left - rect.width / 2;
-      const clickY = e.clientY - rect.top - rect.height / 2;
+      const ax = e.clientX - rect.left - rect.width / 2;
+      const ay = e.clientY - rect.top - rect.height / 2;
       const s = DOUBLE_TAP_SCALE;
-      const clamped = constrainPos(-(clickX * (s - 1)) / s, -(clickY * (s - 1)) / s, s);
-      g.scale = s;
-      g.posX = clamped.x;
-      g.posY = clamped.y;
-      commit(true);
+      const nx = ax - (ax - 0) * s;
+      const ny = ay - (ay - 0) * s;
+      g.current.scale = s;
+      const c = clampPos(nx, ny, s);
+      g.current.posX = c.x; g.current.posY = c.y;
+      flush(true);
     }
-  }, [resetZoom, constrainPos, commit]);
-
-  // Track mouse drag listeners so we can clean up on unmount
-  const mouseDragCleanupRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    return () => { mouseDragCleanupRef.current?.(); };
-  }, []);
+  }, [resetZoom, clampPos, flush]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    const g = gestureRef.current;
-    if (g.scale <= 1.05) return;
+    if (g.current.scale <= 1.05) return;
     e.preventDefault();
-    g.isMouseDragging = true;
-    g.mousePanStartX = e.clientX;
-    g.mousePanStartY = e.clientY;
-    g.mousePanOriginX = g.posX;
-    g.mousePanOriginY = g.posY;
+    g.current.isMouseDragging = true;
+    g.current.mouseDragStartX = e.clientX;
+    g.current.mouseDragStartY = e.clientY;
+    g.current.mouseDragOriginX = g.current.posX;
+    g.current.mouseDragOriginY = g.current.posY;
 
     const onMouseMove = (ev: MouseEvent) => {
-      const dx = (ev.clientX - g.mousePanStartX) / g.scale;
-      const dy = (ev.clientY - g.mousePanStartY) / g.scale;
-      const clamped = constrainPos(g.mousePanOriginX + dx, g.mousePanOriginY + dy, g.scale);
-      g.posX = clamped.x;
-      g.posY = clamped.y;
-      commit(false);
+      const dx = ev.clientX - g.current.mouseDragStartX;
+      const dy = ev.clientY - g.current.mouseDragStartY;
+      const c = clampPos(g.current.mouseDragOriginX + dx, g.current.mouseDragOriginY + dy, g.current.scale);
+      g.current.posX = c.x; g.current.posY = c.y;
+      flush(false);
     };
-
     const cleanup = () => {
-      g.isMouseDragging = false;
+      g.current.isMouseDragging = false;
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', cleanup);
       mouseDragCleanupRef.current = null;
     };
-
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', cleanup);
     mouseDragCleanupRef.current = cleanup;
-  }, [constrainPos, commit]);
+  }, [clampPos, flush]);
 
+  // transform = translate then scale, so posX/posY are in screen pixels
   const imageStyle: React.CSSProperties = {
-    transform: `scale(${renderScale}) translate(${renderPos.x}px, ${renderPos.y}px)`,
-    transition: isAnimating ? 'transform 0.2s ease-out' : 'none',
+    transform: `translate(${renderTransform.x}px, ${renderTransform.y}px) scale(${renderTransform.scale})`,
+    transition: renderTransform.animate ? 'transform 0.2s ease-out' : 'none',
     transformOrigin: 'center center',
     willChange: 'transform',
   };
@@ -373,9 +328,8 @@ function useImageZoom() {
       onDoubleClick: handleDoubleClick,
       onMouseDown: handleMouseDown,
     },
-    // Expose for swipe logic
-    isPinching: () => gestureRef.current.isPinching,
-    isPanning: () => gestureRef.current.isPanning,
+    isPinching: () => g.current.isPinching,
+    isPanning:  () => g.current.isPanning,
   };
 }
 
