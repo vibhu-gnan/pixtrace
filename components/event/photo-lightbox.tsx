@@ -52,28 +52,21 @@ function getMidpoint(t1: Touch, t2: Touch) {
 }
 
 function useImageZoom() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  // ALL mutable state lives here — never in closures, never in React state except for render
+  // ALL mutable gesture state — never stale because handlers read g.current directly
   const g = useRef({
     scale: 1,
-    // posX/posY are in SCREEN pixels (not image-space). transform = translate(posX, posY) scale(scale)
-    posX: 0,
+    posX: 0,   // screen pixels — transform = translate(posX,posY) scale(scale)
     posY: 0,
-    // pinch
     isPinching: false,
     lastPinchDist: 0,
     lastPinchMidX: 0,
     lastPinchMidY: 0,
-    // pan (touch)
     isPanning: false,
     panStartX: 0,
     panStartY: 0,
     panOriginX: 0,
     panOriginY: 0,
-    // double-tap
     lastTapTime: 0,
-    // mouse drag
     isMouseDragging: false,
     mouseDragStartX: 0,
     mouseDragStartY: 0,
@@ -82,18 +75,17 @@ function useImageZoom() {
   });
 
   const [renderTransform, setRenderTransform] = useState({ scale: 1, x: 0, y: 0, animate: false });
-
   const isZoomed = renderTransform.scale > 1.05;
 
-  // Push g → React render. Call after mutating g.
   const flush = useCallback((animate: boolean) => {
     setRenderTransform({ scale: g.current.scale, x: g.current.posX, y: g.current.posY, animate });
   }, []);
 
-  // Clamp posX/posY so image never pans off-screen.
-  // Since transform = translate(x,y) scale(s), the image overflows by (s-1)/2 * containerSize px on each side.
+  // clampPos: keep image within viewport. transform = translate(x,y) scale(s)
+  // so overflow = (s-1)/2 * size on each side, in screen pixels
+  const elRef = useRef<HTMLDivElement | null>(null);
   const clampPos = useCallback((x: number, y: number, s: number) => {
-    const el = containerRef.current;
+    const el = elRef.current;
     if (!el || s <= 1) return { x: 0, y: 0 };
     const r = el.getBoundingClientRect();
     const maxX = (r.width  * (s - 1)) / 2;
@@ -102,22 +94,26 @@ function useImageZoom() {
   }, []);
 
   const resetZoom = useCallback(() => {
-    g.current.scale = 1;
-    g.current.posX = 0;
-    g.current.posY = 0;
-    g.current.isPinching = false;
-    g.current.isPanning = false;
-    g.current.isMouseDragging = false;
+    g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
+    g.current.isPinching = false; g.current.isPanning = false; g.current.isMouseDragging = false;
     flush(true);
   }, [flush]);
 
-  // ─── Attach native (non-passive) listeners once on mount ──
-  // All handlers read from g.current so no stale closure issues.
-  useEffect(() => {
-    const el = containerRef.current;
+  // ─── Callback ref — listeners attach the moment the DOM node exists ──────
+  // This is critical: Radix Dialog renders asynchronously, so useEffect([])) fires
+  // before the node is in the DOM. A callback ref fires exactly when the node mounts.
+  const listenerCleanupRef = useRef<(() => void) | null>(null);
+
+  const containerRef = useCallback((el: HTMLDivElement | null) => {
+    // Clean up previous listeners if node changes
+    if (listenerCleanupRef.current) {
+      listenerCleanupRef.current();
+      listenerCleanupRef.current = null;
+    }
+    elRef.current = el;
     if (!el) return;
 
-    // ── Wheel ────────────────────────────────────────────
+    // ── Wheel ──────────────────────────────────────────
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const factor = e.deltaMode === 1 ? 30 : 1;
@@ -126,11 +122,9 @@ function useImageZoom() {
       if (newScale <= 1) {
         g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
       } else {
-        // Zoom toward cursor: anchor = cursor pos relative to container centre
         const rect = el.getBoundingClientRect();
         const ax = e.clientX - rect.left - rect.width / 2;
         const ay = e.clientY - rect.top - rect.height / 2;
-        // New pos = ax - (ax - oldPos) * (newScale/oldScale)
         const ratio = newScale / g.current.scale;
         const nx = ax - (ax - g.current.posX) * ratio;
         const ny = ay - (ay - g.current.posY) * ratio;
@@ -141,7 +135,7 @@ function useImageZoom() {
       flush(false);
     };
 
-    // ── Touch Start ──────────────────────────────────────
+    // ── Touch Start ────────────────────────────────────
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault();
@@ -165,7 +159,6 @@ function useImageZoom() {
             const ax = e.touches[0].clientX - rect.left - rect.width / 2;
             const ay = e.touches[0].clientY - rect.top - rect.height / 2;
             const s = DOUBLE_TAP_SCALE;
-            // zoom toward tap point
             const nx = ax - (ax - 0) * s;
             const ny = ay - (ay - 0) * s;
             g.current.scale = s;
@@ -186,24 +179,21 @@ function useImageZoom() {
       }
     };
 
-    // ── Touch Move ──────────────────────────────────────
+    // ── Touch Move ─────────────────────────────────────
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 2 && g.current.isPinching) {
         e.preventDefault();
         const dist = getDistance(e.touches[0], e.touches[1]);
-        const mid = getMidpoint(e.touches[0], e.touches[1]);
+        const mid  = getMidpoint(e.touches[0], e.touches[1]);
         const ratio = dist / g.current.lastPinchDist;
         const newScale = clamp(g.current.scale * ratio, MIN_SCALE, MAX_SCALE);
         const actualRatio = newScale / g.current.scale;
-
         if (newScale <= 1) {
           g.current.scale = 1; g.current.posX = 0; g.current.posY = 0;
         } else {
           const rect = el.getBoundingClientRect();
-          // anchor = pinch midpoint relative to container centre
           const ax = g.current.lastPinchMidX - rect.left - rect.width / 2;
           const ay = g.current.lastPinchMidY - rect.top - rect.height / 2;
-          // pan drift from midpoint movement
           const driftX = mid.x - g.current.lastPinchMidX;
           const driftY = mid.y - g.current.lastPinchMidY;
           const nx = ax - (ax - g.current.posX) * actualRatio + driftX;
@@ -226,7 +216,7 @@ function useImageZoom() {
       }
     };
 
-    // ── Touch End ───────────────────────────────────────
+    // ── Touch End ──────────────────────────────────────
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length === 0) {
         g.current.isPinching = false;
@@ -251,14 +241,14 @@ function useImageZoom() {
     el.addEventListener('touchstart', onTouchStart, { passive: false });
     el.addEventListener('touchmove',  onTouchMove,  { passive: false });
     el.addEventListener('touchend',   onTouchEnd,   { passive: false });
-    return () => {
+
+    listenerCleanupRef.current = () => {
       el.removeEventListener('wheel',      onWheel);
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove',  onTouchMove);
       el.removeEventListener('touchend',   onTouchEnd);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — all state via g.current ref
+  }, [clampPos, flush]); // stable: clampPos and flush have [] deps themselves
 
   // ─── Mouse drag (desktop) ──────────────────────────────
   const mouseDragCleanupRef = useRef<(() => void) | null>(null);
@@ -269,7 +259,7 @@ function useImageZoom() {
     if (g.current.scale > 1.05) {
       resetZoom();
     } else {
-      const el = containerRef.current;
+      const el = elRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const ax = e.clientX - rect.left - rect.width / 2;
@@ -292,7 +282,6 @@ function useImageZoom() {
     g.current.mouseDragStartY = e.clientY;
     g.current.mouseDragOriginX = g.current.posX;
     g.current.mouseDragOriginY = g.current.posY;
-
     const onMouseMove = (ev: MouseEvent) => {
       const dx = ev.clientX - g.current.mouseDragStartX;
       const dy = ev.clientY - g.current.mouseDragStartY;
@@ -311,7 +300,6 @@ function useImageZoom() {
     mouseDragCleanupRef.current = cleanup;
   }, [clampPos, flush]);
 
-  // transform = translate then scale, so posX/posY are in screen pixels
   const imageStyle: React.CSSProperties = {
     transform: `translate(${renderTransform.x}px, ${renderTransform.y}px) scale(${renderTransform.scale})`,
     transition: renderTransform.animate ? 'transform 0.2s ease-out' : 'none',
@@ -323,7 +311,7 @@ function useImageZoom() {
     isZoomed,
     resetZoom,
     imageStyle,
-    containerRef,
+    containerRef,  // now a callback ref — pass directly as ref={zoom.containerRef}
     handlers: {
       onDoubleClick: handleDoubleClick,
       onMouseDown: handleMouseDown,
