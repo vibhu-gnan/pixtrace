@@ -176,6 +176,11 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
   }, [canGoNext]);
 
   const handleClose = useCallback(() => {
+    // Pop the history state we pushed so back button doesn't go to a phantom state
+    if (pushedStateRef.current) {
+      pushedStateRef.current = false;
+      try { window.history.back(); } catch { /* SSR guard */ }
+    }
     onClose();
   }, [onClose]);
 
@@ -343,8 +348,6 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
               <CloseIcon className="text-white" />
             </button>
           </div>
-
-
 
           {/* Previous button */}
           {canGoPrev && (

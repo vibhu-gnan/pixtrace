@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Allowed hostnames for download proxy — prevents open proxy / SSRF abuse
+const ALLOWED_HOSTS = [
+    'pub-cc4d5b144c5490713c006e00c5daf1a0.r2.dev', // R2 public bucket
+];
+
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const url = searchParams.get('url');
@@ -10,30 +15,47 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // Basic validation to prevent open proxy abuse (optional but recommended)
-        // Here we check if the protocol is https
         const parsedUrl = new URL(url);
+
+        // Only allow HTTPS
         if (parsedUrl.protocol !== 'https:') {
             return NextResponse.json({ error: 'Invalid protocol' }, { status: 400 });
         }
 
-        // Fetch the file from the external URL
-        const response = await fetch(url);
+        // Restrict to allowed R2 hosts only
+        if (!ALLOWED_HOSTS.some(host => parsedUrl.hostname === host)) {
+            return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });
+        }
+
+        // Fetch with timeout to prevent hanging connections
+        const response = await fetch(url, {
+            signal: AbortSignal.timeout(30000),
+        });
 
         if (!response.ok) {
             return NextResponse.json({ error: 'Failed to fetch file' }, { status: response.status });
         }
 
-        // Get the content type from the response headers or fallback
+        // Reject files over 50MB
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > 50 * 1024 * 1024) {
+            return NextResponse.json({ error: 'File too large' }, { status: 413 });
+        }
+
         const contentType = response.headers.get('content-type') || 'application/octet-stream';
 
-        // Stream the response back to the client
-        // We can pass the body directly to the new Response
-        // Setting Content-Disposition forces the browser to download it
+        // Sanitize filename
+        const safeName = filename
+            .replace(/[/\\]/g, '_')
+            .replace(/\.\./g, '_')
+            .slice(0, 255);
+
         return new NextResponse(response.body, {
             headers: {
                 'Content-Type': contentType,
-                'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+                'Content-Disposition': `attachment; filename="${encodeURIComponent(safeName)}"`,
+                ...(contentLength ? { 'Content-Length': contentLength } : {}),
+                'Cache-Control': 'private, no-store',
             },
         });
     } catch (error) {

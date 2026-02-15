@@ -137,11 +137,12 @@ export default async function GallerySlugPage({
                     <GalleryPageClient
                         initialMedia={media}
                         albums={albums}
-                        eventHash={event.event_hash || slug} // Pass hash for API calls if needed by client
+                        eventHash={event.event_hash || slug}
                         eventName={event.name}
                         description={event.description}
                         totalCount={totalCount}
                         initialPhotoId={initialPhotoId}
+                        allowDownload={event.allow_download ?? true}
                     />
                 </div>
 

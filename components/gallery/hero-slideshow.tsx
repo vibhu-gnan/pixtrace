@@ -12,46 +12,59 @@ export function HeroSlideshow({ slides, intervalMs = 5000 }: HeroSlideshowProps)
   const [nextIndex, setNextIndex] = useState<number | null>(null);
   const [loadedIndices, setLoadedIndices] = useState<Set<number>>(new Set([0]));
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loadedRef = useRef<Set<number>>(new Set([0]));
+  const preloadingRef = useRef<Set<number>>(new Set());
   const transitionDuration = 1200; // ms
 
-  // Preload an image by index
+  // Keep ref in sync with state
+  useEffect(() => {
+    loadedRef.current = loadedIndices;
+  }, [loadedIndices]);
+
+  // Preload an image by index — uses ref to avoid stale closure issues
   const preloadImage = useCallback((index: number) => {
-    if (loadedIndices.has(index)) return;
+    if (loadedRef.current.has(index) || preloadingRef.current.has(index)) return;
+    preloadingRef.current.add(index);
     const img = new Image();
     img.src = slides[index].url;
     img.onload = () => {
+      preloadingRef.current.delete(index);
       setLoadedIndices(prev => {
+        if (prev.has(index)) return prev;
         const next = new Set(prev);
         next.add(index);
         return next;
       });
     };
-  }, [slides, loadedIndices]);
+    img.onerror = () => {
+      preloadingRef.current.delete(index);
+    };
+  }, [slides]);
 
   // Advance to next slide
   const advance = useCallback(() => {
-    const next = (currentIndex + 1) % slides.length;
-    if (!loadedIndices.has(next)) return; // skip if not loaded yet
-    setNextIndex(next);
-    // After transition completes, swap
-    setTimeout(() => {
-      setCurrentIndex(next);
-      setNextIndex(null);
-    }, transitionDuration);
-  }, [currentIndex, slides.length, loadedIndices]);
+    setCurrentIndex(prev => {
+      const next = (prev + 1) % slides.length;
+      if (!loadedRef.current.has(next)) return prev; // skip if not loaded
+      setNextIndex(next);
+      setTimeout(() => {
+        setCurrentIndex(next);
+        setNextIndex(null);
+      }, transitionDuration);
+      return prev; // don't change yet — setTimeout will do it
+    });
+  }, [slides.length]);
 
   // Preload next image on mount and when currentIndex changes
   useEffect(() => {
     const next = (currentIndex + 1) % slides.length;
     preloadImage(next);
-    // Also preload the one after that
     const afterNext = (currentIndex + 2) % slides.length;
     preloadImage(afterNext);
   }, [currentIndex, slides.length, preloadImage]);
 
   // Auto-advance timer
   useEffect(() => {
-    // Check prefers-reduced-motion
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) return;
 

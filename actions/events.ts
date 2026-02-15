@@ -415,6 +415,7 @@ export async function updateEventPermissions(eventId: string, payload: {
 
   if (evt?.event_hash) {
     revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
   }
   revalidatePath(`/events/${eventId}/permissions`);
 

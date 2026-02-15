@@ -27,7 +27,6 @@ body {
 }
 
 /* Ken Burns slideshow keyframes — 4 variants for visual variety */
-/* Ken Burns slideshow keyframes — 4 variants for visual variety */
 @keyframes kenBurns0 {
   from { transform: scale(1.10) translate(0%, 0%); }
   to   { transform: scale(1.20) translate(-1%, -1%); }
