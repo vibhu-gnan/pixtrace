@@ -11,9 +11,10 @@ interface GalleryGridProps {
     media: GalleryMediaItem[];
     eventHash?: string;
     initialPhotoId?: string;
+    allowDownload?: boolean;
 }
 
-export function GalleryGrid({ media, eventHash, initialPhotoId }: GalleryGridProps) {
+export function GalleryGrid({ media, eventHash, initialPhotoId, allowDownload = true }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -140,6 +141,7 @@ export function GalleryGrid({ media, eventHash, initialPhotoId }: GalleryGridPro
                     isOpen={lightboxOpen}
                     onClose={() => setLightboxOpen(false)}
                     eventHash={eventHash}
+                    allowDownload={allowDownload}
                 />
             )}
         </>

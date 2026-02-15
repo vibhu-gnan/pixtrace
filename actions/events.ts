@@ -22,6 +22,8 @@ export interface EventData {
   updated_at?: string;
   albums?: { id: string; name: string; sort_order: number }[];
   media_count?: number;
+  allow_download?: boolean;
+  allow_slideshow?: boolean;
 }
 
 export async function createEvent(formData: FormData) {
@@ -367,4 +369,54 @@ export async function unpublishEvent(eventId: string): Promise<{ error?: string 
   revalidatePath(`/events/${eventId}`);
   revalidatePath('/dashboard');
   return {};
+}
+
+export async function updateEventPermissions(eventId: string, payload: {
+  allowDownload?: boolean;
+  allowSlideshow?: boolean;
+  allowDownloadRequest?: boolean; // Future proofing
+  allowViewRequest?: boolean;     // Future proofing
+  downloadAccess?: 'everyone' | 'no_one';
+  viewAccess?: 'everyone' | 'bmu_id' | 'no_one';
+}) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const supabase = createAdminClient();
+
+  // Create update object with only defined fields
+  const updates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (typeof payload.allowDownload !== 'undefined') updates.allow_download = payload.allowDownload;
+  if (typeof payload.allowSlideshow !== 'undefined') updates.allow_slideshow = payload.allowSlideshow;
+
+  // Note: view/download access granular controls are UI-only for now until deeper schema implementation
+  // We'll trust the checked toggles for the booleans
+
+  const { error } = await supabase
+    .from('events')
+    .update(updates)
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error updating permissions:', error);
+    return { error: 'Failed to update permissions' };
+  }
+
+  // Get event_hash to revalidate public gallery
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+  }
+  revalidatePath(`/events/${eventId}/permissions`);
+
+  return { success: true };
 }

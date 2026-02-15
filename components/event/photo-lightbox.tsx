@@ -41,12 +41,13 @@ interface PhotoLightboxProps {
   isOpen: boolean;
   onClose: () => void;
   eventHash?: string;
+  allowDownload?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
 const LIGHTBOX_STATE_KEY = 'pixtrace-lightbox';
 
-export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash }: PhotoLightboxProps) {
+export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, allowDownload = true }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
   const [linkCopied, setLinkCopied] = useState(false);
@@ -309,22 +310,24 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash 
         >
           {/* Top-right buttons */}
           <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading}
-              className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all ${downloadSuccess ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
-                } ${isDownloading ? 'cursor-wait opacity-80' : ''}`}
-              aria-label="Download photo"
-              title="Download original"
-            >
-              {isDownloading ? (
-                <SpinnerIcon className="animate-spin text-white" />
-              ) : downloadSuccess ? (
-                <CheckIcon className="text-white" />
-              ) : (
-                <DownloadIcon className="text-white" />
-              )}
-            </button>
+            {allowDownload && (
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all ${downloadSuccess ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
+                  } ${isDownloading ? 'cursor-wait opacity-80' : ''}`}
+                aria-label="Download photo"
+                title="Download original"
+              >
+                {isDownloading ? (
+                  <SpinnerIcon className="animate-spin text-white" />
+                ) : downloadSuccess ? (
+                  <CheckIcon className="text-white" />
+                ) : (
+                  <DownloadIcon className="text-white" />
+                )}
+              </button>
+            )}
             <button
               onClick={handleSharePhoto}
               className="relative w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"

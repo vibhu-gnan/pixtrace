@@ -134,6 +134,7 @@ export default async function GalleryEventPage({
             description={event.description}
             totalCount={totalCount}
             initialPhotoId={initialPhotoId}
+            allowDownload={event.allow_download ?? true}
           />
         </div>
 

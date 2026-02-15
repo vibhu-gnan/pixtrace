@@ -56,6 +56,8 @@ export const events = pgTable('events', {
     };
   }>().default(sql`'{}'::jsonb`),
   isPublic: boolean('is_public').default(true).notNull(),
+  allowDownload: boolean('allow_download').default(true).notNull(),
+  allowSlideshow: boolean('allow_slideshow').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

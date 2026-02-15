@@ -24,6 +24,8 @@ export interface GalleryEvent {
             intervalMs?: number;
         };
     };
+    allow_download?: boolean;
+    allow_slideshow?: boolean;
 }
 
 export interface GalleryMediaItem {
@@ -62,7 +64,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     // 1. Fetch Event Details by hash
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('id, name, description, event_date, event_hash, cover_media_id, theme')
+        .select('id, name, description, event_date, event_hash, cover_media_id, theme, allow_download, allow_slideshow')
         .eq('event_hash', identifier)
         .eq('is_public', true)
         .single();

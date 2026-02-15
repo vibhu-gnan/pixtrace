@@ -15,6 +15,7 @@ interface GalleryPageClientProps {
     description: string | null;
     totalCount: number;
     initialPhotoId?: string;
+    allowDownload?: boolean;
 }
 
 export function GalleryPageClient({
@@ -25,6 +26,7 @@ export function GalleryPageClient({
     description,
     totalCount,
     initialPhotoId,
+    allowDownload,
 }: GalleryPageClientProps) {
     const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
     const [media, setMedia] = useState<GalleryMediaItem[]>(initialMedia);
@@ -48,7 +50,7 @@ export function GalleryPageClient({
         fetch(`/api/gallery/view?hash=${eventHash}`, {
             method: 'POST',
             keepalive: true, // survives page unload
-        }).catch(() => {}); // swallow errors — view counting is non-critical
+        }).catch(() => { }); // swallow errors — view counting is non-critical
     }, [eventHash]);
 
     // Reset when album changes
@@ -260,7 +262,7 @@ export function GalleryPageClient({
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className="px-1 pt-1">
-                <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} />
+                <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} allowDownload={allowDownload} />
             </div>
 
             {/* ── Infinite Scroll Sentinel + Loading ───────────── */}
