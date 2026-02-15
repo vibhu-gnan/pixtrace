@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Allowed hostnames for download proxy — prevents open proxy / SSRF abuse
 const ALLOWED_HOSTS = [
-    'pub-cc4d5b144c5490713c006e00c5daf1a0.r2.dev', // R2 public bucket
+    'pub-cc4d5b144c5490713c006e00c5daf1a0.r2.dev', // Old/Backup
+    'pub-326a39b9ee76449da28abc06e2fe351a.r2.dev', // Current R2 public bucket (from .env.local)
 ];
 
 export async function GET(request: NextRequest) {
