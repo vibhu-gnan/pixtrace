@@ -15,6 +15,13 @@
       "when": 1771088271290,
       "tag": "0001_boring_randall_flagg",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771103995039,
+      "tag": "0002_opposite_viper",
+      "breakpoints": true
     }
   ]
 }

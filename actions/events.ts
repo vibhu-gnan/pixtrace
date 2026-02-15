@@ -178,16 +178,52 @@ export async function updateEvent(eventId: string, formData: FormData) {
 
 export async function updateEventHero(eventId: string, payload: {
   coverMediaId?: string | null;
+  heroMode?: 'single' | 'slideshow' | 'auto';
+  slideshowMediaIds?: string[];
+  intervalMs?: number;
 }) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
 
   const supabase = createAdminClient();
 
+  // Read current theme to merge hero config
+  const { data: currentEvent } = await supabase
+    .from('events')
+    .select('theme')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!currentEvent) return { error: 'Event not found' };
+
+  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
+  const heroMode = payload.heroMode ?? 'single';
+
+  // Build hero config
+  const heroConfig: Record<string, unknown> = { mode: heroMode };
+  if (heroMode === 'slideshow' && payload.slideshowMediaIds?.length) {
+    heroConfig.slideshowMediaIds = payload.slideshowMediaIds;
+  }
+  if (payload.intervalMs) {
+    heroConfig.intervalMs = payload.intervalMs;
+  }
+
+  // Determine cover_media_id based on mode
+  let coverMediaId: string | null = null;
+  if (heroMode === 'single') {
+    coverMediaId = payload.coverMediaId ?? null;
+  } else if (heroMode === 'slideshow' && payload.slideshowMediaIds?.length) {
+    // Use first slideshow photo as OG image fallback
+    coverMediaId = payload.slideshowMediaIds[0];
+  }
+  // auto mode: cover_media_id = null (uses first photo fallback)
+
   const { error } = await supabase
     .from('events')
     .update({
-      cover_media_id: payload.coverMediaId || null,
+      cover_media_id: coverMediaId,
+      theme: { ...currentTheme, hero: heroConfig },
       updated_at: new Date().toISOString(),
     })
     .eq('id', eventId)

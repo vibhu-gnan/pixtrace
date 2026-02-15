@@ -19,7 +19,9 @@
       "Bash(curl:*)",
       "Bash(find:*)",
       "Bash(npx tsc:*)",
-      "WebFetch(domain:developers.cloudflare.com)"
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(dir:*)",
+      "Bash(ls:*)"
     ]
   }
 }

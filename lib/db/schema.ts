@@ -49,6 +49,11 @@ export const events = pgTable('events', {
     primaryColor?: string;
     logoUrl?: string;
     customCss?: string;
+    hero?: {
+      mode: 'single' | 'slideshow' | 'auto';
+      slideshowMediaIds?: string[];
+      intervalMs?: number;
+    };
   }>().default(sql`'{}'::jsonb`),
   isPublic: boolean('is_public').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

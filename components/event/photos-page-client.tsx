@@ -110,7 +110,10 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
     event.cover_media_id ?? null
   );
   const [coverSlideshowSelectedIds, setCoverSlideshowSelectedIds] = useState<Set<string>>(
-    new Set()
+    new Set((event.theme as any)?.hero?.slideshowMediaIds ?? [])
+  );
+  const [heroMode, setHeroMode] = useState<'single' | 'slideshow' | 'auto'>(
+    (event.theme as any)?.hero?.mode ?? 'single'
   );
 
   // ─── Computed Values ─────────────────────────────────────
@@ -331,6 +334,8 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
         onCoverSingleSelectedChange={setCoverSingleSelectedId}
         coverSlideshowSelectedIds={coverSlideshowSelectedIds}
         onCoverSlideshowSelectedChange={setCoverSlideshowSelectedIds}
+        heroMode={heroMode}
+        onHeroModeChange={setHeroMode}
       />
 
       {/* Upload Banner — shows during/after uploads */}

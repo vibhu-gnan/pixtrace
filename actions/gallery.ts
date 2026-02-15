@@ -3,6 +3,13 @@
 import { createClient } from '@/lib/auth';
 import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
+export interface HeroSlide {
+    url: string;
+    mediaId: string;
+}
+
+export type HeroMode = 'single' | 'slideshow' | 'auto';
+
 export interface GalleryEvent {
     id: string;
     name: string;
@@ -10,6 +17,13 @@ export interface GalleryEvent {
     event_date: string | null;
     event_hash?: string;
     cover_media_id?: string | null;
+    theme?: {
+        hero?: {
+            mode?: HeroMode;
+            slideshowMediaIds?: string[];
+            intervalMs?: number;
+        };
+    };
 }
 
 export interface GalleryMediaItem {
@@ -39,19 +53,22 @@ export async function getPublicGallery(identifier: string): Promise<{
     albums: { id: string; name: string }[];
     totalCount: number;
     coverUrl: string | null;
+    heroSlides: HeroSlide[];
+    heroMode: HeroMode;
+    heroIntervalMs: number;
 }> {
     const supabase = await createClient();
 
     // 1. Fetch Event Details by hash
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('id, name, description, event_date, event_hash, cover_media_id')
+        .select('id, name, description, event_date, event_hash, cover_media_id, theme')
         .eq('event_hash', identifier)
         .eq('is_public', true)
         .single();
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null };
+        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
     }
 
     // 2. Fetch albums for this event
@@ -77,7 +94,7 @@ export async function getPublicGallery(identifier: string): Promise<{
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, coverUrl: null };
+        return { event, media: [], albums: albums ? albums.map(a => ({ id: a.id, name: a.name })) : [], totalCount: count || 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
     }
 
     // Build album name lookup
@@ -108,12 +125,62 @@ export async function getPublicGallery(identifier: string): Promise<{
         }
     }
 
+    // 6. Resolve hero slides based on hero mode
+    const heroConfig = (event.theme as any)?.hero;
+    const heroMode: HeroMode = heroConfig?.mode ?? 'single';
+    const heroIntervalMs: number = heroConfig?.intervalMs ?? 5000;
+    let heroSlides: HeroSlide[] = [];
+
+    if (heroMode === 'slideshow' && heroConfig?.slideshowMediaIds?.length) {
+        // Fetch all slideshow media in one query
+        const { data: slideshowMedia } = await supabase
+            .from('media')
+            .select('id, r2_key, preview_r2_key')
+            .in('id', heroConfig.slideshowMediaIds)
+            .eq('event_id', event.id);
+
+        // Re-order to match saved order (DB doesn't guarantee order)
+        const mediaMap = new Map((slideshowMedia ?? []).map((m: any) => [m.id, m]));
+        heroSlides = (heroConfig.slideshowMediaIds as string[])
+            .map((id: string) => {
+                const m = mediaMap.get(id);
+                if (!m) return null;
+                const url = getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key);
+                return { url, mediaId: id };
+            })
+            .filter((s): s is HeroSlide => s !== null);
+
+    } else if (heroMode === 'auto') {
+        // Use first 5 images from the event
+        const { data: autoMedia } = await supabase
+            .from('media')
+            .select('id, r2_key, preview_r2_key')
+            .eq('event_id', event.id)
+            .eq('media_type', 'image')
+            .order('created_at', { ascending: true })
+            .limit(5);
+
+        heroSlides = (autoMedia ?? []).map((m: any) => ({
+            url: getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key),
+            mediaId: m.id,
+        }));
+
+    } else {
+        // mode === 'single' (or unset): wrap existing coverUrl
+        if (coverUrl) {
+            heroSlides = [{ url: coverUrl, mediaId: event.cover_media_id ?? '' }];
+        }
+    }
+
     return {
         event,
         media,
         albums: (albums || []).map(a => ({ id: a.id, name: a.name })),
         totalCount: count || 0,
         coverUrl,
+        heroSlides,
+        heroMode,
+        heroIntervalMs,
     };
 }
 

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { getPublicGallery } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
+import { HeroSlideshow } from '@/components/gallery/hero-slideshow';
 
 // ISR: serve from edge cache, revalidate every hour
 export const revalidate = 3600;
@@ -60,7 +61,7 @@ export default async function GalleryEventPage({
   try {
     const { eventHash } = await params;
     const { photo: initialPhotoId } = await searchParams;
-    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl } = await getCachedGallery(eventHash);
+    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, heroIntervalMs } = await getCachedGallery(eventHash);
 
     if (!event) {
       notFound();
@@ -77,25 +78,35 @@ export default async function GalleryEventPage({
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');
     const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
+    const firstSlideUrl = heroSlides[0]?.url || coverUrl;
+    const hasSlideshow = heroSlides.length > 1;
 
     return (
       <main className="min-h-screen bg-white">
         {/* ── Hero Section ─────────────────────────────────── */}
         <section className="relative w-full h-screen overflow-hidden">
-          {coverUrl ? (
+          {/* SSR: first image rendered statically for LCP */}
+          {firstSlideUrl ? (
             <img
-              src={coverUrl}
+              src={firstSlideUrl}
               alt={event.name}
-              className="absolute inset-0 w-full h-full object-cover"
+              fetchPriority="high"
+              className="absolute inset-0 w-full h-full object-cover z-0"
             />
           ) : (
             <div className="absolute inset-0 bg-gray-800" />
           )}
+
+          {/* Client slideshow — only activates with 2+ slides */}
+          {hasSlideshow && (
+            <HeroSlideshow slides={heroSlides} intervalMs={heroIntervalMs} />
+          )}
+
           {/* Dark gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
+          <div className={`absolute inset-0 z-10 bg-gradient-to-b ${hasSlideshow ? 'from-black/40 via-black/50 to-black/70' : 'from-black/30 via-black/40 to-black/60'}`} />
 
           {/* Centered event info */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-10 px-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20 px-4">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-center uppercase">
               {event.name}
             </h1>
