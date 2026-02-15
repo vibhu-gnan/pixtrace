@@ -86,7 +86,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         .single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
+        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
     }
 
     // 2. Fetch albums for this event
@@ -112,7 +112,7 @@ export async function getPublicGallery(identifier: string): Promise<{
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, heroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
+        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000 };
     }
 
     // Build album name lookup

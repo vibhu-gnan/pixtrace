@@ -327,7 +327,7 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
       return coverMobileSlideshowSelectedIds;
     }
     return new Set<string>();
-  }, [coverSelectionMode, coverSingleSelectedId, coverSlideshowSelectedIds]);
+  }, [coverSelectionMode, coverSingleSelectedId, coverSlideshowSelectedIds, coverMobileSlideshowSelectedIds]);
 
   const pendingCount = items.filter((i) => i.status === 'pending').length;
 
