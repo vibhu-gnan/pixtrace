@@ -333,7 +333,7 @@ export function GalleryPageClient({
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className="pt-1 relative">
-                <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} allowDownload={allowDownload} />
+                <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading} />
 
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.

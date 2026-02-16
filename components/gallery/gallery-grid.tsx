@@ -12,9 +12,10 @@ interface GalleryGridProps {
     eventHash?: string;
     initialPhotoId?: string;
     allowDownload?: boolean;
+    loading?: boolean;
 }
 
-export function GalleryGrid({ media, eventHash, initialPhotoId, allowDownload = true }: GalleryGridProps) {
+export function GalleryGrid({ media, eventHash, initialPhotoId, allowDownload = true, loading = false }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -82,6 +83,14 @@ export function GalleryGrid({ media, eventHash, initialPhotoId, allowDownload = 
     })), [images]);
 
     if (images.length === 0) {
+        // Show spinner while loading (e.g. album switch), empty state only when truly empty
+        if (loading) {
+            return (
+                <div className="flex items-center justify-center py-24">
+                    <div className="w-8 h-8 border-[3px] border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                </div>
+            );
+        }
         return (
             <div className="text-center py-16">
                 <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
