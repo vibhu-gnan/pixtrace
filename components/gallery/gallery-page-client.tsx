@@ -62,11 +62,19 @@ export function GalleryPageClient({
         }).catch(() => { });
     }, [eventHash]);
 
+    // Track whether this is the initial mount (skip scroll on first render)
+    const isInitialMount = useRef(true);
+
     // Reset when album changes
     useEffect(() => {
         setError('');
-        // Scroll to top of gallery section on album switch
-        document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Only scroll on album switch, not on initial page load
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+        } else {
+            // Scroll to top of page (cover) on album switch
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         if (activeAlbum === null) {
             setMedia(initialMedia);
             hasMoreRef.current = initialMedia.length < totalCount;
