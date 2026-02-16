@@ -40,11 +40,13 @@ export function GalleryPageClient({
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
-    const lastLoadTimeRef = useRef(0);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Refs mirror state so the IntersectionObserver callback never goes stale
     const hasMoreRef = useRef(initialMedia.length < totalCount);
+    const mediaRef = useRef<GalleryMediaItem[]>(initialMedia);
+    const activeAlbumRef = useRef<string | null>(null);
     const loadMoreRef = useRef<(() => void) | null>(null);
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Pre-compute album name map to pass to server action (avoids re-querying albums per scroll page)
     const albumNamesRef = useRef<Record<string, string>>(
@@ -75,13 +77,17 @@ export function GalleryPageClient({
             // Scroll to top of gallery section on album switch
             document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        // Cancel any pending retry from the previous album
+        if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
         if (activeAlbum === null) {
             setMedia(initialMedia);
+            mediaRef.current = initialMedia;
             hasMoreRef.current = initialMedia.length < totalCount;
             setHasMore(initialMedia.length < totalCount);
         } else {
             // Album selected — fetch from scratch (null cursor = start of sorted order)
             setMedia([]);
+            mediaRef.current = [];
             hasMoreRef.current = true;
             setHasMore(true);
             setLoading(true);
@@ -95,6 +101,10 @@ export function GalleryPageClient({
         }
     }, [activeAlbum, eventHash, initialMedia, totalCount, photoOrder]);
 
+    // Keep refs in sync with state (read latest values without stale closures)
+    useEffect(() => { mediaRef.current = media; }, [media]);
+    useEffect(() => { activeAlbumRef.current = activeAlbum; }, [activeAlbum]);
+
     // Helper: check if sentinel is currently visible in the viewport (with margin)
     const isSentinelVisible = useCallback(() => {
         const sentinel = sentinelRef.current;
@@ -103,31 +113,46 @@ export function GalleryPageClient({
         return rect.top < window.innerHeight + 600; // match rootMargin
     }, []);
 
-    // Load more photos — cursor-based, throttled to prevent rapid-fire
+    // Schedule a retry if sentinel is still visible after load completes.
+    // Clears any pending retry first to avoid stacking.
+    const scheduleRetryIfNeeded = useCallback(() => {
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        if (!hasMoreRef.current) return;
+        // Wait a tick for React to flush the new media into the DOM,
+        // then check if the sentinel is still in/near the viewport.
+        retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null;
+            if (hasMoreRef.current && !loadingRef.current && isSentinelVisible()) {
+                loadMoreRef.current?.();
+            }
+        }, 300); // 300ms gives React time to render new images & push sentinel down
+    }, [isSentinelVisible]);
+
+    // Load more photos — reads ALL state from refs (no stale closures)
     const loadMore = useCallback(async () => {
         if (loadingRef.current || !hasMoreRef.current) return;
-        // Throttle: minimum 1s between requests
-        const now = Date.now();
-        if (now - lastLoadTimeRef.current < 1000) return;
-        lastLoadTimeRef.current = now;
         loadingRef.current = true;
         setLoading(true);
         setError('');
         try {
-            const lastItem = media[media.length - 1];
+            // Read latest media from ref — never stale
+            const currentMedia = mediaRef.current;
+            const lastItem = currentMedia[currentMedia.length - 1];
             const cursor = lastItem?.created_at || null;
             const { media: newMedia, hasMore: more } = await getPublicGalleryPage(
                 eventHash,
                 cursor,
-                activeAlbum,
+                activeAlbumRef.current,
                 albumNamesRef.current,
                 photoOrder,
             );
             setMedia((prev) => {
-                // Deduplicate
                 const existingIds = new Set(prev.map((m) => m.id));
                 const unique = newMedia.filter((m) => !existingIds.has(m.id));
-                return [...prev, ...unique];
+                const next = [...prev, ...unique];
+                // Sync ref immediately so next loadMore sees latest media
+                mediaRef.current = next;
+                return next;
             });
             hasMoreRef.current = more;
             setHasMore(more);
@@ -136,13 +161,10 @@ export function GalleryPageClient({
         } finally {
             setLoading(false);
             loadingRef.current = false;
-            // After load completes, if sentinel is still visible, load more
-            // (handles the case where user scrolled to bottom while loading)
-            if (hasMoreRef.current && isSentinelVisible()) {
-                setTimeout(() => loadMoreRef.current?.(), 100);
-            }
+            // After load + render, check if we need to keep loading
+            scheduleRetryIfNeeded();
         }
-    }, [eventHash, media, activeAlbum, photoOrder, isSentinelVisible]); // removed hasMore — use hasMoreRef instead
+    }, [eventHash, photoOrder, scheduleRetryIfNeeded]);
 
     // Keep loadMoreRef pointing at the latest loadMore so the observer never goes stale
     loadMoreRef.current = loadMore;
@@ -163,7 +185,11 @@ export function GalleryPageClient({
         );
 
         observer.observe(sentinel);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            // Clean up any pending retry timer
+            if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // intentionally empty — observer is stable, state accessed via refs
 
