@@ -72,8 +72,8 @@ export function GalleryPageClient({
         if (isInitialMount.current) {
             isInitialMount.current = false;
         } else {
-            // Scroll to top of page (cover) on album switch
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // Scroll to top of gallery section on album switch
+            document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         if (activeAlbum === null) {
             setMedia(initialMedia);
