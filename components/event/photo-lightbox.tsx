@@ -584,7 +584,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/95 z-50 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 focus:outline-none"
+          className="fixed inset-0 z-50 flex items-center justify-center focus:outline-none"
           style={{ touchAction: 'none' }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
         >
@@ -654,7 +654,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
           {/* Main image display */}
           <div
             ref={zoom.containerRef}
-            className={`relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center overflow-hidden ${zoom.isZoomed ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+            className={`relative w-full h-full flex items-center justify-center overflow-hidden ${zoom.isZoomed ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
             style={{ touchAction: 'none' }}
             onTouchStart={handleSwipeTouchStart}
             onTouchEnd={handleSwipeTouchEnd}
