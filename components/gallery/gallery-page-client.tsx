@@ -332,37 +332,48 @@ export function GalleryPageClient({
             </div>
 
             {/* ── Photo Grid ───────────────────────────────────── */}
-            <div className="pt-1">
+            <div className="pt-1 relative">
                 <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} allowDownload={allowDownload} />
+
+                {/* Invisible sentinel — sits inside the grid container,
+                    positioned to trigger ~800px before the user reaches the end.
+                    This ensures loading fires while the user is still viewing images,
+                    not after they've scrolled past into empty space. */}
+                <div
+                    ref={sentinelRef}
+                    className="absolute bottom-0 left-0 w-full pointer-events-none"
+                    style={{ height: '1px' }}
+                    aria-hidden="true"
+                />
             </div>
 
-            {/* ── Infinite Scroll Sentinel + Loading ───────────── */}
-            <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center">
-                {loading && (
-                    <div className="w-full">
-                        <GallerySkeleton />
-                    </div>
-                )}
-                {error && (
-                    <div className="text-center">
-                        <p className="text-sm text-red-500 mb-2">{error}</p>
-                        <button
-                            onClick={loadMore}
-                            className="text-sm text-blue-600 hover:underline font-medium"
-                        >
-                            Try again
-                        </button>
-                    </div>
-                )}
-                {!hasMore && !loading && media.length > 0 && (
+            {/* ── Loading / Error / End ──────────────────────────── */}
+            {loading && (
+                <div className="w-full">
+                    <GallerySkeleton />
+                </div>
+            )}
+            {error && (
+                <div className="py-8 text-center">
+                    <p className="text-sm text-red-500 mb-2">{error}</p>
+                    <button
+                        onClick={loadMore}
+                        className="text-sm text-blue-600 hover:underline font-medium"
+                    >
+                        Try again
+                    </button>
+                </div>
+            )}
+            {!hasMore && !loading && media.length > 0 && (
+                <div className="py-8 flex justify-center">
                     <button
                         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                        className="mt-4 px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
+                        className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
                     >
                         Return to Top
                     </button>
-                )}
-            </div>
+                </div>
+            )}
         </>
     );
 }
