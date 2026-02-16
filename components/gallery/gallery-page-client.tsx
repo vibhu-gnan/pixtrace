@@ -285,14 +285,14 @@ export function GalleryPageClient({
             </div>
 
             {/* ── Photo Grid ───────────────────────────────────── */}
-            <div className="px-1 pt-1">
+            <div className="pt-1">
                 <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} allowDownload={allowDownload} />
             </div>
 
             {/* ── Infinite Scroll Sentinel + Loading ───────────── */}
             <div ref={sentinelRef} className="py-8 flex flex-col items-center justify-center">
                 {loading && (
-                    <div className="w-full px-1">
+                    <div className="w-full">
                         <GallerySkeleton />
                     </div>
                 )}
