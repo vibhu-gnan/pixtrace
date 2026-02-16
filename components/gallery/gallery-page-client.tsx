@@ -65,6 +65,8 @@ export function GalleryPageClient({
     // Reset when album changes
     useEffect(() => {
         setError('');
+        // Scroll to top of gallery section on album switch
+        document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         if (activeAlbum === null) {
             setMedia(initialMedia);
             hasMoreRef.current = initialMedia.length < totalCount;
