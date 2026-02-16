@@ -95,6 +95,14 @@ export function GalleryPageClient({
         }
     }, [activeAlbum, eventHash, initialMedia, totalCount, photoOrder]);
 
+    // Helper: check if sentinel is currently visible in the viewport (with margin)
+    const isSentinelVisible = useCallback(() => {
+        const sentinel = sentinelRef.current;
+        if (!sentinel) return false;
+        const rect = sentinel.getBoundingClientRect();
+        return rect.top < window.innerHeight + 600; // match rootMargin
+    }, []);
+
     // Load more photos — cursor-based, throttled to prevent rapid-fire
     const loadMore = useCallback(async () => {
         if (loadingRef.current || !hasMoreRef.current) return;
@@ -128,8 +136,13 @@ export function GalleryPageClient({
         } finally {
             setLoading(false);
             loadingRef.current = false;
+            // After load completes, if sentinel is still visible, load more
+            // (handles the case where user scrolled to bottom while loading)
+            if (hasMoreRef.current && isSentinelVisible()) {
+                setTimeout(() => loadMoreRef.current?.(), 100);
+            }
         }
-    }, [eventHash, media, activeAlbum, photoOrder]); // removed hasMore — use hasMoreRef instead
+    }, [eventHash, media, activeAlbum, photoOrder, isSentinelVisible]); // removed hasMore — use hasMoreRef instead
 
     // Keep loadMoreRef pointing at the latest loadMore so the observer never goes stale
     loadMoreRef.current = loadMore;
