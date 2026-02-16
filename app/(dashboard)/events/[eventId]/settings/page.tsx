@@ -82,6 +82,7 @@ export default async function SettingsPage({
             <EventLogoSettings
               eventId={eventData.id}
               initialLogoUrl={(eventData.theme as any)?.logoUrl}
+              initialLogoDisplay={(eventData.theme as any)?.logoDisplay}
             />
           </section>
 

@@ -44,6 +44,12 @@ body {
   to   { transform: scale(1.10) translate(1%, 0%); }
 }
 
+/* Logo pulse animation for gallery loading screen */
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.03); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-slideshow-img {
     animation: none !important;

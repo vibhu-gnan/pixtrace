@@ -126,8 +126,8 @@ export default async function GalleryEventPage({
 
           {/* Centered event info */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20 px-4">
-            {/* Logo or Title */}
-            {event.theme?.logoUrl ? (
+            {/* Logo on cover — only if logoDisplay allows it (default: show) */}
+            {event.theme?.logoUrl && ((event.theme as Record<string, unknown>)?.logoDisplay ?? 'cover_and_loading') === 'cover_and_loading' ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={event.theme.logoUrl}

@@ -507,10 +507,15 @@ export async function updateEventLogo(eventId: string, logoUrl: string | null) {
 
   const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
 
+  // When removing logo, also reset logoDisplay to 'none'
+  const updatedTheme = logoUrl
+    ? { ...currentTheme, logoUrl }
+    : { ...currentTheme, logoUrl, logoDisplay: 'none' };
+
   const { error } = await supabase
     .from('events')
     .update({
-      theme: { ...currentTheme, logoUrl },
+      theme: updatedTheme,
       updated_at: new Date().toISOString(),
     })
     .eq('id', eventId)
@@ -532,6 +537,55 @@ export async function updateEventLogo(eventId: string, logoUrl: string | null) {
   if (evt?.event_hash) {
     revalidatePath(`/gallery/${evt.event_hash}`);
     revalidatePath(`/${evt.event_hash}`);
+  }
+
+  return { success: true };
+}
+
+const VALID_LOGO_DISPLAYS = ['cover_and_loading', 'loading_only', 'none'] as const;
+type LogoDisplayValue = typeof VALID_LOGO_DISPLAYS[number];
+
+export async function updateEventLogoDisplay(eventId: string, logoDisplay: string) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  // Validate input
+  if (!VALID_LOGO_DISPLAYS.includes(logoDisplay as LogoDisplayValue)) {
+    return { error: 'Invalid logo display option' };
+  }
+
+  const supabase = createAdminClient();
+
+  // Read current theme
+  const { data: currentEvent } = await supabase
+    .from('events')
+    .select('theme, event_hash')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!currentEvent) return { error: 'Event not found' };
+
+  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
+
+  const { error } = await supabase
+    .from('events')
+    .update({
+      theme: { ...currentTheme, logoDisplay },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error updating logo display:', error);
+    return { error: 'Failed to update logo display' };
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  if (currentEvent.event_hash) {
+    revalidatePath(`/gallery/${currentEvent.event_hash}`);
+    revalidatePath(`/${currentEvent.event_hash}`);
   }
 
   return { success: true };
