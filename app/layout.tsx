@@ -36,6 +36,12 @@ export const metadata: Metadata = {
     description: "The premium gallery platform that delivers original quality photos to your guests instantly via simple QR codes.",
     images: ["/og-image.jpg"],
   },
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon-16x16.png',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
   robots: {
     index: true,
     follow: true,
@@ -63,7 +69,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-        
+
         {/* Performance optimizations */}
         <meta name="theme-color" content="#101622" />
       </head>
