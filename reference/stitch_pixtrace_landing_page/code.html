@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PIXTRACE - Premium Event Gallery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b6cee",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glass-panel:hover {
+            border-color: rgba(43, 108, 238, 0.5);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .grid-mask {
+            mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+        }</style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-800 dark:text-slate-200 antialiased overflow-x-hidden">
+<nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-background-dark/80 backdrop-blur-md">
+<div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center">
+<span class="material-icons text-white text-lg">filter_center_focus</span>
+</div>
+<span class="text-xl font-bold text-white tracking-tight">PIXTRACE</span>
+</div>
+<div class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+<a class="hover:text-white transition-colors" href="#">Features</a>
+<a class="hover:text-white transition-colors" href="#">Pricing</a>
+<a class="hover:text-white transition-colors" href="#">FAQ</a>
+</div>
+<div class="flex items-center gap-4">
+<a class="hidden md:block text-sm font-medium text-slate-300 hover:text-white" href="#">Login</a>
+<a class="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all shadow-[0_0_20px_-5px_rgba(43,108,238,0.5)]" href="#">
+                Get Started
+            </a>
+</div>
+</div>
+</nav>
+<section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/20 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none"></div>
+<div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+<div class="relative z-10 max-w-2xl">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-primary mb-6">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+                New Gallery Engine v2.0 Live
+            </div>
+<h1 class="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-[1.1]">
+                Your Event Memories, <br/>
+<span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">Delivered Beautifully.</span>
+</h1>
+<p class="text-lg text-slate-400 mb-8 max-w-lg leading-relaxed">
+                The premium gallery platform that delivers original quality photos to your guests instantly via simple QR codes.
+            </p>
+<div class="flex flex-col sm:flex-row gap-4">
+<button class="px-8 py-4 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg transition-all shadow-[0_0_30px_-10px_rgba(43,108,238,0.6)] flex items-center justify-center gap-2 group">
+                    Start Uploading
+                    <span class="material-icons text-sm group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+<button class="px-8 py-4 glass-panel text-white font-semibold rounded-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+<span class="material-icons text-primary">play_circle</span>
+                    View Demo
+                </button>
+</div>
+<div class="mt-12 flex items-center gap-4 text-sm text-slate-500">
+<div class="flex -space-x-3">
+<img alt="User Avatar 1" class="w-10 h-10 rounded-full border-2 border-background-dark object-cover" data-alt="Small avatar of a smiling woman" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCZwAk3wMETEXnxe1EHy-iM2K6S6e9HKo5sfrJMyWqWaspQf_zJ7yKZVceGjNURxekQ367W3HK9xmGOx3PBW8uQUNS7fREwNo4Y3xTsyauonT7vWGZV0t3t6P5fYqE0hJorY96nBV5Uk0mt_zCnDbWA2Ulv98jTQx-1NbikcxTEwJoMPlL-N4XWN-9pTYjD_f6ZzKEWe2r-LmkjVIYRpx4to9VTGLrx8nntlMeag7zyPdI8ptx2Nd2VYrKWtGlv072f8i9wvqNwyM"/>
+<img alt="User Avatar 2" class="w-10 h-10 rounded-full border-2 border-background-dark object-cover" data-alt="Small avatar of a man with glasses" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSd6OUFjH5hbZE4Y3zmEGMAazKyPsXHuiOyZk0lU-1jILO9lBDVrdYSFJFQGByD0b4vTL6_I9pN0rA_a3XJYGjAHyUtdGwYCJRoow8xFttwqU3MdyVvKMcDwHhfGH_ef0aLPZe9kZdYBR0L-S0K4tojMi5gwbuJpuYefGAdCJq9k_MTQGuPFNdhIoaBdiZsEpUE4PwAIQycHd7vC_yirvxNGzns4xfxupu6mQ5oPY4Ei04hP5J4PHgfiLcfjj8fm6nWls5rgbupNE"/>
+<img alt="User Avatar 3" class="w-10 h-10 rounded-full border-2 border-background-dark object-cover" data-alt="Small avatar of a smiling man" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkSjiFCQsLJf5H5eOp7bV9XcKASL5C95La6Dyzxmfk4fOE47FfCEmu7R8jvIcZK4-5no-YZ9G15PZ0BWjnl3W_vNy9o1qV9QOWRCzy_Xo8T1fm18tc3HAQx2Rbgk3QwLkhd9Vz5ETBJhv-CsisgsbKAo1_67aQroParmHlKQaKFzRk0jxxHZpmg_CDkZpWe_ZhS2utAXzt8-YT_mC9REtACkTpX1oMNKf5fCIOXs17ysu9VyVP4Ye2FAo1znulDILSAg70Gl6nH2E"/>
+</div>
+<p>Trusted by 2,000+ Photographers</p>
+</div>
+</div>
+<div class="relative h-[600px] w-full hidden lg:block perspective-1000">
+<div class="absolute inset-0 grid grid-cols-3 gap-4 transform rotate-y-12 rotate-x-6 scale-90 opacity-80 grid-mask">
+<div class="flex flex-col gap-4 -mt-12">
+<div class="relative rounded-xl overflow-hidden h-64 group">
+<img alt="Concert crowd looking at stage" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" data-alt="Silhouette of crowd at concert with lights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQ-je-Bpdlnk7aVjLdCPSeZD_V1aFZgJ2Qn5-8V865NBep6NIQAcJR9eJETRH27a1fUO-gnHi7RcnM146fzgCBSxsF_q2K44FZT0X0dcBziwe-ngFQD0gdBA0054Ep0ZFmsRWe78AarnmCkzcYHZE2Ygh7X-MdswkEL0PAw5Pj9EuSnk7aDA1NmjR6prmoxjQ8JFeJtgUuEEGG2k2J7KNEvA3tq0FZDnJgDqX-Nun8o3NbcoQ0oOC2sgngUhgHk6pNwWV1ORepjBY"/>
+<div class="absolute inset-0 bg-primary/10"></div>
+</div>
+<div class="relative rounded-xl overflow-hidden h-48 group">
+<img alt="Event attendee smiling" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" data-alt="Close up of happy person at event" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3jjAfx3dZnB4rfwHb6z4IgXzBxa9gJFnKAVIwEyKdRmBVB5-tZJfRgRfIrBk2KAWIG0iuIAtzYdD1z2-bKwNDTpvmFTTqqtV1xU0mHnzflhQQniX9CZgJwyFhfTqPSRNnjLKHIhMVcH2hQJKVw6hnpZU0Y51Fs0x3PKoWMMzrp06Bl_tvKW1M7Hsp3PgMKgAbZJ-jV2DtgxsfqvK7-8xSaQYwgTpcOUfGoDwMMh3LCxJMJrn0byGJ18ZHbgLW3aIMZTi5uSwuFNY"/>
+</div>
+<div class="relative rounded-xl overflow-hidden h-64 group">
+<img alt="Elegant dinner party scene" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" data-alt="Blurred scene of people chatting at dinner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxyqWzMdKJwff7B1ui_KeljvbautlEJ11Xq07XwjgS8buSfI9y8G5c7Qay5vKnsGLVg2X4JoN-YPUujXcJ_GleaKWM6I2k3t_AZqoqDDkwNa1mPjwMCG2zel2y0_UaWxVSeaT2KnKsODkHCBMhC2Ay2N0W-d0CQh_PRF3uhraLwCRykSMtc0Wm-kRyBpxYIeFbEyGO3JlZ7GkJvX29DPixIGjHgsYsNxe-fKkydyWs4jdunIs91GpynzTZXjmRTQu5JW4ENmqkz0A"/>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<div class="relative rounded-xl overflow-hidden h-56 group border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]">
+<img alt="Portrait of woman at event" class="w-full h-full object-cover" data-alt="Portrait of a woman smiling at an event" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBznxMu2VQBxkroAwpk438PdlQkHW0p0-RPJWJOWAJnJ1aPhDjj_-Cr9e4shVHU9CmdvDOu5Ouguh64OaoAJkE4mMhLfsG_lZ6n4LS4EIvv4qrWSpRQDISG6EZlqP5u728Naj1sGykeo8jQ7A7kbm8RJbkuKEbnWC8wwyGBaIVaU9ndM3mZ1LzMxZ_qRLA5sb91HjYEBRY2WCGDDcGhOX6vRCADq94oocYmBuBra0xuIW4sxW0-WysPdhdN5FtWPgSDLVWMiWhkxvc"/>
+<div class="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">PREMIUM GALLERY</div>
+</div>
+<div class="relative rounded-xl overflow-hidden h-72 group">
+<img alt="DJ playing music at club" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" data-alt="DJ at a turntable in a club" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgTuPbKO8-ZScxdWxRFf3lBlIQUWzwME8d0mqAPqFg5xro0VcIAzLEWUZKsteeDiGT-s_wS3jmj6kuOxNQdJr8wSZRbCSPC6PRDB_IhIGDiF3k3DG7mnQETBheT3MbDqD-FJUAwR-ptVlOvzODztLHJ1cOrtwRi2-O5ZnDA3cAS-1npqajpdObny8tdVFlmMo4mR4rURPmyngoUh3KLPIwgcwh-V44PTOJ0LC0LzD99s4QalOaaDgIhREzVhQNNaWxS7MlM6HKs2s"/>
+</div>
+</div>
+<div class="flex flex-col gap-4 -mt-8">
+<div class="relative rounded-xl overflow-hidden h-48 group">
+<img alt="Group of friends laughing" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" data-alt="Group of friends laughing at a party" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJq7ARmqagtneWWQ41wa97QeUuUaxppSXaFncgG1c_GhhmMO70qhOjr67c3YCEQVTH_LK97-2YhtZx_CoUQu1L53TDlXl2J1dQeJ3U-U2p9_ccQD0RU6yetSH8B5514OizyWqSF4SUYiaDIL4YA4ou8K1i_GqUvz4h_cLaY7_3uxjdePY0_dmbziJdF4wH5zNZPcMZ4HsyGYfifIOUFCmkuSAFIb7sU-MAkjG6Ltdy8AkryaMbmmRAlWe3iF24QNPeeUD_Kwy4Nxo"/>
+</div>
+<div class="relative rounded-xl overflow-hidden h-80 group">
+<img alt="Night city event skyline" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500" data-alt="Abstract bokeh of city lights at night" src="https://lh3.googleusercontent.com/aida-public/AB6AXuALmmkIotWC6tOGYGOdyKz5oL3i-eFafQLOr5xKvTca24DS8NCI4f-w8ZAcdyPkyfpCSOrEfFZxIYZHSY4QTk1Yi5_rA_EC2Sp5fbAn0RcNI2pY1vnQyspKvvf1r6JyKhjJ5yXYIYzjahlUpUDfdd8MXT0RnwhUznS7Tc2PAKCbBVUAEVwmA5DPFRTvVS4j9MQF8qdMkq0gN65lYTR7ANLoP-wBAmMrNQso3ZbMt00HtMeoQ-RdMFErg9DC5kk6GacM6KYBefcqGOs"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 relative">
+<div class="max-w-7xl mx-auto px-6">
+<div class="mb-16 text-center max-w-2xl mx-auto">
+<h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Elegant Gallery Management</h2>
+<p class="text-slate-400">Everything you need to deliver a premium experience to your clients.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="col-span-1 md:col-span-2 glass-panel rounded-2xl p-8 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-32 bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all duration-500"></div>
+<div class="relative z-10 flex flex-col h-full justify-between">
+<div class="mb-8">
+<div class="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center mb-6 text-primary">
+<span class="material-icons text-2xl">grid_view</span>
+</div>
+<h3 class="text-2xl font-bold text-white mb-2">Smart Organization</h3>
+<p class="text-slate-400 max-w-md">Organize thousands of photos into beautiful albums effortlessly. Create curated collections that highlight the best moments.</p>
+</div>
+<div class="w-full h-48 rounded-xl bg-background-dark/50 border border-white/5 relative overflow-hidden flex items-center justify-center px-8">
+<div class="grid grid-cols-4 gap-2 w-full max-w-md opacity-75">
+<div class="h-20 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-2"></div>
+<div class="h-20 bg-slate-700/50 rounded border border-slate-600/50 w-full transform -translate-y-2"></div>
+<div class="h-20 bg-primary/20 rounded border border-primary/50 w-full transform translate-y-4 shadow-[0_0_15px_rgba(43,108,238,0.3)]"></div>
+<div class="h-20 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-1"></div>
+<div class="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-2"></div>
+<div class="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform -translate-y-2"></div>
+<div class="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-4"></div>
+<div class="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-1"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-1 glass-panel rounded-2xl p-8 relative overflow-hidden group">
+<div class="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-6 text-emerald-400 group-hover:scale-110 transition-transform">
+<span class="material-icons text-2xl">high_quality</span>
+</div>
+<h3 class="text-xl font-bold text-white mb-2">Original Quality</h3>
+<p class="text-slate-400 text-sm mb-6">We never compress your art. Deliver full-resolution RAW conversions or high-res JPEGs directly to clients without quality loss.</p>
+<div class="mt-auto pt-4 border-t border-white/5 flex items-center justify-between text-xs font-mono text-emerald-400">
+<span>48MP SUPPORTED</span>
+<span class="material-icons text-base">check_circle</span>
+</div>
+</div>
+<div class="col-span-1 glass-panel rounded-2xl p-8 relative overflow-hidden group">
+<div class="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 text-purple-400 group-hover:scale-110 transition-transform">
+<span class="material-icons text-2xl">security</span>
+</div>
+<h3 class="text-xl font-bold text-white mb-2">Privacy First</h3>
+<p class="text-slate-400 text-sm">GDPR compliant galleries. Guests only see their own photos if enabled, or access secured public albums with PIN protection.</p>
+</div>
+<div class="col-span-1 md:col-span-2 glass-panel rounded-2xl p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent skew-x-12 translate-x-full group-hover:translate-x-0 transition-transform duration-1000"></div>
+<div class="flex-1">
+<div class="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center mb-6 text-orange-400">
+<span class="material-icons text-2xl">qr_code_2</span>
+</div>
+<h3 class="text-2xl font-bold text-white mb-2">Instant Sharing</h3>
+<p class="text-slate-400">Generate unique QR codes for each event. Print them on table cards and let guests start uploading or downloading immediately.</p>
+</div>
+<div class="w-32 h-32 bg-white p-2 rounded-lg shadow-2xl shrink-0">
+<div class="w-full h-full border-2 border-black border-dashed flex items-center justify-center">
+<span class="material-icons text-4xl text-black">qr_code</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-background-dark relative border-t border-white/5">
+<div class="max-w-7xl mx-auto px-6">
+<div class="text-center mb-16">
+<span class="text-primary font-bold tracking-widest text-sm uppercase">Workflow</span>
+<h2 class="text-3xl md:text-4xl font-bold text-white mt-2">Simplicity by Design</h2>
+</div>
+<div class="relative">
+<div class="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+<div class="relative flex flex-col items-center text-center group">
+<div class="w-24 h-24 rounded-full bg-background-dark border-4 border-slate-800 flex items-center justify-center z-10 mb-6 group-hover:border-primary transition-colors duration-300 shadow-xl">
+<span class="material-icons text-3xl text-slate-400 group-hover:text-white">cloud_upload</span>
+</div>
+<h3 class="text-xl font-bold text-white mb-2">1. Upload</h3>
+<p class="text-slate-400 text-sm px-4">Drag and drop thousands of photos. Our bulk uploader handles RAW and JPEG efficiently.</p>
+</div>
+<div class="relative flex flex-col items-center text-center group">
+<div class="w-24 h-24 rounded-full bg-background-dark border-4 border-slate-800 flex items-center justify-center z-10 mb-6 group-hover:border-primary transition-colors duration-300 shadow-xl">
+<span class="material-icons text-3xl text-slate-400 group-hover:text-white animate-pulse">auto_awesome_mosaic</span>
+</div>
+<h3 class="text-xl font-bold text-white mb-2">2. Organize</h3>
+<p class="text-slate-400 text-sm px-4">Our system automatically arranges your photos into beautiful, responsive galleries.</p>
+</div>
+<div class="relative flex flex-col items-center text-center group">
+<div class="w-24 h-24 rounded-full bg-background-dark border-4 border-slate-800 flex items-center justify-center z-10 mb-6 group-hover:border-primary transition-colors duration-300 shadow-xl">
+<span class="material-icons text-3xl text-slate-400 group-hover:text-white">qr_code_scanner</span>
+</div>
+<h3 class="text-xl font-bold text-white mb-2">3. Share</h3>
+<p class="text-slate-400 text-sm px-4">Guests scan a QR code and browse their event gallery.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/5"></div>
+<div class="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-background-dark to-transparent"></div>
+<div class="max-w-4xl mx-auto px-6 relative z-10 text-center">
+<h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Ready to modernize your workflow?</h2>
+<p class="text-xl text-slate-400 mb-10">Join thousands of event photographers saving hours of sorting time every week.</p>
+<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+<button class="w-full sm:w-auto px-8 py-4 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg transition-all shadow-lg hover:shadow-primary/50 text-lg">
+                Get Started for Free
+            </button>
+<button class="w-full sm:w-auto px-8 py-4 bg-transparent border border-slate-600 text-slate-300 font-semibold rounded-lg hover:bg-white/5 hover:text-white hover:border-white transition-all text-lg">
+                Contact Sales
+            </button>
+</div>
+<p class="mt-6 text-sm text-slate-500">No credit card required for trial • Cancel anytime</p>
+</div>
+</section>
+<footer class="bg-[#0b1019] border-t border-white/5 pt-16 pb-8">
+<div class="max-w-7xl mx-auto px-6">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
+<div class="col-span-2 lg:col-span-2">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-6 h-6 rounded bg-primary flex items-center justify-center">
+<span class="material-icons text-white text-xs">filter_center_focus</span>
+</div>
+<span class="text-xl font-bold text-white">PIXTRACE</span>
+</div>
+<p class="text-slate-500 text-sm max-w-xs mb-6">
+                    The advanced photography platform for events, weddings, and corporate gatherings.
+                </p>
+<div class="flex gap-4">
+<a class="text-slate-400 hover:text-primary transition-colors" href="#"><span class="material-icons">facebook</span></a>
+<a class="text-slate-400 hover:text-primary transition-colors" href="#"><span class="material-icons">photo_camera</span></a>
+<a class="text-slate-400 hover:text-primary transition-colors" href="#"><span class="material-icons">alternate_email</span></a>
+</div>
+</div>
+<div>
+<h4 class="text-white font-semibold mb-4">Product</h4>
+<ul class="space-y-2 text-sm text-slate-400">
+<li><a class="hover:text-primary" href="#">Features</a></li>
+<li><a class="hover:text-primary" href="#">Pricing</a></li>
+<li><a class="hover:text-primary" href="#">API</a></li>
+<li><a class="hover:text-primary" href="#">Integrations</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-white font-semibold mb-4">Company</h4>
+<ul class="space-y-2 text-sm text-slate-400">
+<li><a class="hover:text-primary" href="#">About</a></li>
+<li><a class="hover:text-primary" href="#">Blog</a></li>
+<li><a class="hover:text-primary" href="#">Careers</a></li>
+<li><a class="hover:text-primary" href="#">Legal</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-white font-semibold mb-4">Support</h4>
+<ul class="space-y-2 text-sm text-slate-400">
+<li><a class="hover:text-primary" href="#">Help Center</a></li>
+<li><a class="hover:text-primary" href="#">Status</a></li>
+<li><a class="hover:text-primary" href="#">Contact</a></li>
+</ul>
+</div>
+</div>
+<div class="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+<p class="text-slate-600 text-sm">© 2023 PIXTRACE Inc. All rights reserved.</p>
+<div class="flex gap-6 text-sm text-slate-600">
+<a class="hover:text-slate-400" href="#">Privacy Policy</a>
+<a class="hover:text-slate-400" href="#">Terms of Service</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>

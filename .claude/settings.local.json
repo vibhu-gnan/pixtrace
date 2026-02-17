@@ -24,7 +24,8 @@
       "Bash(ls:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix\\(lightbox\\): fix pinch zoom and pan not working after double-tap\n\n- Switch pinch to incremental approach \\(update lastPinchDist each frame\\)\n  so pinch-in/out responds continuously instead of drifting from start\n- Add touchAction: none to Dialog.Content so browser doesn''t intercept\n  pinch gestures before they reach the native listeners\n- Clear isPanning on double-tap to keep gesture state clean\n- Pan correctly arms on first touch after double-tap zoom\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

@@ -1,9 +1,7 @@
 import Link from 'next/link';
 import Navigation from '@/components/Navigation';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { LazyImage } from '@/components/UI/LoadingStates';
 import type { FeatureCard } from '@/types';
-import { scrollToElement } from '@/lib/utils';
 
 const featureCards: FeatureCard[] = [
   {

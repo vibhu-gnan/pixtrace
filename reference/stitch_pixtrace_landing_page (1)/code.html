@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PIXTRACE Pricing Plans</title>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b6cee",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622", // Close to zinc-950 but slightly bluer
+                        "surface-dark": "#18181b", // darker zinc for cards
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for table */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #101622; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46; 
+        }
+        
+        .glass-card {
+            background: rgba(24, 24, 27, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .glass-card-pro {
+            background: rgba(43, 108, 238, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(43, 108, 238, 0.5);
+            box-shadow: 0 0 40px rgba(43, 108, 238, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-zinc-800 dark:text-zinc-200 antialiased selection:bg-primary selection:text-white min-h-screen flex flex-col">
+<!-- Ambient Background Glows -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<div class="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] opacity-40"></div>
+<div class="absolute bottom-[-10%] right-[10%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] opacity-30"></div>
+</div>
+<!-- Navigation (Simplified for context) -->
+<nav class="relative z-10 w-full border-b border-white/5 bg-background-dark/80 backdrop-blur-md">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex items-center justify-between h-16">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center text-white font-bold">P</div>
+<span class="text-white font-bold text-lg tracking-tight">PIXTRACE</span>
+</div>
+<div class="hidden md:block">
+<div class="ml-10 flex items-baseline space-x-8">
+<a class="text-zinc-400 hover:text-white transition-colors px-3 py-2 text-sm font-medium" href="#">Features</a>
+<a class="text-white px-3 py-2 text-sm font-medium" href="#">Pricing</a>
+<a class="text-zinc-400 hover:text-white transition-colors px-3 py-2 text-sm font-medium" href="#">Portfolio</a>
+</div>
+</div>
+<div>
+<a class="text-sm text-zinc-400 hover:text-white transition-colors mr-4" href="#">Login</a>
+<a class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors" href="#">Start Free Trial</a>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="relative z-10 flex-grow py-20 px-4 sm:px-6 lg:px-8">
+<!-- Header -->
+<div class="text-center max-w-3xl mx-auto mb-16">
+<h1 class="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight leading-tight">
+                Simple, transparent pricing for <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-300">pro photographers</span>
+</h1>
+<p class="text-lg text-zinc-400">
+                Choose the perfect plan to showcase your events. No hidden fees, cancel anytime.
+            </p>
+</div>
+<!-- Pricing Cards Grid -->
+<div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-24 relative">
+<!-- Starter Plan -->
+<div class="glass-card rounded-xl p-8 flex flex-col transition-transform hover:-translate-y-2 duration-300">
+<div class="mb-6">
+<h3 class="text-xl font-medium text-white mb-2">Starter</h3>
+<p class="text-zinc-400 text-sm h-10">Perfect for photographers just getting started with online galleries.</p>
+</div>
+<div class="mb-8">
+<div class="flex items-baseline gap-1">
+<span class="text-3xl font-bold text-white">₹2,499</span>
+<span class="text-zinc-500">/year</span>
+</div>
+</div>
+<ul class="space-y-4 mb-8 flex-grow">
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>10 GB Storage</span>
+</li>
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>Up to 5 Events</span>
+</li>
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>Original Quality Downloads</span>
+</li>
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>Basic Analytics</span>
+</li>
+</ul>
+<button class="w-full py-3 px-4 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all font-medium">
+                    Get Started
+                </button>
+</div>
+<!-- Pro Plan (Highlighted) -->
+<div class="glass-card-pro rounded-xl p-8 flex flex-col relative transform scale-105 z-20">
+<div class="absolute -top-4 left-0 right-0 flex justify-center">
+<span class="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg shadow-primary/40">Most Popular</span>
+</div>
+<div class="mb-6">
+<h3 class="text-xl font-medium text-white mb-2">Pro</h3>
+<p class="text-blue-200/70 text-sm h-10">For busy professionals handling multiple clients and high volumes.</p>
+</div>
+<div class="mb-8">
+<div class="flex items-baseline gap-1">
+<span class="text-4xl font-bold text-white">₹4,999</span>
+<span class="text-blue-200/60">/year</span>
+</div>
+</div>
+<ul class="space-y-4 mb-8 flex-grow">
+<li class="flex items-start gap-3 text-white">
+<span class="material-icons-round text-primary text-xl bg-white rounded-full p-[2px]">check</span>
+<span class="font-medium">50 GB Storage</span>
+</li>
+<li class="flex items-start gap-3 text-white">
+<span class="material-icons-round text-primary text-xl bg-white rounded-full p-[2px]">check</span>
+<span>Unlimited Events</span>
+</li>
+<li class="flex items-start gap-3 text-white">
+<span class="material-icons-round text-primary text-xl bg-white rounded-full p-[2px]">check</span>
+<span>Custom Branding &amp; Domain</span>
+</li>
+<li class="flex items-start gap-3 text-white">
+<span class="material-icons-round text-primary text-xl bg-white rounded-full p-[2px]">check</span>
+<span>Priority Support</span>
+</li>
+<li class="flex items-start gap-3 text-white">
+<span class="material-icons-round text-primary text-xl bg-white rounded-full p-[2px]">check</span>
+<span>Client Proofing</span>
+</li>
+</ul>
+<button class="w-full py-3 px-4 rounded-lg bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 transition-all font-semibold">
+                    Reach Out
+                </button>
+</div>
+<!-- Enterprise Plan -->
+<div class="glass-card rounded-xl p-8 flex flex-col transition-transform hover:-translate-y-2 duration-300">
+<div class="mb-6">
+<h3 class="text-xl font-medium text-white mb-2">Enterprise</h3>
+<p class="text-zinc-400 text-sm h-10">Custom solutions for agencies and large scale studios.</p>
+</div>
+<div class="mb-8">
+<div class="flex items-baseline gap-1">
+<span class="text-3xl font-bold text-white">Custom</span>
+</div>
+</div>
+<ul class="space-y-4 mb-8 flex-grow">
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>Unlimited Storage</span>
+</li>
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>White-label Solution</span>
+</li>
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>Dedicated Account Manager</span>
+</li>
+<li class="flex items-start gap-3 text-zinc-300">
+<span class="material-icons-round text-primary text-xl">check_circle</span>
+<span>API Access</span>
+</li>
+</ul>
+<button class="w-full py-3 px-4 rounded-lg border border-zinc-700 bg-zinc-800/50 text-white hover:bg-zinc-700 transition-all font-medium">
+                    Contact Us
+                </button>
+</div>
+</div>
+<!-- Comparison Table Section -->
+<div class="max-w-5xl mx-auto mb-20">
+<h2 class="text-2xl font-bold text-white text-center mb-10">Compare Features</h2>
+<div class="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/30 backdrop-blur-sm">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-zinc-800">
+<th class="p-4 pl-6 font-medium text-zinc-400 w-1/3">Features</th>
+<th class="p-4 font-medium text-white text-center w-1/5">Starter</th>
+<th class="p-4 font-medium text-primary text-center w-1/5 bg-primary/5">Pro</th>
+<th class="p-4 font-medium text-white text-center w-1/5">Enterprise</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<!-- Row 1 -->
+<tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+<td class="p-4 pl-6 text-zinc-300">Storage Capacity</td>
+<td class="p-4 text-center text-zinc-400">10 GB</td>
+<td class="p-4 text-center text-white font-medium bg-primary/5">50 GB</td>
+<td class="p-4 text-center text-zinc-400">Unlimited</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+<td class="p-4 pl-6 text-zinc-300">Active Events</td>
+<td class="p-4 text-center text-zinc-400">5</td>
+<td class="p-4 text-center text-white font-medium bg-primary/5">Unlimited</td>
+<td class="p-4 text-center text-zinc-400">Unlimited</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+<td class="p-4 pl-6 text-zinc-300">Custom Branding</td>
+<td class="p-4 text-center text-zinc-600"><span class="material-icons-round text-lg">remove</span></td>
+<td class="p-4 text-center text-primary bg-primary/5"><span class="material-icons-round text-lg">check</span></td>
+<td class="p-4 text-center text-zinc-400"><span class="material-icons-round text-lg">check</span></td>
+</tr>
+<!-- Row 4 -->
+<tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+<td class="p-4 pl-6 text-zinc-300">Client Proofing</td>
+<td class="p-4 text-center text-zinc-600"><span class="material-icons-round text-lg">remove</span></td>
+<td class="p-4 text-center text-primary bg-primary/5"><span class="material-icons-round text-lg">check</span></td>
+<td class="p-4 text-center text-zinc-400"><span class="material-icons-round text-lg">check</span></td>
+</tr>
+<!-- Row 5 -->
+<tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+<td class="p-4 pl-6 text-zinc-300">Watermarking</td>
+<td class="p-4 text-center text-zinc-400">Standard</td>
+<td class="p-4 text-center text-white font-medium bg-primary/5">Custom</td>
+<td class="p-4 text-center text-zinc-400">Custom + AI</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-zinc-800/30 transition-colors">
+<td class="p-4 pl-6 text-zinc-300">Support Level</td>
+<td class="p-4 text-center text-zinc-400">Email</td>
+<td class="p-4 text-center text-white font-medium bg-primary/5">Priority Email &amp; Chat</td>
+<td class="p-4 text-center text-zinc-400">24/7 Dedicated Agent</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Bottom CTA -->
+<div class="max-w-4xl mx-auto text-center py-16 px-4 rounded-2xl relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-r from-zinc-900 to-zinc-800 border border-zinc-700/50 rounded-2xl opacity-80 z-0"></div>
+<!-- Decorative gradient behind CTA -->
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-full bg-primary/5 blur-3xl z-0 pointer-events-none"></div>
+<div class="relative z-10">
+<h2 class="text-3xl font-bold text-white mb-4">Need a custom solution?</h2>
+<p class="text-zinc-400 mb-8 max-w-xl mx-auto">
+                    We build tailored gallery experiences for high-volume studios and agencies. Let's discuss your specific needs.
+                </p>
+<div class="flex flex-col sm:flex-row justify-center gap-4">
+<button class="px-8 py-3 rounded-lg bg-primary text-white font-semibold hover:bg-blue-600 transition-colors shadow-lg shadow-primary/20">
+                        Let's Talk
+                    </button>
+<button class="px-8 py-3 rounded-lg border border-zinc-600 text-zinc-300 hover:text-white hover:border-zinc-400 transition-colors font-medium">
+                        View API Docs
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="border-t border-zinc-800 bg-background-dark py-12 relative z-10">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex flex-col md:flex-row justify-between items-center">
+<div class="flex items-center gap-2 mb-4 md:mb-0">
+<div class="w-6 h-6 rounded bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center text-white text-xs font-bold">P</div>
+<span class="text-zinc-400 font-semibold text-sm tracking-tight">PIXTRACE</span>
+</div>
+<div class="flex space-x-6 text-sm text-zinc-500">
+<a class="hover:text-zinc-300 transition-colors" href="#">Privacy</a>
+<a class="hover:text-zinc-300 transition-colors" href="#">Terms</a>
+<a class="hover:text-zinc-300 transition-colors" href="#">Twitter</a>
+<a class="hover:text-zinc-300 transition-colors" href="#">Instagram</a>
+</div>
+<div class="mt-4 md:mt-0 text-zinc-600 text-sm">
+                    © 2023 Pixtrace Inc.
+                </div>
+</div>
+</div>
+</footer>
+</body></html>

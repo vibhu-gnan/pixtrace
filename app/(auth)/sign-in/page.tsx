@@ -64,14 +64,14 @@ function SignInForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background-dark px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-white">
             Sign in to PIXTRACE
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Event Gallery Platform
+          <p className="mt-2 text-center text-sm text-slate-400">
+            Welcome back! Please sign in to your account.
           </p>
         </div>
 
@@ -79,7 +79,7 @@ function SignInForm() {
         <div>
           <button
             onClick={handleGoogleSignIn}
-            className="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-3 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors"
+            className="flex w-full items-center justify-center gap-3 rounded-md glass-panel px-3 py-3 text-sm font-medium text-slate-300 border border-white/10 hover:bg-white/5 transition-colors"
           >
             <GoogleIcon />
             Continue with Google
@@ -88,17 +88,17 @@ function SignInForm() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300" />
+            <div className="w-full border-t border-white/10" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-gray-50 px-2 text-gray-500">or</span>
+            <span className="bg-background-dark px-2 text-slate-500">or</span>
           </div>
         </div>
 
         <form className="space-y-6" onSubmit={handleSignIn}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="rounded-md bg-red-900/50 border border-red-500/50 p-4">
+              <p className="text-sm text-red-200">{error}</p>
             </div>
           )}
           <div className="-space-y-px rounded-md shadow-sm">
@@ -112,7 +112,7 @@ function SignInForm() {
                 type="email"
                 autoComplete="email"
                 required
-                className="relative block w-full rounded-t-md border-0 py-3 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                className="relative block w-full rounded-t-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -129,7 +129,7 @@ function SignInForm() {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="relative block w-full rounded-b-md border-0 py-3 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                className="relative block w-full rounded-b-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -142,19 +142,19 @@ function SignInForm() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative flex w-full justify-center rounded-md bg-blue-600 px-3 py-3 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative flex w-full justify-center rounded-md bg-primary px-3 py-3 text-sm font-semibold text-white hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
 
           <div className="text-center text-sm">
-            <span className="text-gray-600">Don&apos;t have an account? </span>
+            <span className="text-slate-400">New to PIXTRACE? </span>
             <Link
-              href="/sign-up"
-              className="font-medium text-blue-600 hover:text-blue-500"
+              href="/pricing"
+              className="font-medium text-primary hover:text-blue-400"
             >
-              Sign up
+              View Pricing Plans
             </Link>
           </div>
         </form>
