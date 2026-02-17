@@ -333,7 +333,7 @@ function CustomSolutionCTA() {
       <div className="relative z-10">
         <h2 className="text-3xl font-bold text-white mb-4">Need a custom solution?</h2>
         <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-          We build tailored gallery experiences for high-volume studios and agencies. Let's discuss your specific needs.
+          We build tailored gallery experiences for high-volume studios and agencies. Let&apos;s discuss your specific needs.
         </p>
         
         {!showContactOptions ? (
@@ -343,7 +343,7 @@ function CustomSolutionCTA() {
               className="px-8 py-3 rounded-lg bg-primary text-white font-semibold hover:bg-blue-600 transition-colors shadow-lg shadow-primary/20"
               aria-label="Contact us for custom solution"
             >
-              Let's Talk
+              Let&apos;s Talk
             </button>
             <button
               onClick={handleAPIDocs}
@@ -429,20 +429,20 @@ export default function PricingPage() {
                 <span className="text-slate-400 font-semibold text-sm tracking-tight">PIXTRACE</span>
               </div>
               <div className="flex space-x-6 text-sm text-slate-500">
-                <a 
+                <Link 
                   className="hover:text-slate-300 transition-colors" 
                   href="/privacy"
                   aria-label="View privacy policy"
                 >
                   Privacy
-                </a>
-                <a 
+                </Link>
+                <Link 
                   className="hover:text-slate-300 transition-colors" 
                   href="/terms"
                   aria-label="View terms of service"
                 >
                   Terms
-                </a>
+                </Link>
                 <a 
                   className="hover:text-slate-300 transition-colors" 
                   href="https://twitter.com/pixtrace"
