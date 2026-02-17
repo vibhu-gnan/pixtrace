@@ -15,6 +15,7 @@ interface GalleryPageClientProps {
     description: string | null;
     totalCount: number;
     initialPhotoId?: string;
+    initialAlbumId?: string;
     allowDownload?: boolean;
     photoOrder?: 'oldest_first' | 'newest_first';
 }
@@ -27,10 +28,13 @@ export function GalleryPageClient({
     description,
     totalCount,
     initialPhotoId,
+    initialAlbumId,
     allowDownload,
     photoOrder = 'oldest_first',
 }: GalleryPageClientProps) {
-    const [activeAlbum, setActiveAlbum] = useState<string | null>(null);
+    // Validate initialAlbumId — only use if it matches an actual album
+    const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
+    const [activeAlbum, setActiveAlbum] = useState<string | null>(validInitialAlbum);
     const [media, setMedia] = useState<GalleryMediaItem[]>(initialMedia);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(initialMedia.length < totalCount);
@@ -77,6 +81,14 @@ export function GalleryPageClient({
             // Scroll to top of gallery section on album switch
             document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        // Sync URL with album selection (replaceState to avoid polluting history)
+        const url = new URL(window.location.href);
+        if (activeAlbum) {
+            url.searchParams.set('album', activeAlbum);
+        } else {
+            url.searchParams.delete('album');
+        }
+        window.history.replaceState({}, '', url.toString());
         // Cancel any pending retry from the previous album
         if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
         if (activeAlbum === null) {
@@ -219,12 +231,46 @@ export function GalleryPageClient({
         return () => { stopped = true; clearTimeout(timeout); };
     }, [eventHash]);
 
-    const handleCopyLink = async () => {
-        const url = window.location.href;
-        try { await navigator.clipboard.writeText(url); }
+    const [shareMenuOpen, setShareMenuOpen] = useState(false);
+    const shareMenuRef = useRef<HTMLDivElement>(null);
+
+    // Close share menu on outside click
+    useEffect(() => {
+        if (!shareMenuOpen) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+                setShareMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [shareMenuOpen]);
+
+    // Build gallery URL (without album param)
+    const getGalleryUrl = useCallback(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('album');
+        url.searchParams.delete('photo');
+        return url.toString();
+    }, []);
+
+    // Build album-specific URL
+    const getAlbumUrl = useCallback(() => {
+        const url = new URL(window.location.href);
+        if (activeAlbum) {
+            url.searchParams.set('album', activeAlbum);
+        }
+        url.searchParams.delete('photo');
+        return url.toString();
+    }, [activeAlbum]);
+
+    const activeAlbumName = activeAlbum ? albums.find(a => a.id === activeAlbum)?.name : null;
+
+    const copyToClipboard = async (text: string) => {
+        try { await navigator.clipboard.writeText(text); }
         catch {
             const input = document.createElement('input');
-            input.value = url;
+            input.value = text;
             document.body.appendChild(input);
             input.select();
             document.execCommand('copy');
@@ -235,13 +281,23 @@ export function GalleryPageClient({
         copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleShare = async () => {
-        const url = window.location.href;
+    const shareOrCopy = async (url: string, title: string) => {
         if (navigator.share) {
-            try { await navigator.share({ title: eventName, url }); }
+            try { await navigator.share({ title, url }); }
             catch { /* cancelled */ }
         } else {
-            handleCopyLink();
+            copyToClipboard(url);
+        }
+        setShareMenuOpen(false);
+    };
+
+    const handleShareClick = () => {
+        // No album selected — share directly (no dropdown needed)
+        if (!activeAlbum) {
+            shareOrCopy(getGalleryUrl(), eventName);
+        } else {
+            // Album selected — show dropdown with 2 options
+            setShareMenuOpen(prev => !prev);
         }
     };
 
@@ -314,11 +370,10 @@ export function GalleryPageClient({
                             )}
                         </div>
 
-                        {/* Right: Action icons */}
-                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                            {/* Share */}
+                        {/* Right: Share */}
+                        <div className="relative flex-shrink-0 ml-4" ref={shareMenuRef}>
                             <button
-                                onClick={handleShare}
+                                onClick={handleShareClick}
                                 className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                                 title="Share"
                             >
@@ -326,6 +381,31 @@ export function GalleryPageClient({
                                     <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                                 </svg>
                             </button>
+                            {/* Share dropdown — only when album is selected */}
+                            {shareMenuOpen && activeAlbum && (
+                                <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40 animate-in fade-in slide-in-from-top-1">
+                                    <button
+                                        onClick={() => shareOrCopy(getGalleryUrl(), eventName)}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="font-medium">Share Entire Gallery</div>
+                                        <div className="text-[11px] text-gray-400 mt-0.5">All albums &amp; photos</div>
+                                    </button>
+                                    <button
+                                        onClick={() => shareOrCopy(getAlbumUrl(), `${eventName} — ${activeAlbumName}`)}
+                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="font-medium">Share This Album</div>
+                                        <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbumName}</div>
+                                    </button>
+                                </div>
+                            )}
+                            {/* Copied toast */}
+                            {copied && (
+                                <div className="absolute right-0 top-full mt-1 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md shadow-lg z-40 whitespace-nowrap">
+                                    Link copied!
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

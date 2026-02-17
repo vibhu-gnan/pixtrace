@@ -10,7 +10,7 @@ export const revalidate = 3600;
 
 type Props = {
   params: Promise<{ eventHash: string }>;
-  searchParams: Promise<{ photo?: string }>;
+  searchParams: Promise<{ photo?: string; album?: string }>;
 };
 
 // Deduplicate getPublicGallery calls within the same request
@@ -60,7 +60,7 @@ export default async function GalleryEventPage({
 }: Props) {
   try {
     const { eventHash } = await params;
-    const { photo: initialPhotoId } = await searchParams;
+    const { photo: initialPhotoId, album: initialAlbumId } = await searchParams;
     const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = await getCachedGallery(eventHash);
 
     if (!event) {
@@ -163,6 +163,7 @@ export default async function GalleryEventPage({
             description={event.description}
             totalCount={totalCount}
             initialPhotoId={initialPhotoId}
+            initialAlbumId={initialAlbumId}
             allowDownload={event.allow_download ?? true}
             photoOrder={photoOrder}
           />
