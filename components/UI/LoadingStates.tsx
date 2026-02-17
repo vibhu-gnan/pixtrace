@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -88,14 +89,15 @@ export function LazyImage({
       {isLoading && (
         <Skeleton className={`absolute inset-0 ${skeletonClassName}`} />
       )}
-      <img
-        src={imageSrc}
-        alt={alt}
+      <Image
+        src={typeof imageSrc === 'string' ? imageSrc : ''}
+        alt={alt || ''}
         onLoad={handleLoad}
         onError={handleError}
         className={`transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-1'} ${className}`}
         loading="lazy"
-        {...props}
+        fill
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
       />
     </div>
   );
