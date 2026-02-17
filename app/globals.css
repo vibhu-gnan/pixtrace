@@ -24,6 +24,28 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .glass-panel:hover {
+    border-color: rgba(43, 108, 238, 0.5);
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .grid-mask {
+    mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  }
 }
 
 /* Ken Burns slideshow keyframes — 4 variants for visual variety */
