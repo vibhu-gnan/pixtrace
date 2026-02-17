@@ -288,8 +288,12 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
             <div className="col-span-2 lg:col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-                  <span className="material-icons text-white text-xs" aria-hidden="true">filter_center_focus</span>
+                <div className="w-6 h-6 rounded-lg overflow-hidden">
+                  <img 
+                    src="/logo.png" 
+                    alt="PIXTRACE Logo" 
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <span className="text-xl font-bold text-white">PIXTRACE</span>
               </div>

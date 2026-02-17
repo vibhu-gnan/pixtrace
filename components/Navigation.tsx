@@ -97,8 +97,12 @@ export default function Navigation() {
     <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-background-dark/80 backdrop-blur-md" role="navigation" aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <span className="material-icons text-white text-lg">filter_center_focus</span>
+          <div className="w-8 h-8 rounded-lg overflow-hidden group-hover:scale-105 transition-transform">
+            <img 
+              src="/logo.png" 
+              alt="PIXTRACE Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <span className="text-xl font-bold text-white tracking-tight">PIXTRACE</span>
         </Link>
