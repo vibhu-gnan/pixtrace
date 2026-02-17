@@ -6,18 +6,44 @@ import type { LogoDisplay } from '@/actions/gallery-theme';
 interface GalleryLoadingScreenProps {
     logoUrl: string | null;
     logoDisplay: LogoDisplay;
+    customPreloader?: string | null;
 }
 
 /**
  * Full-screen loading overlay shown via Suspense while the gallery page streams in.
  *
- * - Logo mode: Branded logo with fade-in + gentle pulse animation, spinner beneath
- * - Spinner mode: Simple circular spinner (no logo uploaded, or fallback on error)
+ * Priority order:
+ * 1. Custom preloader HTML (rendered in sandboxed iframe — safe, isolated CSS)
+ * 2. Logo mode: Branded logo with fade-in + gentle pulse animation
+ * 3. Spinner mode: Simple circular spinner (fallback)
  *
- * Safety: 3-second timeout on logo load — falls back to spinner if R2 is slow.
- * onError handler catches broken logo URLs.
+ * Safety: 3-second timeout on logo load, iframe sandbox blocks scripts.
  */
-export function GalleryLoadingScreen({ logoUrl, logoDisplay }: GalleryLoadingScreenProps) {
+export function GalleryLoadingScreen({ logoUrl, logoDisplay, customPreloader }: GalleryLoadingScreenProps) {
+    // ── Custom preloader mode ──────────────────────────────────
+    if (customPreloader) {
+        return (
+            <div className="fixed inset-0 z-50">
+                <iframe
+                    srcDoc={customPreloader}
+                    sandbox=""
+                    title="Loading"
+                    className="w-full h-full border-0"
+                    style={{ display: 'block' }}
+                />
+            </div>
+        );
+    }
+
+    // ── Logo / Spinner mode ────────────────────────────────────
+    return <LogoOrSpinnerLoader logoUrl={logoUrl} logoDisplay={logoDisplay} />;
+}
+
+/**
+ * Inner component for logo/spinner modes.
+ * Separated so the custom preloader path avoids unnecessary hook initialization.
+ */
+function LogoOrSpinnerLoader({ logoUrl, logoDisplay }: { logoUrl: string | null; logoDisplay: LogoDisplay }) {
     const showLogo = !!logoUrl && logoDisplay !== 'none';
     const [logoLoaded, setLogoLoaded] = useState(false);
     const [logoFailed, setLogoFailed] = useState(false);
@@ -56,7 +82,6 @@ export function GalleryLoadingScreen({ logoUrl, logoDisplay }: GalleryLoadingScr
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
             {useLogoMode ? (
                 <div className="flex flex-col items-center gap-6">
-                    {/* Logo with fade-in and pulse */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={logoUrl!}
@@ -66,17 +91,14 @@ export function GalleryLoadingScreen({ logoUrl, logoDisplay }: GalleryLoadingScr
                         className={`h-20 sm:h-24 md:h-28 max-w-[60vw] object-contain transition-opacity duration-300 ${logoLoaded ? 'opacity-100 animate-[logoPulse_1.5s_ease-in-out_infinite]' : 'opacity-0'
                             }`}
                     />
-                    {/* Spinner beneath logo — only show after logo is visible */}
                     {logoLoaded && (
                         <div className="w-6 h-6 border-[2.5px] border-gray-200 border-t-gray-500 rounded-full animate-spin" />
                     )}
-                    {/* While logo is loading, show a small spinner as placeholder */}
                     {!logoLoaded && (
                         <div className="w-8 h-8 border-[3px] border-gray-200 border-t-gray-600 rounded-full animate-spin" />
                     )}
                 </div>
             ) : (
-                /* Simple spinner mode */
                 <div className="w-8 h-8 border-[3px] border-gray-200 border-t-gray-600 rounded-full animate-spin" />
             )}
         </div>

@@ -590,3 +590,55 @@ export async function updateEventLogoDisplay(eventId: string, logoDisplay: strin
 
   return { success: true };
 }
+
+const MAX_PRELOADER_SIZE = 51200; // 50KB
+
+export async function updateEventCustomPreloader(eventId: string, html: string | null) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  // Validate size
+  if (html && html.length > MAX_PRELOADER_SIZE) {
+    return { error: 'Custom preloader HTML must be under 50KB' };
+  }
+
+  const supabase = createAdminClient();
+
+  const { data: currentEvent } = await supabase
+    .from('events')
+    .select('theme, event_hash')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!currentEvent) return { error: 'Event not found' };
+
+  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
+
+  // Set or clear the custom preloader
+  const updatedTheme = html
+    ? { ...currentTheme, customPreloader: html }
+    : { ...currentTheme, customPreloader: undefined };
+
+  const { error } = await supabase
+    .from('events')
+    .update({
+      theme: updatedTheme,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);
+
+  if (error) {
+    console.error('Error updating custom preloader:', error);
+    return { error: 'Failed to update custom preloader' };
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  if (currentEvent.event_hash) {
+    revalidatePath(`/gallery/${currentEvent.event_hash}`);
+    revalidatePath(`/${currentEvent.event_hash}`);
+  }
+
+  return { success: true };
+}

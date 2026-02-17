@@ -8,9 +8,10 @@ export type LogoDisplay = 'cover_and_loading' | 'loading_only' | 'none';
 export interface GalleryTheme {
     logoUrl: string | null;
     logoDisplay: LogoDisplay;
+    customPreloader: string | null;
 }
 
-const FALLBACK: GalleryTheme = { logoUrl: null, logoDisplay: 'none' };
+const FALLBACK: GalleryTheme = { logoUrl: null, logoDisplay: 'none', customPreloader: null };
 
 /**
  * Lightweight query to fetch ONLY logo/theme data for the gallery loading screen.
@@ -54,7 +55,11 @@ export const getGalleryTheme = cache(async (eventHash: string): Promise<GalleryT
             logoDisplay = 'none';
         }
 
-        return { logoUrl, logoDisplay };
+        // Extract custom preloader HTML (max 50KB guard)
+        const rawPreloader = typeof theme.customPreloader === 'string' ? theme.customPreloader : null;
+        const customPreloader = rawPreloader && rawPreloader.length <= 51200 ? rawPreloader : null;
+
+        return { logoUrl, logoDisplay, customPreloader };
     } catch {
         // Network error, Supabase down, etc. — never block the loading screen
         return FALLBACK;

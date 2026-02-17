@@ -1,4 +1,5 @@
 import { EventLogoSettings } from '@/components/dashboard/event-logo-settings';
+import { EventCustomPreloader } from '@/components/dashboard/event-custom-preloader';
 import { notFound } from 'next/navigation';
 
 import Link from 'next/link';
@@ -83,6 +84,14 @@ export default async function SettingsPage({
               eventId={eventData.id}
               initialLogoUrl={(eventData.theme as any)?.logoUrl}
               initialLogoDisplay={(eventData.theme as any)?.logoDisplay}
+            />
+          </section>
+
+          {/* Custom Preloader */}
+          <section>
+            <EventCustomPreloader
+              eventId={eventData.id}
+              initialHtml={(eventData.theme as any)?.customPreloader}
             />
           </section>
 
