@@ -61,15 +61,15 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link 
-                href="/sign-in"
+              <Link
+                href="/pricing"
                 className="px-8 py-4 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg transition-all shadow-[0_0_30px_-10px_rgba(43,108,238,0.6)] flex items-center justify-center gap-2 group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark"
-                aria-label="Login to PIXTRACE"
+                aria-label="View pricing plans"
               >
-                Login
+                Get Started
                 <span className="material-icons text-sm group-hover:translate-x-1 transition-transform" aria-hidden="true">arrow_forward</span>
               </Link>
-              
+
               <Link
                 href="/gallery"
                 className="px-8 py-4 glass-panel text-white font-semibold rounded-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2"
@@ -264,11 +264,11 @@ export default function Home() {
           <p className="text-xl text-slate-400 mb-10">Join thousands of event photographers saving hours of sorting time every week.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/sign-in"
+              href="/pricing"
               className="w-full sm:w-auto px-8 py-4 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg transition-all shadow-lg hover:shadow-primary/50 text-lg"
-              aria-label="Login to PIXTRACE"
+              aria-label="View pricing plans"
             >
-              Login Now
+              View Plans
             </Link>
             <a
               href="tel:8688146351"
@@ -278,7 +278,7 @@ export default function Home() {
               Contact Sales
             </a>
           </div>
-          <p className="mt-6 text-sm text-slate-500">No credit card required for trial • Cancel anytime</p>
+          <p className="mt-6 text-sm text-slate-500">Cancel anytime • No hidden fees</p>
         </div>
       </section>
 

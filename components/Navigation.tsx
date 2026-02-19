@@ -120,7 +120,7 @@ export default function Navigation() {
             </div>
           )}
 
-          {user ? (
+          {user && (
             <>
               <Link
                 href="/dashboard"
@@ -137,14 +137,6 @@ export default function Navigation() {
                 Sign Out
               </button>
             </>
-          ) : (
-            <Link
-              className="hidden md:block px-5 py-2.5 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all shadow-[0_0_20px_-5px_rgba(43,108,238,0.5)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark"
-              href="/sign-in"
-              aria-label="Sign in to your account"
-            >
-              Login
-            </Link>
           )}
 
           {/* Mobile hamburger button */}
@@ -178,7 +170,7 @@ export default function Navigation() {
           >
             Pricing
           </Link>
-          {user ? (
+          {user && (
             <>
               <Link
                 href="/dashboard"
@@ -194,14 +186,6 @@ export default function Navigation() {
                 Sign Out
               </button>
             </>
-          ) : (
-            <Link
-              className="block text-center mt-2 px-5 py-2.5 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all"
-              href="/sign-in"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Login
-            </Link>
           )}
         </div>
       )}
