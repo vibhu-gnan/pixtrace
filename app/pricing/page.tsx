@@ -153,7 +153,7 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
                 {plan.currency}{plan.price.toLocaleString()}
               </span>
               <span className={plan.highlighted ? 'text-blue-200/60' : 'text-slate-500'}>
-                /{plan.interval}
+                /{plan.interval === 'year' ? 'year' : plan.interval}
               </span>
             </>
           ) : (

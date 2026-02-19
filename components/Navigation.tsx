@@ -10,6 +10,7 @@ export default function Navigation() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -107,45 +108,112 @@ export default function Navigation() {
           <span className="text-xl font-bold text-white tracking-tight">PIXTRACE</span>
         </Link>
         
+        {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
           <Link className="hover:text-white transition-colors focus:outline-none focus:text-white" href="/#features">Features</Link>
           <Link className="hover:text-white transition-colors focus:outline-none focus:text-white" href="/pricing">Pricing</Link>
         </div>
         
-        <div className="flex items-center gap-4">
-          {error && (
-            <div className="text-xs text-red-400" role="alert">
-              {error}
-            </div>
-          )}
-          
-          {user ? (
-            <>
-              <Link 
-                href="/dashboard" 
-                className="hidden md:block text-sm font-medium text-slate-300 hover:text-white transition-colors focus:outline-none focus:text-white"
-                aria-label="Go to dashboard"
-              >
-                Dashboard
-              </Link>
-              <button
-                onClick={handleSignOut}
-                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors focus:outline-none focus:text-white"
-                aria-label="Sign out"
-              >
-                Sign Out
-              </button>
-            </>
-          ) : (
+        {/* Mobile Menu Button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden p-2 text-slate-400 hover:text-white transition-colors"
+          aria-label="Toggle mobile menu"
+        >
+          <span className="material-icons text-2xl">
+            {mobileMenuOpen ? 'close' : 'menu'}
+          </span>
+        </button>
+      </div>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden absolute top-full left-0 right-0 bg-background-dark border-b border-white/5 shadow-lg">
+          <div className="max-w-7xl mx-auto px-6 py-4 space-y-4">
             <Link 
-              className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all shadow-[0_0_20px_-5px_rgba(43,108,238,0.5)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark" 
-              href="/sign-in"
-              aria-label="Sign in to your account"
+              className="block text-sm font-medium text-slate-400 hover:text-white transition-colors focus:outline-none focus:text-white py-2" 
+              href="/#features"
+              onClick={() => setMobileMenuOpen(false)}
             >
-              Login
+              Features
             </Link>
-          )}
+            <Link 
+              className="block text-sm font-medium text-slate-400 hover:text-white transition-colors focus:outline-none focus:text-white py-2" 
+              href="/pricing"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Pricing
+            </Link>
+            <div className="pt-4 border-t border-white/10">
+              {user ? (
+                <div className="space-y-2">
+                  <Link 
+                    href="/dashboard" 
+                    className="block text-sm font-medium text-slate-300 hover:text-white transition-colors focus:outline-none focus:text-white py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      handleSignOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors focus:outline-none focus:text-white"
+                    aria-label="Sign out"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <Link 
+                  className="block px-5 py-2.5 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all text-center"
+                  href="/sign-in"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Sign in to your account"
+                >
+                  Login
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
+      )}
+      
+      {/* Desktop Auth Section */}
+      <div className="hidden md:flex items-center gap-4">
+        {error && (
+          <div className="text-xs text-red-400" role="alert">
+            {error}
+          </div>
+        )}
+        
+        {user ? (
+          <>
+            <Link 
+              href="/dashboard" 
+              className="hidden md:block text-sm font-medium text-slate-300 hover:text-white transition-colors focus:outline-none focus:text-white"
+              aria-label="Go to dashboard"
+            >
+              Dashboard
+            </Link>
+            <button
+              onClick={handleSignOut}
+              className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors focus:outline-none focus:text-white"
+              aria-label="Sign out"
+            >
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <Link 
+            className="px-5 py-2.5 bg-primary hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition-all shadow-[0_0_20px_-5px_rgba(43,108,238,0.5)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark" 
+            href="/sign-in"
+            aria-label="Sign in to your account"
+          >
+            Login
+          </Link>
+        )}
       </div>
     </nav>
   );
