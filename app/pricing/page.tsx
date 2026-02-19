@@ -12,7 +12,7 @@ const pricingPlans: PricingPlan[] = [
     name: 'Starter',
     price: 2499,
     currency: '₹',
-    interval: 'year',
+    interval: 'month',
     description: 'Perfect for photographers just getting started with online galleries.',
     features: [
       '10 GB Storage',
@@ -28,7 +28,7 @@ const pricingPlans: PricingPlan[] = [
     name: 'Pro',
     price: 4999,
     currency: '₹',
-    interval: 'year',
+    interval: 'month',
     description: 'For busy professionals handling multiple clients and high volumes.',
     features: [
       '50 GB Storage',
@@ -122,8 +122,8 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
     <div 
       className={`
         relative flex flex-col rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1
-        ${plan.highlighted 
-          ? 'bg-primary/10 border border-primary/30 shadow-[0_0_40px_rgba(43,108,238,0.15)] scale-105 z-10' 
+        ${plan.highlighted
+          ? 'bg-primary/10 border border-primary/30 shadow-[0_0_40px_rgba(43,108,238,0.15)] md:scale-105 z-10'
           : 'glass-panel hover:bg-white/5'
         }
       `}
@@ -153,7 +153,7 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
                 {plan.currency}{plan.price.toLocaleString()}
               </span>
               <span className={plan.highlighted ? 'text-blue-200/60' : 'text-slate-500'}>
-                /{plan.interval === 'year' ? 'year' : plan.interval}
+                /{plan.interval}
               </span>
             </>
           ) : (
@@ -222,10 +222,10 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
 
 function ComparisonTable() {
   return (
-    <div className="max-w-5xl mx-auto mb-20">
+    <div className="max-w-5xl mx-auto mb-20 px-2 sm:px-0">
       <h2 className="text-2xl font-bold text-white text-center mb-10">Compare Features</h2>
-      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/30 backdrop-blur-sm">
-        <table className="w-full text-left border-collapse">
+      <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/30 backdrop-blur-sm -mx-2 sm:mx-0">
+        <table className="w-full text-left border-collapse min-w-[500px]">
           <thead>
             <tr className="border-b border-slate-800">
               <th className="p-4 pl-6 font-medium text-slate-400 w-1/3">Features</th>
@@ -390,7 +390,7 @@ export default function PricingPage() {
           <div className="absolute bottom-[-10%] right-[10%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] opacity-30"></div>
         </div>
 
-        <main className="relative z-10 flex-grow py-20 px-4 sm:px-6 lg:px-8">
+        <main className="relative z-10 flex-grow pt-28 pb-20 px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight leading-tight">
@@ -405,7 +405,7 @@ export default function PricingPage() {
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-24 relative">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-24 px-2 sm:px-0 relative">
             {pricingPlans.map((plan) => (
               <PricingCard key={plan.id} plan={plan} />
             ))}
