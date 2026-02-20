@@ -182,21 +182,37 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
         ))}
       </ul>
 
-      {!showContactOptions ? (
-        <button
-          onClick={handleContactClick}
-          className={`
-            w-full py-3 px-4 rounded-lg font-medium transition-all
-            ${plan.highlighted
-              ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 font-semibold'
-              : 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white'
-            }
-          `}
-          aria-label={`Contact us about ${plan.name} plan`}
-        >
-          Contact Us
-        </button>
-      ) : (
+      {plan.id === 'starter' ? (
+  <a
+    href="https://rzp.io/rzp/uXSCNaBp"
+    target="_blank"
+    rel="noopener noreferrer"
+    className={`
+      w-full py-3 px-4 rounded-lg font-medium transition-all text-center block
+      ${plan.highlighted
+        ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 font-semibold'
+        : 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white'
+      }
+    `}
+  >
+    Buy Now
+  </a>
+) : !showContactOptions ? (
+  <button
+    onClick={handleContactClick}
+    className={`
+      w-full py-3 px-4 rounded-lg font-medium transition-all
+      ${plan.highlighted
+        ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 font-semibold'
+        : 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white'
+      }
+    `}
+    aria-label={`Contact us about ${plan.name} plan`}
+  >
+    Contact Us
+  </button>
+) : (
+      
         <div className="space-y-3">
           <button
             onClick={handleEmailClick}
