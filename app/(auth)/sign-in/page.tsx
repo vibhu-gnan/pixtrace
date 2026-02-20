@@ -19,10 +19,18 @@ function GoogleIcon() {
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const getSafeRedirect = () => {
+    const redirect = searchParams.get('redirect');
+    if (!redirect) return '/';
+    if (!redirect.startsWith('/')) return '/';
+    return redirect;
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +39,7 @@ function SignInForm() {
 
     try {
       const supabase = createClient();
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -38,8 +47,9 @@ function SignInForm() {
 
       if (error) throw error;
 
-      const redirect = searchParams.get('redirect') || '/dashboard';
-      router.push(redirect);
+      const redirectPath = getSafeRedirect();
+
+      router.push(redirectPath);
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
@@ -50,15 +60,17 @@ function SignInForm() {
 
   const handleGoogleSignIn = async () => {
     const supabase = createClient();
-    const redirect = searchParams.get('redirect') || '/dashboard';
+    const redirectPath = getSafeRedirect();
 
-    // Use environment variable for production, fallback to window.location.origin
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
 
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${baseUrl}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+        redirectTo: `${baseUrl}/auth/callback?redirect=${encodeURIComponent(
+          redirectPath
+        )}`,
       },
     });
   };
@@ -101,52 +113,35 @@ function SignInForm() {
               <p className="text-sm text-red-200">{error}</p>
             </div>
           )}
+
           <div className="-space-y-px rounded-md shadow-sm">
-            <div>
-              <label htmlFor="email-address" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="relative block w-full rounded-t-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="relative block w-full rounded-b-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
+            <input
+              type="email"
+              required
+              placeholder="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+              className="relative block w-full rounded-t-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-primary"
+            />
+            <input
+              type="password"
+              required
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              className="relative block w-full rounded-b-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-primary"
+            />
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative flex w-full justify-center rounded-md bg-primary px-3 py-3 text-sm font-semibold text-white hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-md bg-primary px-3 py-3 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
 
           <div className="text-center text-sm">
             <span className="text-slate-400">New to PIXTRACE? </span>
@@ -165,11 +160,13 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">Loading...</div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
       <SignInForm />
     </Suspense>
   );
