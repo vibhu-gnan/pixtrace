@@ -25,10 +25,11 @@ function SignInForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ✅ Correct default redirect
   const getSafeRedirect = () => {
     const redirect = searchParams.get('redirect');
-    if (!redirect) return '/';
-    if (!redirect.startsWith('/')) return '/';
+    if (!redirect) return '/dashboard';
+    if (!redirect.startsWith('/')) return '/dashboard';
     return redirect;
   };
 
@@ -47,9 +48,12 @@ function SignInForm() {
 
       if (error) throw error;
 
+      // Wait for session to settle
+      await supabase.auth.getSession();
+
       const redirectPath = getSafeRedirect();
 
-      router.push(redirectPath);
+      router.replace(redirectPath);
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
@@ -76,10 +80,11 @@ function SignInForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background-dark px-4 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background-dark px-4">
       <div className="w-full max-w-md space-y-8">
+
         <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-white">
+          <h2 className="text-center text-3xl font-bold text-white">
             Sign in to PIXTRACE
           </h2>
           <p className="mt-2 text-center text-sm text-slate-400">
@@ -87,27 +92,17 @@ function SignInForm() {
           </p>
         </div>
 
-        {/* Google Sign In */}
-        <div>
-          <button
-            onClick={handleGoogleSignIn}
-            className="flex w-full items-center justify-center gap-3 rounded-md glass-panel px-3 py-3 text-sm font-medium text-slate-300 border border-white/10 hover:bg-white/5 transition-colors"
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
-        </div>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-background-dark px-2 text-slate-500">or</span>
-          </div>
-        </div>
+        {/* Google */}
+        <button
+          onClick={handleGoogleSignIn}
+          className="flex w-full items-center justify-center gap-3 rounded-md glass-panel px-3 py-3 text-sm font-medium text-slate-300 border border-white/10 hover:bg-white/5 transition-colors"
+        >
+          <GoogleIcon />
+          Continue with Google
+        </button>
 
         <form className="space-y-6" onSubmit={handleSignIn}>
+
           {error && (
             <div className="rounded-md bg-red-900/50 border border-red-500/50 p-4">
               <p className="text-sm text-red-200">{error}</p>
@@ -122,8 +117,9 @@ function SignInForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
-              className="relative block w-full rounded-t-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-primary"
+              className="w-full rounded-t-md py-3 px-4 bg-slate-800/50 text-white ring-1 ring-slate-600 focus:ring-2 focus:ring-primary"
             />
+
             <input
               type="password"
               required
@@ -131,7 +127,7 @@ function SignInForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
-              className="relative block w-full rounded-b-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-primary"
+              className="w-full rounded-b-md py-3 px-4 bg-slate-800/50 text-white ring-1 ring-slate-600 focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -152,6 +148,7 @@ function SignInForm() {
               View Pricing Plans
             </Link>
           </div>
+
         </form>
       </div>
     </div>
@@ -160,13 +157,7 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          Loading...
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
       <SignInForm />
     </Suspense>
   );
