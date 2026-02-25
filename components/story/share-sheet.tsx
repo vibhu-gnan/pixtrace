@@ -113,17 +113,24 @@ export function ShareSheet({
 
     await copyToClipboard(galleryUrl);
 
+    // Best path: native file share (iOS Safari + installed apps)
     if (navigator.share && navigator.canShare?.({ files: [result.file] })) {
       try {
         await navigator.share({ files: [result.file], title: eventName });
         showToast('Link copied! Add a Link Sticker on Instagram');
         setGenerating(false);
         return;
-      } catch {
-        // cancelled — fall through to download
+      } catch (e) {
+        // User cancelled — stop, don't fall through to download
+        if ((e as Error).name === 'AbortError') {
+          setGenerating(false);
+          return;
+        }
+        // Other error — fall through
       }
     }
 
+    // Fallback: download image then open Instagram Stories deep link
     const url = URL.createObjectURL(result.blob);
     const link = document.createElement('a');
     link.href = url;
@@ -133,7 +140,13 @@ export function ShareSheet({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    showToast('Saved! Add a Link Sticker on Instagram');
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      setTimeout(() => { window.location.href = 'instagram://story-camera'; }, 800);
+      showToast('Saved! Opening Instagram Stories…');
+    } else {
+      showToast('Saved! Open Instagram Stories and select the image');
+    }
     setGenerating(false);
   }, [generating, generateCard, galleryUrl, eventName, copyToClipboard, showToast]);
 
