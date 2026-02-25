@@ -8,6 +8,7 @@ const PUBLIC_PREFIXES = [
   '/api/gallery',
   '/api/download',
   '/api/webhooks',
+  '/api/proxy-image',
   '/sign-in',
   '/sign-up',
   '/pricing',

@@ -6,6 +6,7 @@ import { getPublicGalleryPage } from '@/actions/gallery';
 import type { GalleryMediaItem } from '@/actions/gallery';
 
 import { GallerySkeleton } from './gallery-skeleton';
+import { ShareSheet } from '@/components/story/share-sheet';
 
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
@@ -18,6 +19,7 @@ interface GalleryPageClientProps {
     initialAlbumId?: string;
     allowDownload?: boolean;
     photoOrder?: 'oldest_first' | 'newest_first';
+    logoUrl?: string;
 }
 
 export function GalleryPageClient({
@@ -31,6 +33,7 @@ export function GalleryPageClient({
     initialAlbumId,
     allowDownload,
     photoOrder = 'oldest_first',
+    logoUrl,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -232,6 +235,7 @@ export function GalleryPageClient({
     }, [eventHash]);
 
     const [shareMenuOpen, setShareMenuOpen] = useState(false);
+    const [headerShareSheetOpen, setHeaderShareSheetOpen] = useState(false);
     const shareMenuRef = useRef<HTMLDivElement>(null);
 
     // Close share menu on outside click
@@ -292,13 +296,7 @@ export function GalleryPageClient({
     };
 
     const handleShareClick = () => {
-        // No album selected — share directly (no dropdown needed)
-        if (!activeAlbum) {
-            shareOrCopy(getGalleryUrl(), eventName);
-        } else {
-            // Album selected — show dropdown with 2 options
-            setShareMenuOpen(prev => !prev);
-        }
+        setShareMenuOpen(prev => !prev);
     };
 
     // Revoked overlay
@@ -382,21 +380,34 @@ export function GalleryPageClient({
                                 </svg>
                             </button>
                             {/* Share dropdown — only when album is selected */}
-                            {shareMenuOpen && activeAlbum && (
+                            {shareMenuOpen && (
                                 <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40 animate-in fade-in slide-in-from-top-1">
                                     <button
                                         onClick={() => shareOrCopy(getGalleryUrl(), eventName)}
                                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        <div className="font-medium">Share Entire Gallery</div>
-                                        <div className="text-[11px] text-gray-400 mt-0.5">All albums &amp; photos</div>
+                                        <div className="font-medium">{activeAlbum ? 'Share Entire Gallery' : 'Copy Link'}</div>
+                                        <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbum ? 'All albums & photos' : 'Share gallery URL'}</div>
                                     </button>
+                                    {activeAlbum && (
+                                        <button
+                                            onClick={() => shareOrCopy(getAlbumUrl(), `${eventName} — ${activeAlbumName}`)}
+                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <div className="font-medium">Share This Album</div>
+                                            <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbumName}</div>
+                                        </button>
+                                    )}
+                                    <div className="border-t border-gray-100 my-1" />
                                     <button
-                                        onClick={() => shareOrCopy(getAlbumUrl(), `${eventName} — ${activeAlbumName}`)}
+                                        onClick={() => { setShareMenuOpen(false); setHeaderShareSheetOpen(true); }}
                                         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        <div className="font-medium">Share This Album</div>
-                                        <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbumName}</div>
+                                        <div className="font-medium flex items-center gap-2">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="2" /><line x1="12" y1="18" x2="12" y2="18.01" /></svg>
+                                            Share to Story
+                                        </div>
+                                        <div className="text-[11px] text-gray-400 mt-0.5">Create branded story card</div>
                                     </button>
                                 </div>
                             )}
@@ -413,7 +424,7 @@ export function GalleryPageClient({
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className="pt-1 relative">
-                <GalleryGrid media={media} eventHash={eventHash} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading} />
+                <GalleryGrid media={media} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading} />
 
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.
@@ -453,6 +464,18 @@ export function GalleryPageClient({
                         Return to Top
                     </button>
                 </div>
+            )}
+            {/* Share sheet for gallery header */}
+            {media.length > 0 && (
+                <ShareSheet
+                    isOpen={headerShareSheetOpen}
+                    onClose={() => setHeaderShareSheetOpen(false)}
+                    photoUrl={media[0].full_url || media[0].original_url}
+                    eventName={eventName}
+                    eventSubtitle={`${totalCount} Photos${albums.length > 1 ? ` · ${albums.length} Albums` : ''}`}
+                    logoUrl={logoUrl}
+                    galleryUrl={typeof window !== 'undefined' ? getGalleryUrl() : ''}
+                />
             )}
         </>
     );

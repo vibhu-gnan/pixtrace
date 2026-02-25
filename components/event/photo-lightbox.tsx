@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { MediaItem } from '@/actions/media';
+import { ShareSheet } from '@/components/story/share-sheet';
 
 type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
@@ -329,16 +330,19 @@ interface PhotoLightboxProps {
   isOpen: boolean;
   onClose: () => void;
   eventHash?: string;
+  eventName?: string;
+  logoUrl?: string;
   allowDownload?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
 const LIGHTBOX_STATE_KEY = 'pixtrace-lightbox';
 
-export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, allowDownload = true }: PhotoLightboxProps) {
+export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, eventName, logoUrl, allowDownload = true }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
   const [linkCopied, setLinkCopied] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -459,6 +463,14 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
 
   const handleSharePhoto = useCallback(async () => {
     if (!currentPhoto) return;
+
+    // Public gallery with eventName → open Spotify-style share sheet
+    if (eventName && eventHash) {
+      setShareSheetOpen(true);
+      return;
+    }
+
+    // Dashboard fallback → copy/share link
     const baseUrl = eventHash
       ? `${window.location.origin}/gallery/${eventHash}`
       : window.location.href.split('?')[0];
@@ -481,7 +493,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     setLinkCopied(true);
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = setTimeout(() => setLinkCopied(false), 2000);
-  }, [currentPhoto, eventHash]);
+  }, [currentPhoto, eventHash, eventName]);
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
@@ -489,6 +501,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
   useEffect(() => {
     setIsDownloading(false);
     setDownloadSuccess(false);
+    setShareSheetOpen(false);
   }, [currentIndex]);
 
   const handleDownload = useCallback(async () => {
@@ -580,6 +593,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
         : currentPhoto.original_url;
 
   return (
+    <>
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/95 z-50 backdrop-blur-sm" />
@@ -676,6 +690,19 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+
+    {/* Share sheet — rendered outside Dialog to avoid z-index conflicts */}
+    {eventName && eventHash && currentPhoto && (
+      <ShareSheet
+        isOpen={shareSheetOpen}
+        onClose={() => setShareSheetOpen(false)}
+        photoUrl={currentPhoto.full_url}
+        eventName={eventName}
+        logoUrl={logoUrl}
+        galleryUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/gallery/${eventHash}`}
+      />
+    )}
+    </>
   );
 }
 
