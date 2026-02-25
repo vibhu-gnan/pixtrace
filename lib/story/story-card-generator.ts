@@ -225,7 +225,7 @@ function renderGlassFrame(
   // Use a higher scale than drawBlurredBackground (0.15 vs 0.05) so the
   // photo is recognizable, not a solid color.
   const bgTemp = document.createElement('canvas');
-  const bgScale = 0.06; // 6% — heavy blur, strong bokeh background
+  const bgScale = 0.03; // 3% — maximum blur, full bokeh background
   bgTemp.width = Math.round(W * bgScale);
   bgTemp.height = Math.round(H * bgScale);
   const bgCtx = bgTemp.getContext('2d')!;
@@ -310,9 +310,9 @@ function renderGlassFrame(
 
   // Logo at bottom center
   if (logo) {
-    const logoH = 64;
+    const logoH = 192;
     const logoW = Math.round((logo.naturalWidth / logo.naturalHeight) * logoH);
-    ctx.drawImage(logo, (W - logoW) / 2, H - 120, logoW, logoH);
+    ctx.drawImage(logo, (W - logoW) / 2, H - 230, logoW, logoH);
   }
 }
 
