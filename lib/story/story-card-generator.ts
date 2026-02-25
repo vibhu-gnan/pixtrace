@@ -246,19 +246,10 @@ function renderGlassFrame(
   const cardRadius = 32;
   const photoRadius = 24;
 
-  // Constrain photo to available space (margins + max height)
+  // Force 4:5 portrait frame regardless of source image orientation
   const maxPhotoW = W - 120;   // 60px margins each side
-  const maxPhotoH = H * 0.52;  // ~52% of story for photo
-
-  const imgRatio = photo.naturalWidth / photo.naturalHeight;
-  let photoW: number, photoH: number;
-  if (imgRatio > maxPhotoW / maxPhotoH) {
-    photoW = maxPhotoW;
-    photoH = Math.round(photoW / imgRatio);
-  } else {
-    photoH = maxPhotoH;
-    photoW = Math.round(photoH * imgRatio);
-  }
+  const photoW = maxPhotoW;
+  const photoH = Math.round(photoW * 5 / 4); // 4:5 → 960×1200
 
   const cardW = photoW + cardPad * 2;
   const cardH = photoH + cardPad * 2;
