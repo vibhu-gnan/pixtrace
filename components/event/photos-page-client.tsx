@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useUploadStore } from '@/lib/upload/upload-manager';
 import { UploadBanner } from './upload-banner';
 import { PhotoGrid } from './photo-grid';
-import { StatsBar } from './stats-bar';
 import { AlbumCard } from './album-card';
 import { CreateAlbumCard } from './create-album-card';
 import { AlbumsEmptyState } from './albums-empty-state';
@@ -355,9 +354,6 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
 
       {/* Upload Banner — shows during/after uploads */}
       <UploadBanner eventName={eventName} />
-
-      {/* Stats bar */}
-      <StatsBar albumCount={albumCount} photoCount={photoCount} videoCount={videoCount} />
 
       {/* Upload drop zone */}
       <div
