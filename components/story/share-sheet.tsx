@@ -30,6 +30,7 @@ export function ShareSheet({
   galleryUrl,
 }: ShareSheetProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<StoryTemplate>('immersive');
+  const [showLogo, setShowLogo] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -87,7 +88,7 @@ export function ShareSheet({
         photoUrl,
         eventName,
         eventSubtitle,
-        logoUrl,
+        logoUrl: showLogo ? logoUrl : undefined,
         template: selectedTemplate,
       });
       const file = new File([blob], `${eventName.replace(/\s+/g, '-').toLowerCase()}-story.png`, {
@@ -98,7 +99,7 @@ export function ShareSheet({
       console.error('Story generation failed:', err);
       return null;
     }
-  }, [photoUrl, eventName, eventSubtitle, logoUrl, selectedTemplate]);
+  }, [photoUrl, eventName, eventSubtitle, logoUrl, showLogo, selectedTemplate]);
 
   const handleShareStory = useCallback(async () => {
     if (generating) return;
@@ -253,6 +254,35 @@ export function ShareSheet({
             })}
           </div>
         </div>
+
+        {/* Logo toggle — only if event has a logo */}
+        {logoUrl && (
+          <div className="px-5 pb-4">
+            <button
+              onClick={() => setShowLogo(v => !v)}
+              className="w-full flex items-center justify-between py-3 px-4 rounded-2xl transition-all active:scale-[0.98]"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              } as React.CSSProperties}
+            >
+              <span className="text-[13px] font-semibold text-white/70">Include logo</span>
+              {/* Toggle pill */}
+              <div
+                className="relative w-[42px] h-[24px] rounded-full transition-all duration-200 flex-shrink-0"
+                style={{ background: showLogo ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.15)' }}
+              >
+                <div
+                  className="absolute top-[3px] w-[18px] h-[18px] rounded-full transition-all duration-200"
+                  style={{
+                    background: showLogo ? '#111' : 'rgba(255,255,255,0.5)',
+                    left: showLogo ? '21px' : '3px',
+                  }}
+                />
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="mx-5 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)' }} />
