@@ -6,6 +6,8 @@ import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl }
 export interface HeroSlide {
     url: string;
     mediaId: string;
+    width?: number | null;
+    height?: number | null;
 }
 
 export type HeroMode = 'single' | 'slideshow' | 'auto';
@@ -194,13 +196,14 @@ export async function getPublicGallery(identifier: string): Promise<{
     }
 
     // 7. Resolve mobile-specific slideshow (portrait phones) if configured
+    type MobileSlideRow = SlideRow & { width: number | null; height: number | null };
     let mobileHeroSlides: HeroSlide[] = [];
     if (heroMode === 'slideshow' && heroConfig?.mobileSlideshowMediaIds?.length) {
         const { data: mobileMedia } = await (supabase
             .from('media')
-            .select('id, r2_key, preview_r2_key')
+            .select('id, r2_key, preview_r2_key, width, height')
             .in('id', heroConfig.mobileSlideshowMediaIds)
-            .eq('event_id', event.id) as unknown as Promise<{ data: SlideRow[] | null; error: unknown }>);
+            .eq('event_id', event.id) as unknown as Promise<{ data: MobileSlideRow[] | null; error: unknown }>);
 
         const mobileMap = new Map((mobileMedia ?? []).map(m => [m.id, m]));
         mobileHeroSlides = (heroConfig.mobileSlideshowMediaIds as string[])
@@ -208,7 +211,7 @@ export async function getPublicGallery(identifier: string): Promise<{
                 const m = mobileMap.get(id);
                 if (!m) return null;
                 const url = getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key);
-                return { url, mediaId: id };
+                return { url, mediaId: id, width: m.width ?? undefined, height: m.height ?? undefined } as HeroSlide;
             })
             .filter((s): s is HeroSlide => s !== null);
     }

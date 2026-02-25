@@ -96,8 +96,9 @@ export default async function GalleryEventPage({
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');
     const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
-    // Mobile hero slide is portrait-optimized — perfect for 9:16 story cards
-    const mobileCoverUrl = mobileHeroSlides[0]?.url || '';
+    // Pick the first portrait mobile slide for story cards (9:16 format)
+    const portraitSlide = mobileHeroSlides.find(s => s.width && s.height && s.height > s.width);
+    const mobileCoverUrl = portraitSlide?.url || mobileHeroSlides[0]?.url || '';
     const firstSlideUrl = heroSlides[0]?.url || coverUrl;
     const hasSlideshow = heroSlides.length > 1;
 
