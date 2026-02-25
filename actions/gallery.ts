@@ -89,7 +89,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     // 1. Fetch Event Details by hash
     const { data: event, error: eventError } = await (supabase
         .from('events')
-        .select('id, name, description, event_date, event_end_date, event_hash, cover_media_id, theme, allow_download, allow_slideshow, face_search_enabled')
+        .select('*')
         .eq('event_hash', identifier)
         .eq('is_public', true)
         .single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
