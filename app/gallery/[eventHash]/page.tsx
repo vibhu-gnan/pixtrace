@@ -167,6 +167,7 @@ export default async function GalleryEventPage({
             allowDownload={event.allow_download ?? true}
             photoOrder={photoOrder}
             logoUrl={event.theme?.logoUrl}
+            coverUrl={coverUrl}
           />
         </div>
 
