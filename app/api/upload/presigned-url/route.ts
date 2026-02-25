@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { generatePresignedUrl } from '@/lib/storage/presigned-urls';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getOrganizerPlanLimits, canUpload } from '@/lib/plans/limits';
 
 interface VariantRequest {
   suffix: string;
@@ -43,6 +44,15 @@ export async function POST(request: NextRequest) {
       { error: 'Storage not configured' },
       { status: 503 }
     );
+  }
+
+  // Check storage limits
+  if (fileSize) {
+    const limits = await getOrganizerPlanLimits(organizer.id);
+    const uploadCheck = canUpload(limits, fileSize);
+    if (!uploadCheck.allowed) {
+      return NextResponse.json({ error: uploadCheck.reason }, { status: 403 });
+    }
   }
 
   // Verify event belongs to organizer

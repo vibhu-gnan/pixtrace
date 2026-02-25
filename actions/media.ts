@@ -5,6 +5,7 @@ import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteObjects } from '@/lib/storage/r2-client';
 import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+import { decrementStorageUsed } from '@/lib/plans/limits';
 
 export interface MediaItem {
   id: string;
@@ -116,10 +117,10 @@ export async function deleteMedia(mediaId: string, eventId: string) {
 
   if (!event) return { error: 'Event not found' };
 
-  // Fetch R2 keys before deleting
+  // Fetch R2 keys and file size before deleting
   const { data: mediaRow } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key, preview_r2_key')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size')
     .eq('id', mediaId)
     .eq('event_id', eventId)
     .single();
@@ -136,6 +137,13 @@ export async function deleteMedia(mediaId: string, eventId: string) {
   if (error) {
     console.error('Error deleting media:', error);
     return { error: 'Failed to delete media' };
+  }
+
+  // Decrement storage usage
+  if (mediaRow.file_size) {
+    decrementStorageUsed(organizer.id, mediaRow.file_size).catch((err) => {
+      console.error('Error decrementing storage:', err);
+    });
   }
 
   // Clean up R2 files (fire-and-forget)
@@ -171,10 +179,10 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
 
   if (!event) return { error: 'Event not found' };
 
-  // Fetch R2 keys before deleting
+  // Fetch R2 keys and file sizes before deleting
   const { data: mediaRows } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key, preview_r2_key')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size')
     .eq('event_id', eventId)
     .in('id', mediaIds);
 
@@ -188,6 +196,16 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
   if (error) {
     console.error('Error deleting media:', error);
     return { error: 'Failed to delete media' };
+  }
+
+  // Decrement storage usage
+  if (mediaRows && mediaRows.length > 0) {
+    const totalBytes = mediaRows.reduce((sum, row) => sum + (row.file_size || 0), 0);
+    if (totalBytes > 0) {
+      decrementStorageUsed(organizer.id, totalBytes).catch((err) => {
+        console.error('Error decrementing storage:', err);
+      });
+    }
   }
 
   // Clean up R2 files (fire-and-forget)

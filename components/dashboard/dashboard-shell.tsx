@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import type { OrganizerProfile } from '@/lib/auth/session';
+import type { PlanLimits } from '@/lib/plans/limits';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { Footer } from './footer';
 
 interface DashboardShellProps {
   organizer: OrganizerProfile;
+  planLimits: PlanLimits;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ organizer, children }: DashboardShellProps) {
+export function DashboardShell({ organizer, planLimits, children }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -19,6 +21,7 @@ export function DashboardShell({ organizer, children }: DashboardShellProps) {
       {/* Sidebar */}
       <Sidebar
         organizer={organizer}
+        planLimits={planLimits}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />

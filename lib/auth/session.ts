@@ -7,6 +7,9 @@ export interface OrganizerProfile {
   email: string;
   name: string | null;
   avatar_url: string | null;
+  plan_id: string;
+  razorpay_customer_id: string | null;
+  storage_used_bytes: number;
   created_at: string;
   updated_at: string;
 }

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/auth/client';
 import Link from 'next/link';
 
@@ -16,14 +16,26 @@ function GoogleIcon() {
   );
 }
 
-export default function SignUpPage() {
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Free',
+  starter: 'Starter — ₹2,499/month',
+  pro: 'Pro — ₹4,999/month',
+};
+
+function SignUpForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedPlan = searchParams.get('plan') || 'free';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const isPaidPlan = selectedPlan === 'starter' || selectedPlan === 'pro';
+  const redirectAfterAuth = isPaidPlan ? `/checkout?plan=${selectedPlan}` : '/dashboard';
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,20 +47,16 @@ export default function SignUpPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: name,
-          },
-        },
+        options: { data: { full_name: name } },
       });
 
       if (error) throw error;
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push(redirectAfterAuth);
         router.refresh();
-      }, 2000);
+      }, 1500);
     } catch (err: any) {
       setError(err.message || 'Failed to sign up');
     } finally {
@@ -58,139 +66,139 @@ export default function SignUpPage() {
 
   const handleGoogleSignUp = async () => {
     const supabase = createClient();
-
-    // Use environment variable for production, fallback to window.location.origin
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${baseUrl}/auth/callback?redirect=/dashboard`,
+        redirectTo: `${baseUrl}/auth/callback?redirect=${encodeURIComponent(redirectAfterAuth)}`,
       },
     });
   };
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-8 text-center">
-          <div className="rounded-md bg-green-50 p-4">
-            <p className="text-sm text-green-800">
-              Account created successfully! Redirecting...
-            </p>
+      <div className="flex min-h-screen items-center justify-center bg-background-dark px-4">
+        <div className="w-full max-w-md text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+            <span className="material-icons text-primary text-3xl">check_circle</span>
           </div>
+          <h2 className="text-2xl font-bold text-white">Account created!</h2>
+          <p className="text-slate-400">
+            {isPaidPlan ? 'Redirecting to checkout...' : 'Redirecting to your dashboard...'}
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background-dark px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+        {/* Logo */}
+        <div className="text-center">
+          <Link href="/" className="inline-flex items-center gap-2 mb-6">
+            <span className="text-2xl font-bold text-white tracking-tight">PIXTRACE</span>
+          </Link>
+          <h2 className="text-3xl font-bold tracking-tight text-white">
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-sm text-slate-400">
             Start managing your event galleries
           </p>
         </div>
 
+        {/* Plan badge */}
+        {selectedPlan && PLAN_LABELS[selectedPlan] && (
+          <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-full bg-primary/10 border border-primary/30 w-fit mx-auto">
+            <span className="material-icons text-primary text-sm">star</span>
+            <span className="text-sm text-primary font-medium">
+              {PLAN_LABELS[selectedPlan]} plan selected
+            </span>
+          </div>
+        )}
+
         {/* Google Sign Up */}
-        <div>
-          <button
-            onClick={handleGoogleSignUp}
-            className="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-3 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors"
-          >
-            <GoogleIcon />
-            Continue with Google
-          </button>
-        </div>
+        <button
+          onClick={handleGoogleSignUp}
+          className="flex w-full items-center justify-center gap-3 rounded-md glass-panel px-3 py-3 text-sm font-medium text-slate-300 border border-white/10 hover:bg-white/5 transition-colors"
+        >
+          <GoogleIcon />
+          Continue with Google
+        </button>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300" />
+            <div className="w-full border-t border-white/10" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-gray-50 px-2 text-gray-500">or</span>
+            <span className="bg-background-dark px-2 text-slate-500">or</span>
           </div>
         </div>
 
-        <form className="space-y-6" onSubmit={handleSignUp}>
+        <form className="space-y-4" onSubmit={handleSignUp}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="rounded-md bg-red-900/50 border border-red-500/50 p-4">
+              <p className="text-sm text-red-200">{error}</p>
             </div>
           )}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="sr-only">Full name</label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="relative block w-full rounded-md border-0 py-3 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                placeholder="Full name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label htmlFor="email-address" className="sr-only">Email address</label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="relative block w-full rounded-md border-0 py-3 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                className="relative block w-full rounded-md border-0 py-3 px-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                placeholder="Password (min. 8 characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-          </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative flex w-full justify-center rounded-md bg-blue-600 px-3 py-3 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creating account...' : 'Create account'}
-            </button>
-          </div>
+          <input
+            type="text"
+            required
+            placeholder="Full name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={loading}
+            className="block w-full rounded-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
+          />
+          <input
+            type="email"
+            required
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            className="block w-full rounded-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
+          />
+          <input
+            type="password"
+            required
+            minLength={8}
+            placeholder="Password (min. 8 characters)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            className="block w-full rounded-md border-0 py-3 px-4 bg-slate-800/50 text-white ring-1 ring-inset ring-slate-600 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
+          />
 
-          <div className="text-center text-sm">
-            <span className="text-gray-600">Already have an account? </span>
-            <Link
-              href="/sign-in"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full justify-center rounded-md bg-primary px-3 py-3 text-sm font-semibold text-white hover:bg-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? 'Creating account...' : isPaidPlan ? 'Create account & proceed to payment' : 'Create free account'}
+          </button>
+
+          <p className="text-center text-sm text-slate-500">
+            Already have an account?{' '}
+            <Link href="/sign-in" className="text-primary hover:text-blue-400 font-medium">
               Sign in
             </Link>
-          </div>
+          </p>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background-dark">
+        <div className="text-slate-400">Loading...</div>
+      </div>
+    }>
+      <SignUpForm />
+    </Suspense>
   );
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { incrementStorageUsed } from '@/lib/plans/limits';
 
 export async function POST(request: NextRequest) {
   const organizer = await getCurrentOrganizer();
@@ -71,6 +72,13 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create media record' },
         { status: 500 }
       );
+    }
+
+    // Track storage usage
+    if (fileSize) {
+      incrementStorageUsed(organizer.id, fileSize).catch((err) => {
+        console.error('Error tracking storage:', err);
+      });
     }
 
     // Revalidate dashboard paths

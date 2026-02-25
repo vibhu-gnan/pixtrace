@@ -7,8 +7,11 @@ const PUBLIC_PREFIXES = [
   '/gallery',
   '/api/gallery',
   '/api/download',
+  '/api/webhooks',
   '/sign-in',
   '/sign-up',
+  '/pricing',
+  '/enterprise',
   '/auth/callback',
 ];
 

@@ -6,6 +6,7 @@ import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
 import { deleteObjects } from '@/lib/storage/r2-client';
+import { getOrganizerPlanLimits, canCreateEvent } from '@/lib/plans/limits';
 
 export interface EventData {
   id: string;
@@ -41,6 +42,13 @@ export async function createEvent(formData: FormData) {
 
   if (!name?.trim()) {
     return { error: 'Event name is required' };
+  }
+
+  // Check plan limits
+  const limits = await getOrganizerPlanLimits(organizer.id);
+  const eventCheck = canCreateEvent(limits);
+  if (!eventCheck.allowed) {
+    return { error: eventCheck.reason };
   }
 
   const supabase = createAdminClient();

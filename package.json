@@ -27,6 +27,7 @@
     "next": "^15.1.6",
     "postgres": "^3.4.0",
     "qrcode": "^1.5.3",
+    "razorpay": "^2.9.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-virtuoso": "^4.10.0",

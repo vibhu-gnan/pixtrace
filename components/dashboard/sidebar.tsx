@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import * as Progress from '@radix-ui/react-progress';
 import type { OrganizerProfile } from '@/lib/auth/session';
+import type { PlanLimits } from '@/lib/plans/limits';
 import { SignOutButton } from './sign-out-button';
 
 // ─── SVG Icons ───────────────────────────────────────────────
@@ -13,6 +14,15 @@ function HomeIcon({ className }: { className?: string }) {
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function CreditCardIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
     </svg>
   );
 }
@@ -36,26 +46,6 @@ function CogIcon({ className }: { className?: string }) {
   );
 }
 
-function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
 function MenuIcon({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -70,21 +60,29 @@ function MenuIcon({ className }: { className?: string }) {
 
 const navItems = [
   { label: 'My Events', href: '/dashboard', icon: HomeIcon, enabled: true },
+  { label: 'Billing', href: '/billing', icon: CreditCardIcon, enabled: true },
   { label: 'Analytics', href: '#', icon: ChartIcon, enabled: false },
   { label: 'Settings', href: '#', icon: CogIcon, enabled: false },
-  { label: 'About Us', href: '#', icon: UsersIcon, enabled: false },
 ];
 
 // ─── Sidebar Component ──────────────────────────────────────
 
 interface SidebarProps {
   organizer: OrganizerProfile;
+  planLimits: PlanLimits;
   open: boolean;
   onClose: () => void;
 }
 
-export function Sidebar({ organizer, open, onClose }: SidebarProps) {
+export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) {
   const pathname = usePathname();
+
+  const isUnlimitedStorage = planLimits.storageLimitBytes === 0;
+  const storagePercent = isUnlimitedStorage
+    ? 0
+    : Math.min(100, Math.round((planLimits.storageUsedBytes / planLimits.storageLimitBytes) * 100));
+  const usedDisplay = formatBytes(planLimits.storageUsedBytes);
+  const limitDisplay = isUnlimitedStorage ? 'Unlimited' : formatBytes(planLimits.storageLimitBytes);
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-100">
@@ -142,21 +140,34 @@ export function Sidebar({ organizer, open, onClose }: SidebarProps) {
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Storage</span>
-            <span className="text-xs font-bold text-brand-500">75%</span>
+            {!isUnlimitedStorage && (
+              <span className={`text-xs font-bold ${storagePercent >= 90 ? 'text-red-500' : 'text-brand-500'}`}>
+                {storagePercent}%
+              </span>
+            )}
           </div>
-          <Progress.Root
-            className="relative overflow-hidden bg-gray-100 rounded-full w-full h-2"
-            value={75}
-          >
-            <Progress.Indicator
-              className="bg-brand-500 h-full rounded-full transition-transform duration-500"
-              style={{ width: '75%' }}
-            />
-          </Progress.Root>
-          <p className="text-[11px] text-gray-400 mt-2">15GB of 20GB used</p>
-          <button className="w-full mt-3 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">
-            Upgrade Plan
-          </button>
+          {!isUnlimitedStorage && (
+            <Progress.Root
+              className="relative overflow-hidden bg-gray-100 rounded-full w-full h-2"
+              value={storagePercent}
+            >
+              <Progress.Indicator
+                className={`h-full rounded-full transition-transform duration-500 ${storagePercent >= 90 ? 'bg-red-500' : 'bg-brand-500'}`}
+                style={{ width: `${storagePercent}%` }}
+              />
+            </Progress.Root>
+          )}
+          <p className="text-[11px] text-gray-400 mt-2">
+            {usedDisplay} of {limitDisplay} used
+          </p>
+          {planLimits.planId !== 'enterprise' && (
+            <Link
+              href="/pricing"
+              className="block w-full mt-3 text-xs font-medium text-center text-gray-600 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
+            >
+              {planLimits.planId === 'free' ? 'Upgrade Plan' : 'Change Plan'}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -180,7 +191,7 @@ export function Sidebar({ organizer, open, onClose }: SidebarProps) {
           <p className="text-sm font-medium text-gray-900 truncate">
             {organizer.name || organizer.email?.split('@')[0]}
           </p>
-          <p className="text-[11px] text-gray-400">Organizer</p>
+          <p className="text-[11px] text-gray-400">{planLimits.planName} Plan</p>
         </div>
         <SignOutButton />
       </div>
@@ -208,4 +219,14 @@ export function Sidebar({ organizer, open, onClose }: SidebarProps) {
       )}
     </>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const gb = bytes / (1024 ** 3);
+  if (gb >= 1) return `${gb.toFixed(1)}GB`;
+  const mb = bytes / (1024 ** 2);
+  if (mb >= 1) return `${mb.toFixed(0)}MB`;
+  const kb = bytes / 1024;
+  return `${kb.toFixed(0)}KB`;
 }
