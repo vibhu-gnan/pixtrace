@@ -450,34 +450,36 @@ function TemplatePreview({
 
     case 'glass-frame':
       return (
-        <div className="relative w-full h-full overflow-hidden">
-          {/* Blurred bg */}
+        <div className="relative w-full h-full overflow-hidden bg-black">
+          {/* Very dark blurred bg — nearly black */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(12px) brightness(0.3) saturate(1.4)', transform: 'scale(1.4)' }} />
-          {/* Glass tint */}
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, rgba(120,120,180,0.15) 0%, rgba(0,0,0,0.4) 100%)' }} />
+          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(14px) brightness(0.18) saturate(1.2)', transform: 'scale(1.5)' }} />
+          {/* Extra dark overlay */}
+          <div className="absolute inset-0 bg-black/35" />
           {/* Glass card */}
-          <div className="absolute top-[8px] left-[6px] right-[6px] z-10">
+          <div className="absolute top-[14px] left-[8px] right-[8px] z-10">
             <div
-              className="rounded-[10px] overflow-hidden"
+              className="rounded-[12px] overflow-hidden"
               style={{
-                padding: '3px',
-                background: 'rgba(255,255,255,0.12)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+                padding: '4px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1.5px solid rgba(255,255,255,0.22)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
               }}
             >
-              <div className="aspect-square w-full rounded-[8px] overflow-hidden">
+              {/* Natural aspect ratio — 3:2 landscape crop for preview */}
+              <div className="w-full rounded-[9px] overflow-hidden" style={{ aspectRatio: '3/2' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoUrl} alt="" className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
-          {/* Name */}
+          {/* Name + subtitle */}
           <div className="absolute bottom-3 left-0 right-0 text-center px-2 z-10">
             <div className="text-[8px] font-black text-white uppercase tracking-wider leading-tight drop-shadow">
               {shortName}
             </div>
+            <div className="text-[5px] text-white/35 mt-0.5 tracking-wide">PIXTRACE</div>
           </div>
         </div>
       );

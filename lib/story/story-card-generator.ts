@@ -221,60 +221,95 @@ function renderGlassFrame(
   logo: HTMLImageElement | null,
   opts: StoryCardOptions,
 ) {
-  // Blurred photo background
+  // Very dark blurred photo background
   const dominantColor = extractDominantColor(photo);
   drawBlurredBackground(ctx, photo, dominantColor);
 
-  // Glass card for photo
-  const cardPad = 16;
-  const photoSize = 920;
-  const cardW = photoSize + cardPad * 2;
-  const cardX = (W - cardW) / 2;
-  const cardY = 80;
+  // Extra dark overlay so photo details are barely visible
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(0, 0, W, H);
 
-  // Glass card bg
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  roundRect(ctx, cardX, cardY, cardW, photoSize + cardPad * 2, 24);
+  // ─── Glass card — photo keeps natural aspect ratio ─────────
+  const cardPad = 20;
+  const cardRadius = 32;
+  const photoRadius = 24;
+
+  // Constrain photo to available space (margins + max height)
+  const maxPhotoW = W - 120;   // 60px margins each side
+  const maxPhotoH = H * 0.52;  // ~52% of story for photo
+
+  const imgRatio = photo.naturalWidth / photo.naturalHeight;
+  let photoW: number, photoH: number;
+  if (imgRatio > maxPhotoW / maxPhotoH) {
+    photoW = maxPhotoW;
+    photoH = Math.round(photoW / imgRatio);
+  } else {
+    photoH = maxPhotoH;
+    photoW = Math.round(photoH * imgRatio);
+  }
+
+  const cardW = photoW + cardPad * 2;
+  const cardH = photoH + cardPad * 2;
+  const cardX = (W - cardW) / 2;
+  const cardY = 140;
+
+  // Glass card fill
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  roundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
   ctx.fill();
 
-  // Glass card border
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 1.5;
-  roundRect(ctx, cardX, cardY, cardW, photoSize + cardPad * 2, 24);
+  // Glass card border — bright enough to see clearly
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
   ctx.stroke();
+
+  // Top highlight shine on glass card
+  ctx.save();
+  roundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+  ctx.clip();
+  const shineGrad = ctx.createLinearGradient(0, cardY, 0, cardY + 6);
+  shineGrad.addColorStop(0, 'rgba(255,255,255,0.18)');
+  shineGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shineGrad;
+  ctx.fillRect(cardX, cardY, cardW, 6);
+  ctx.restore();
 
   // Photo inside glass card
   const photoX = cardX + cardPad;
   const photoY = cardY + cardPad;
   ctx.save();
-  roundRect(ctx, photoX, photoY, photoSize, photoSize, 16);
+  roundRect(ctx, photoX, photoY, photoW, photoH, photoRadius);
   ctx.clip();
-  drawCoverFit(ctx, photo, photoX, photoY, photoSize, photoSize);
+  drawCoverFit(ctx, photo, photoX, photoY, photoW, photoH);
   ctx.restore();
 
-  // Event name below
-  const textY = cardY + photoSize + cardPad * 2 + 60;
+  // ─── Text below card ──────────────────────────────────────
+  let textY = cardY + cardH + 72;
   ctx.fillStyle = '#ffffff';
-  ctx.font = '800 50px Inter, system-ui, sans-serif';
+  ctx.font = '800 52px Inter, system-ui, sans-serif';
   ctx.textAlign = 'center';
-  drawWrappedText(ctx, opts.eventName.toUpperCase(), W / 2, textY, W - PADDING * 2, 60);
+  drawWrappedText(ctx, opts.eventName.toUpperCase(), W / 2, textY, W - PADDING * 2, 62);
 
   // Subtitle
   if (opts.eventSubtitle) {
-    ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.font = '400 24px Inter, system-ui, sans-serif';
-    ctx.fillText(opts.eventSubtitle, W / 2, textY + 38);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '400 26px Inter, system-ui, sans-serif';
+    ctx.fillText(opts.eventSubtitle, W / 2, textY + 44);
   }
 
-  // Divider line
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.fillRect((W - 50) / 2, textY + 60, 50, 2);
+  // PIXTRACE watermark — bottom right
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.font = '600 20px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('PIXTRACE', W - 44, H - 44);
+  ctx.textAlign = 'center';
 
-  // Logo at bottom
+  // Logo at bottom center
   if (logo) {
-    const logoH = 40;
+    const logoH = 42;
     const logoW = Math.round((logo.naturalWidth / logo.naturalHeight) * logoH);
-    ctx.drawImage(logo, (W - logoW) / 2, H - 80, logoW, logoH);
+    ctx.drawImage(logo, (W - logoW) / 2, H - 100, logoW, logoH);
   }
 }
 
