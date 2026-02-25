@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       const customer = await razorpay.customers.create({
         name: organizer.name || organizer.email.split('@')[0],
         email: organizer.email,
-        fail_existing: '0',
+        fail_existing: 0,
       });
       customerId = customer.id;
 
