@@ -74,11 +74,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Track storage usage
-    if (fileSize) {
-      incrementStorageUsed(organizer.id, fileSize).catch((err) => {
+    // Track storage usage (original + variant sizes like thumbnail/preview)
+    const variantSizeBytes = body.variantSizeBytes || 0;
+    const totalBytes = fileSize + variantSizeBytes;
+    if (totalBytes > 0) {
+      try {
+        await incrementStorageUsed(organizer.id, totalBytes);
+      } catch (err) {
         console.error('Error tracking storage:', err);
-      });
+      }
     }
 
     // Revalidate dashboard paths

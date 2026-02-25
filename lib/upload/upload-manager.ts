@@ -142,7 +142,8 @@ async function uploadSingleFile(
       });
 
       if (!presignRes.ok) {
-        throw new Error('Failed to get presigned URL');
+        const errData = await presignRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to get presigned URL');
       }
 
       const presignData = await presignRes.json();
@@ -158,6 +159,7 @@ async function uploadSingleFile(
 
       // Step 4: Upload variants (progress 80-90%)
       let previewR2Key: string | undefined;
+      let variantSizeBytes = 0;
 
       if (canGenerate && variantsPromise && presignData.variants) {
         const variants = await variantsPromise;
@@ -169,6 +171,7 @@ async function uploadSingleFile(
 
           if (previewVariant) {
             previewR2Key = previewVariant.r2Key;
+            variantSizeBytes += variants.preview.size;
             variantUploads.push(
               uploadBlob(previewVariant.url, variants.preview, 'image/webp')
             );
@@ -200,6 +203,7 @@ async function uploadSingleFile(
           mediaType: file.type.startsWith('video/') ? 'video' : 'image',
           mimeType: file.type,
           fileSize: file.size,
+          variantSizeBytes,
           width,
           height,
           previewR2Key,

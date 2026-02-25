@@ -160,10 +160,25 @@ export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) 
           <p className="text-[11px] text-gray-400 mt-2">
             {usedDisplay} of {limitDisplay} used
           </p>
+          {!isUnlimitedStorage && storagePercent >= 80 && (
+            <div className={`mt-2 text-[11px] font-medium px-2 py-1 rounded ${
+              storagePercent >= 95
+                ? 'bg-red-50 text-red-600'
+                : 'bg-amber-50 text-amber-600'
+            }`}>
+              {storagePercent >= 95
+                ? 'Storage almost full! Upgrade now.'
+                : 'Running low on storage.'}
+            </div>
+          )}
           {planLimits.planId !== 'enterprise' && (
             <Link
               href="/pricing"
-              className="block w-full mt-3 text-xs font-medium text-center text-gray-600 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
+              className={`block w-full mt-3 text-xs font-medium text-center rounded-lg py-2 transition-colors ${
+                !isUnlimitedStorage && storagePercent >= 90
+                  ? 'bg-blue-600 text-white hover:bg-blue-500'
+                  : 'text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
             >
               {planLimits.planId === 'free' ? 'Upgrade Plan' : 'Change Plan'}
             </Link>

@@ -38,8 +38,16 @@ export default function NewEventPage() {
 
       <form action={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
         {error && (
-          <div className="rounded-md bg-red-50 p-4">
+          <div className="rounded-md bg-red-50 border border-red-200 p-4">
             <p className="text-sm text-red-800">{error}</p>
+            {error.toLowerCase().includes('upgrade') && (
+              <Link
+                href="/pricing"
+                className="inline-block mt-2 text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
+              >
+                View plans &rarr;
+              </Link>
+            )}
           </div>
         )}
 
