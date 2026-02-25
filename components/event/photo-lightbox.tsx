@@ -552,6 +552,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
   // Touch zoom/pan is handled entirely by native listeners in useImageZoom,
   // so here we only need to track horizontal swipe for photo navigation.
   const handleSwipeTouchStart = useCallback((e: React.TouchEvent) => {
+    if (shareSheetOpen) return; // Don't swipe when share sheet is open
     if (e.touches.length === 1 && !zoom.isZoomed) {
       touchStartX.current = e.touches[0].clientX;
       touchStartY.current = e.touches[0].clientY;
@@ -559,11 +560,11 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       touchStartX.current = null;
       touchStartY.current = null;
     }
-  }, [zoom.isZoomed]);
+  }, [zoom.isZoomed, shareSheetOpen]);
 
   const handleSwipeTouchEnd = useCallback((e: React.TouchEvent) => {
-    // Don't swipe-navigate if a zoom/pan gesture is active
-    if (zoom.isZoomed || zoom.isPinching() || zoom.isPanning()) {
+    // Don't swipe-navigate if share sheet or zoom/pan gesture is active
+    if (shareSheetOpen || zoom.isZoomed || zoom.isPinching() || zoom.isPanning()) {
       touchStartX.current = null;
       return;
     }
@@ -581,7 +582,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       if (deltaX > 0 && canGoNext) handleNext();
       else if (deltaX < 0 && canGoPrev) handlePrevious();
     }
-  }, [zoom, canGoNext, canGoPrev, handleNext, handlePrevious]);
+  }, [zoom, canGoNext, canGoPrev, handleNext, handlePrevious, shareSheetOpen]);
 
   if (!currentPhoto) return null;
 
