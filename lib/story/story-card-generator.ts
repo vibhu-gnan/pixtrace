@@ -225,7 +225,7 @@ function renderGlassFrame(
   // Use a higher scale than drawBlurredBackground (0.15 vs 0.05) so the
   // photo is recognizable, not a solid color.
   const bgTemp = document.createElement('canvas');
-  const bgScale = 0.20; // 20% — light blur, photo clearly visible (level B)
+  const bgScale = 0.06; // 6% — heavy blur, strong bokeh background
   bgTemp.width = Math.round(W * bgScale);
   bgTemp.height = Math.round(H * bgScale);
   const bgCtx = bgTemp.getContext('2d')!;
@@ -237,8 +237,8 @@ function renderGlassFrame(
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bgTemp, 0, 0, W, H);
 
-  // Light darken — photo clearly visible, just moody (level B)
-  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  // Darken overlay for contrast
+  ctx.fillStyle = 'rgba(0,0,0,0.52)';
   ctx.fillRect(0, 0, W, H);
 
   // ─── Glass card — photo keeps natural aspect ratio ─────────
@@ -302,17 +302,17 @@ function renderGlassFrame(
   }
 
   // PIXTRACE watermark — bottom right
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.font = '600 20px Inter, system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '700 22px Inter, system-ui, sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText('PIXTRACE', W - 44, H - 44);
   ctx.textAlign = 'center';
 
   // Logo at bottom center
   if (logo) {
-    const logoH = 42;
+    const logoH = 64;
     const logoW = Math.round((logo.naturalWidth / logo.naturalHeight) * logoH);
-    ctx.drawImage(logo, (W - logoW) / 2, H - 100, logoW, logoH);
+    ctx.drawImage(logo, (W - logoW) / 2, H - 120, logoW, logoH);
   }
 }
 
