@@ -26,6 +26,7 @@ export interface EventData {
   media_count?: number;
   allow_download?: boolean;
   allow_slideshow?: boolean;
+  face_search_enabled?: boolean;
   photo_order?: 'oldest_first' | 'newest_first';
 }
 
@@ -407,10 +408,11 @@ export async function unpublishEvent(eventId: string): Promise<{ error?: string 
 export async function updateEventPermissions(eventId: string, payload: {
   allowDownload?: boolean;
   allowSlideshow?: boolean;
+  faceSearchEnabled?: boolean;
   allowDownloadRequest?: boolean; // Future proofing
   allowViewRequest?: boolean;     // Future proofing
   downloadAccess?: 'everyone' | 'no_one';
-  viewAccess?: 'everyone' | 'bmu_id' | 'no_one';
+  viewAccess?: 'everyone';
 }) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
@@ -424,9 +426,7 @@ export async function updateEventPermissions(eventId: string, payload: {
 
   if (typeof payload.allowDownload !== 'undefined') updates.allow_download = payload.allowDownload;
   if (typeof payload.allowSlideshow !== 'undefined') updates.allow_slideshow = payload.allowSlideshow;
-
-  // Note: view/download access granular controls are UI-only for now until deeper schema implementation
-  // We'll trust the checked toggles for the booleans
+  if (typeof payload.faceSearchEnabled !== 'undefined') updates.face_search_enabled = payload.faceSearchEnabled;
 
   const { error } = await supabase
     .from('events')
@@ -649,4 +649,47 @@ export async function updateEventCustomPreloader(eventId: string, html: string |
   }
 
   return { success: true };
+}
+
+export interface FaceProcessingProgress {
+  total: number;
+  completed: number;
+  failed: number;
+  noFaces: number;
+  pending: number;
+  processing: number;
+}
+
+export async function getFaceProcessingProgress(eventId: string): Promise<FaceProcessingProgress | null> {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return null;
+
+  const supabase = createAdminClient();
+
+  // Verify ownership
+  const { data: event } = await supabase
+    .from('events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return null;
+
+  // Get counts by status
+  const { data: jobs } = await supabase
+    .from('face_processing_jobs')
+    .select('status')
+    .eq('event_id', eventId);
+
+  if (!jobs) return { total: 0, completed: 0, failed: 0, noFaces: 0, pending: 0, processing: 0 };
+
+  const total = jobs.length;
+  const completed = jobs.filter((j: any) => j.status === 'completed').length;
+  const failed = jobs.filter((j: any) => j.status === 'failed').length;
+  const noFaces = jobs.filter((j: any) => j.status === 'no_faces').length;
+  const pending = jobs.filter((j: any) => j.status === 'pending').length;
+  const processing = jobs.filter((j: any) => j.status === 'processing').length;
+
+  return { total, completed, failed, noFaces, pending, processing };
 }

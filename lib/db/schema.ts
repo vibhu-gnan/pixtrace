@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, jsonb, pgEnum, index, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, jsonb, pgEnum, index, integer, boolean, smallint, real } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
 // ============================================================================
@@ -150,13 +150,85 @@ export const albumsRelations = relations(albums, ({ one, many }) => ({
   media: many(media),
 }));
 
-export const mediaRelations = relations(media, ({ one }) => ({
+export const mediaRelations = relations(media, ({ one, many }) => ({
   album: one(albums, {
     fields: [media.albumId],
     references: [albums.id],
   }),
   event: one(events, {
     fields: [media.eventId],
+    references: [events.id],
+  }),
+  faceEmbeddings: many(faceEmbeddings),
+}));
+
+// ============================================================================
+// FACE SEARCH TABLES (type reference — queries use Supabase JS client)
+// ============================================================================
+
+export const faceProcessingJobStatusEnum = pgEnum('face_job_status', [
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+  'no_faces',
+]);
+
+// Face embeddings — one row per detected face, vector(512) via pgvector
+export const faceEmbeddings = pgTable('face_embeddings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  faceIndex: smallint('face_index').notNull().default(0),
+  // embedding: vector(512) — managed via raw SQL / pgvector, not Drizzle
+  confidence: real('confidence'),
+  bboxX1: integer('bbox_x1'),
+  bboxY1: integer('bbox_y1'),
+  bboxX2: integer('bbox_x2'),
+  bboxY2: integer('bbox_y2'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  mediaIdIdx: index('face_embeddings_media_id_idx').on(table.mediaId),
+  eventIdIdx: index('face_embeddings_event_id_idx').on(table.eventId),
+}));
+
+// Face processing jobs — queue for GPU processing
+export const faceProcessingJobs = pgTable('face_processing_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  attemptCount: smallint('attempt_count').notNull().default(0),
+  maxAttempts: smallint('max_attempts').notNull().default(3),
+  facesFound: smallint('faces_found'),
+  errorMessage: text('error_message'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  nextRetryAt: timestamp('next_retry_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  eventIdIdx: index('fpj_event_id_idx').on(table.eventId),
+}));
+
+export const faceEmbeddingsRelations = relations(faceEmbeddings, ({ one }) => ({
+  media: one(media, {
+    fields: [faceEmbeddings.mediaId],
+    references: [media.id],
+  }),
+  event: one(events, {
+    fields: [faceEmbeddings.eventId],
+    references: [events.id],
+  }),
+}));
+
+export const faceProcessingJobsRelations = relations(faceProcessingJobs, ({ one }) => ({
+  media: one(media, {
+    fields: [faceProcessingJobs.mediaId],
+    references: [media.id],
+  }),
+  event: one(events, {
+    fields: [faceProcessingJobs.eventId],
     references: [events.id],
   }),
 }));

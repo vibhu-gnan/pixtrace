@@ -85,6 +85,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Enqueue face processing job (images only, non-blocking)
+    if (mediaType === 'image' && media) {
+      try {
+        await supabase.from('face_processing_jobs').insert({
+          event_id: eventId,
+          media_id: media.id,
+          status: 'pending',
+          attempt_count: 0,
+          max_attempts: 3,
+        });
+
+        // Fire-and-forget: trigger face processing immediately
+        const triggerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/face/trigger`;
+        fetch(triggerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
+          },
+        }).catch(() => {}); // Non-blocking, ignore errors
+      } catch (jobErr) {
+        // Don't fail the upload if face job creation fails
+        console.error('Failed to enqueue face processing job:', jobErr);
+      }
+    }
+
     // Revalidate dashboard paths
     revalidatePath(`/events/${eventId}/photos`);
     revalidatePath(`/events/${eventId}`);

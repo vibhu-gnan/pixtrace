@@ -19,6 +19,7 @@ export default async function PermissionsPage({ params }: { params: Promise<{ ev
         initialAllowDownload={event.allow_download ?? true}
         initialAllowSlideshow={event.allow_slideshow ?? true}
         initialPhotoOrder={event.photo_order ?? 'oldest_first'}
+        initialFaceSearchEnabled={event.face_search_enabled ?? false}
       />
     </div>
   );

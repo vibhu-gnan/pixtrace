@@ -7,6 +7,8 @@ import type { GalleryMediaItem } from '@/actions/gallery';
 
 import { GallerySkeleton } from './gallery-skeleton';
 import { ShareSheet } from '@/components/story/share-sheet';
+import { FaceSearchButton } from './face-search-button';
+import { FaceSearchSheet } from './face-search-sheet';
 
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
@@ -22,6 +24,7 @@ interface GalleryPageClientProps {
     logoUrl?: string;
     coverUrl?: string;
     mobileCoverUrl?: string;
+    faceSearchEnabled?: boolean;
 }
 
 export function GalleryPageClient({
@@ -38,6 +41,7 @@ export function GalleryPageClient({
     logoUrl,
     coverUrl,
     mobileCoverUrl,
+    faceSearchEnabled = false,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -48,6 +52,7 @@ export function GalleryPageClient({
     const [error, setError] = useState('');
     const [revoked, setRevoked] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [faceSearchOpen, setFaceSearchOpen] = useState(false);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
@@ -479,6 +484,31 @@ export function GalleryPageClient({
                     logoUrl={logoUrl}
                     galleryUrl={typeof window !== 'undefined' ? getGalleryUrl() : ''}
                 />
+            )}
+
+            {/* Face Search — only when organizer has enabled it */}
+            {!revoked && media.length > 0 && faceSearchEnabled && (
+                <>
+                    <FaceSearchButton onClick={() => setFaceSearchOpen(true)} />
+                    <FaceSearchSheet
+                        isOpen={faceSearchOpen}
+                        onClose={() => setFaceSearchOpen(false)}
+                        eventHash={eventHash}
+                        albums={albums}
+                        onPhotoClick={(mediaId) => {
+                            // Find the photo in the loaded media and open lightbox
+                            // The GalleryGrid component handles its own lightbox
+                            const photoEl = document.querySelector(`[data-media-id="${mediaId}"]`);
+                            if (photoEl) {
+                                (photoEl as HTMLElement).click();
+                            } else {
+                                // Photo might not be loaded yet — open via URL
+                                window.history.pushState({}, '', `?photo=${mediaId}`);
+                                window.location.reload();
+                            }
+                        }}
+                    />
+                </>
             )}
         </>
     );

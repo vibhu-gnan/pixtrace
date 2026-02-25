@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { updateEventPermissions, updateEventPhotoOrder } from '@/actions/events';
+import { useState, useTransition, useEffect, useCallback } from 'react';
+import { updateEventPermissions, updateEventPhotoOrder, getFaceProcessingProgress } from '@/actions/events';
+import type { FaceProcessingProgress } from '@/actions/events';
 
 // ─── Reusable UI Components ──────────────────────────────────
 
@@ -80,12 +81,15 @@ interface PermissionsFormProps {
     initialAllowDownload: boolean;
     initialAllowSlideshow: boolean;
     initialPhotoOrder: 'oldest_first' | 'newest_first';
+    initialFaceSearchEnabled: boolean;
 }
 
-export default function PermissionsForm({ eventId, initialAllowDownload, initialAllowSlideshow, initialPhotoOrder }: PermissionsFormProps) {
+export default function PermissionsForm({ eventId, initialAllowDownload, initialAllowSlideshow, initialPhotoOrder, initialFaceSearchEnabled }: PermissionsFormProps) {
     const [downloadAccess, setDownloadAccess] = useState<'everyone' | 'no_one'>(initialAllowDownload ? 'everyone' : 'no_one');
     const [slideshowEnabled, setSlideshowEnabled] = useState(initialAllowSlideshow);
     const [photoOrder, setPhotoOrder] = useState<'oldest_first' | 'newest_first'>(initialPhotoOrder);
+    const [faceSearchEnabled, setFaceSearchEnabled] = useState(initialFaceSearchEnabled);
+    const [faceProgress, setFaceProgress] = useState<FaceProcessingProgress | null>(null);
 
     // Future proofing UI state (not yet connected to real columns)
     const [allowDownloadRequest, setAllowDownloadRequest] = useState(false);
@@ -96,6 +100,7 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
     const [isDownloadPending, startDownloadTransition] = useTransition();
     const [isSlideshowPending, startSlideshowTransition] = useTransition();
     const [isPhotoOrderPending, startPhotoOrderTransition] = useTransition();
+    const [isFaceSearchPending, startFaceSearchTransition] = useTransition();
 
     // Optimistic updates could be added, but simple transition is fine for settings
 
@@ -151,6 +156,50 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
             }
         });
     };
+
+    const handleFaceSearchChange = (checked: boolean) => {
+        const prevVal = faceSearchEnabled;
+        setFaceSearchEnabled(checked);
+        setError(null);
+
+        startFaceSearchTransition(async () => {
+            try {
+                const result = await updateEventPermissions(eventId, { faceSearchEnabled: checked });
+                if (result.error) throw new Error(result.error);
+                // Fetch progress immediately after enabling
+                if (checked) {
+                    const progress = await getFaceProcessingProgress(eventId);
+                    setFaceProgress(progress);
+                }
+            } catch (err) {
+                console.error(err);
+                setFaceSearchEnabled(prevVal);
+                setError('Failed to update face search settings');
+            }
+        });
+    };
+
+    // Poll face processing progress when enabled
+    const fetchProgress = useCallback(async () => {
+        const progress = await getFaceProcessingProgress(eventId);
+        setFaceProgress(progress);
+        return progress;
+    }, [eventId]);
+
+    useEffect(() => {
+        if (!faceSearchEnabled) return;
+        fetchProgress();
+
+        const interval = setInterval(async () => {
+            const progress = await fetchProgress();
+            // Stop polling when all jobs are done
+            if (progress && progress.pending === 0 && progress.processing === 0) {
+                clearInterval(interval);
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [faceSearchEnabled, fetchProgress]);
 
     return (
         <div>
@@ -221,6 +270,91 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                     <p className="text-sm text-gray-400">
                         Allow visitors to view the images in their collection as a slideshow.
                     </p>
+                </div>
+
+                {/* Face Search Section */}
+                <div className={isFaceSearchPending ? 'opacity-60 pointer-events-none' : ''}>
+                    <h3 className="text-base font-semibold text-gray-900 mb-3">Face Search</h3>
+                    <div className="flex items-center gap-3 mb-2">
+                        <Toggle checked={faceSearchEnabled} onChange={handleFaceSearchChange} />
+                        <span className="text-sm text-gray-600">{faceSearchEnabled ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                    <p className="text-sm text-gray-400">
+                        Allow visitors to find their photos by taking a selfie. Uses AI to detect and match faces.
+                    </p>
+
+                    {/* Processing Progress */}
+                    {faceSearchEnabled && faceProgress && faceProgress.total > 0 && (
+                        <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-100">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-700">Processing Progress</span>
+                                <span className="text-sm text-gray-500">
+                                    {faceProgress.completed + faceProgress.noFaces} / {faceProgress.total}
+                                </span>
+                            </div>
+                            {/* Progress bar */}
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full rounded-full transition-all duration-500 ease-out bg-brand-500"
+                                    style={{
+                                        width: `${Math.round(((faceProgress.completed + faceProgress.noFaces) / faceProgress.total) * 100)}%`,
+                                    }}
+                                />
+                            </div>
+                            {/* Status breakdown */}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                                {faceProgress.completed > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                                        {faceProgress.completed} with faces
+                                    </span>
+                                )}
+                                {faceProgress.noFaces > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-gray-400" />
+                                        {faceProgress.noFaces} no faces
+                                    </span>
+                                )}
+                                {faceProgress.processing > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                        {faceProgress.processing} processing
+                                    </span>
+                                )}
+                                {faceProgress.pending > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                                        {faceProgress.pending} queued
+                                    </span>
+                                )}
+                                {faceProgress.failed > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                                        {faceProgress.failed} failed
+                                    </span>
+                                )}
+                            </div>
+                            {/* Status message */}
+                            {(faceProgress.pending > 0 || faceProgress.processing > 0) && (
+                                <p className="mt-2 text-xs text-gray-400">
+                                    Processing photos... This page updates automatically.
+                                </p>
+                            )}
+                            {faceProgress.pending === 0 && faceProgress.processing === 0 && (
+                                <p className="mt-2 text-xs text-green-600">
+                                    All photos processed. Face search is ready!
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {faceSearchEnabled && faceProgress && faceProgress.total === 0 && (
+                        <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-100">
+                            <p className="text-sm text-gray-500">
+                                No photos have been queued for face processing yet. Photos will be processed when uploaded or when the processing pipeline runs.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Photo Order Section */}

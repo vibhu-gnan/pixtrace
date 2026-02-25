@@ -172,6 +172,7 @@ export default async function GalleryEventPage({
             logoUrl={event.theme?.logoUrl}
             coverUrl={coverUrl}
             mobileCoverUrl={mobileCoverUrl}
+            faceSearchEnabled={event.face_search_enabled ?? false}
           />
         </div>
 

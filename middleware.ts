@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   '/api/download',
   '/api/webhooks',
   '/api/proxy-image',
+  '/api/face',
   '/sign-in',
   '/sign-up',
   '/pricing',

@@ -145,6 +145,7 @@ export default async function GallerySlugPage({
                         initialPhotoId={initialPhotoId}
                         allowDownload={event.allow_download ?? true}
                         photoOrder={photoOrder}
+                        faceSearchEnabled={event.face_search_enabled ?? false}
                     />
                 </div>
 
