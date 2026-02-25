@@ -66,6 +66,7 @@ ALTER TABLE face_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE face_processing_jobs ENABLE ROW LEVEL SECURITY;
 
 -- Public can read face embeddings for public events (needed for face search)
+DROP POLICY IF EXISTS "Public read face embeddings for public events" ON face_embeddings;
 CREATE POLICY "Public read face embeddings for public events"
   ON face_embeddings FOR SELECT
   USING (event_id IN (SELECT id FROM events WHERE is_public = true));
