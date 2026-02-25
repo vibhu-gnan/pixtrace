@@ -221,12 +221,24 @@ function renderGlassFrame(
   logo: HTMLImageElement | null,
   opts: StoryCardOptions,
 ) {
-  // Very dark blurred photo background
-  const dominantColor = extractDominantColor(photo);
-  drawBlurredBackground(ctx, photo, dominantColor);
+  // Soft-blurred photo background — detail stays visible (bokeh, shapes)
+  // Use a higher scale than drawBlurredBackground (0.15 vs 0.05) so the
+  // photo is recognizable, not a solid color.
+  const bgTemp = document.createElement('canvas');
+  const bgScale = 0.15; // 15% — keeps shapes & light detail
+  bgTemp.width = Math.round(W * bgScale);
+  bgTemp.height = Math.round(H * bgScale);
+  const bgCtx = bgTemp.getContext('2d')!;
+  drawCoverFit(bgCtx, photo, 0, 0, bgTemp.width, bgTemp.height);
+  // Multi-pass: draw scaled-down version onto itself for smoother blur
+  bgCtx.drawImage(bgTemp, 0, 0, bgTemp.width, bgTemp.height);
 
-  // Extra dark overlay so photo details are barely visible
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bgTemp, 0, 0, W, H);
+
+  // Moderate darken — photo still visible, just moody
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.fillRect(0, 0, W, H);
 
   // ─── Glass card — photo keeps natural aspect ratio ─────────

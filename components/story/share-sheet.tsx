@@ -451,11 +451,11 @@ function TemplatePreview({
     case 'glass-frame':
       return (
         <div className="relative w-full h-full overflow-hidden bg-black">
-          {/* Very dark blurred bg — nearly black */}
+          {/* Soft-blurred photo bg — details still visible */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(14px) brightness(0.18) saturate(1.2)', transform: 'scale(1.5)' }} />
-          {/* Extra dark overlay */}
-          <div className="absolute inset-0 bg-black/35" />
+          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(8px) brightness(0.38) saturate(1.3)', transform: 'scale(1.3)' }} />
+          {/* Light darken overlay */}
+          <div className="absolute inset-0 bg-black/20" />
           {/* Glass card */}
           <div className="absolute top-[14px] left-[8px] right-[8px] z-10">
             <div
