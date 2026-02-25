@@ -111,22 +111,19 @@ export function ShareSheet({
       return;
     }
 
-    // Copy gallery URL
     await copyToClipboard(galleryUrl);
 
-    // Try native share with file
     if (navigator.share && navigator.canShare?.({ files: [result.file] })) {
       try {
-        await navigator.share({ files: [result.file], title: `${eventName}` });
+        await navigator.share({ files: [result.file], title: eventName });
         showToast('Link copied! Add a Link Sticker on Instagram');
         setGenerating(false);
         return;
       } catch {
-        // User cancelled or share failed — fall through to download
+        // cancelled — fall through to download
       }
     }
 
-    // Fallback: download
     const url = URL.createObjectURL(result.blob);
     const link = document.createElement('a');
     link.href = url;
@@ -157,133 +154,230 @@ export function ShareSheet({
       className="fixed inset-0 z-[9999] flex items-end justify-center"
       onClick={handleBackdropClick}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 animate-in fade-in duration-200" />
+      {/* Blurred backdrop */}
+      <div className="absolute inset-0 bg-black/60 animate-in fade-in duration-200" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as React.CSSProperties} />
 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="relative w-full max-w-lg bg-[#282828] rounded-t-2xl animate-in slide-in-from-bottom duration-300"
+        className="relative w-full max-w-lg animate-in slide-in-from-bottom duration-300 overflow-hidden"
+        style={{
+          borderRadius: '24px 24px 0 0',
+          background: 'linear-gradient(160deg, rgba(40,40,55,0.98) 0%, rgba(12,12,18,0.99) 100%)',
+          backdropFilter: 'blur(48px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(48px) saturate(160%)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          borderLeft: '1px solid rgba(255,255,255,0.06)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 -8px 64px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08)',
+        } as React.CSSProperties}
       >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+        {/* Top highlight line */}
+        <div className="absolute top-0 left-[15%] right-[15%] h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)' }} />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/30 mb-0.5">Share</p>
+            <h3 className="text-[17px] font-bold text-white leading-tight">{eventName}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              backdropFilter: 'blur(10px)',
+            } as React.CSSProperties}
+            aria-label="Close"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
-        {/* Template previews — horizontal scroll */}
-        <div className="px-4 pb-4">
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {TEMPLATES.map((tmpl) => (
-              <button
-                key={tmpl.id}
-                onClick={() => setSelectedTemplate(tmpl.id)}
-                className={`flex-shrink-0 flex flex-col items-center gap-1.5 transition-all ${
-                  selectedTemplate === tmpl.id ? 'scale-[1.02]' : 'opacity-60'
-                }`}
-              >
-                <div
-                  className={`w-[140px] h-[248px] rounded-xl overflow-hidden border-2 transition-colors ${
-                    selectedTemplate === tmpl.id
-                      ? 'border-white'
-                      : 'border-transparent'
-                  }`}
+        {/* Section label */}
+        <p className="px-5 pt-1 pb-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/25">Style</p>
+
+        {/* Template previews */}
+        <div className="px-4 pb-5">
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+            {TEMPLATES.map((tmpl) => {
+              const active = selectedTemplate === tmpl.id;
+              return (
+                <button
+                  key={tmpl.id}
+                  onClick={() => setSelectedTemplate(tmpl.id)}
+                  className="flex-shrink-0 flex flex-col items-center gap-2 transition-all duration-200"
+                  style={{ transform: active ? 'scale(1.05)' : 'scale(1)' }}
                 >
-                  <TemplatePreview
-                    template={tmpl.id}
-                    photoUrl={photoUrl}
-                    eventName={eventName}
-                  />
-                </div>
-                <span
-                  className={`text-[11px] font-medium transition-colors ${
-                    selectedTemplate === tmpl.id ? 'text-white' : 'text-white/40'
-                  }`}
-                >
-                  {tmpl.label}
-                </span>
-              </button>
-            ))}
+                  <div
+                    className="w-[128px] h-[228px] rounded-[18px] overflow-hidden transition-all duration-200"
+                    style={
+                      active
+                        ? {
+                            border: '2.5px solid rgba(255,255,255,0.9)',
+                            boxShadow: '0 0 0 3px rgba(255,255,255,0.1), 0 12px 40px rgba(0,0,0,0.6)',
+                          }
+                        : {
+                            border: '2px solid rgba(255,255,255,0.07)',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                            opacity: 0.5,
+                          }
+                    }
+                  >
+                    <TemplatePreview template={tmpl.id} photoUrl={photoUrl} eventName={eventName} />
+                  </div>
+                  <span
+                    className="text-[11px] font-semibold transition-colors tracking-wide"
+                    style={{ color: active ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.25)' }}
+                  >
+                    {tmpl.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Share targets row */}
-        <div className="px-4 pb-6">
-          <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
+        {/* Divider */}
+        <div className="mx-5 mb-4" style={{ height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)' }} />
+
+        {/* Share to label */}
+        <p className="px-5 pb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-white/25">Share to</p>
+
+        {/* Share target buttons */}
+        <div className="px-5 pb-5">
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
             {/* Instagram Stories */}
-            <button
+            <ShareButton
               onClick={handleShareStory}
               disabled={generating}
-              className="flex flex-col items-center gap-1.5 flex-shrink-0"
+              label={generating ? 'Creating…' : 'Stories'}
+              bg={generating ? 'rgba(255,255,255,0.08)' : undefined}
+              gradient={generating ? undefined : 'linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%)'}
+              glow={generating ? undefined : '0 4px 20px rgba(221,42,123,0.45)'}
             >
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] flex items-center justify-center">
-                {generating ? (
-                  <svg className="animate-spin text-white" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-                ) : (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                    <rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="white" strokeWidth="2" />
-                    <circle cx="12" cy="12" r="5" fill="none" stroke="white" strokeWidth="2" />
-                    <circle cx="17.5" cy="6.5" r="1.5" fill="white" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-[11px] text-white/70 font-medium">
-                {generating ? 'Creating...' : 'Stories'}
-              </span>
-            </button>
-
-            {/* Copy Link */}
-            <button onClick={handleCopyLink} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              <div className="w-14 h-14 rounded-full bg-[#3a3a3a] flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              {generating ? (
+                <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+                  <rect x="2" y="2" width="20" height="20" rx="5" fill="none" stroke="white" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="5" fill="none" stroke="white" strokeWidth="2" />
+                  <circle cx="17.5" cy="6.5" r="1.5" fill="white" />
                 </svg>
-              </div>
-              <span className="text-[11px] text-white/70 font-medium">Copy link</span>
-            </button>
+              )}
+            </ShareButton>
 
             {/* WhatsApp */}
-            <button onClick={handleWhatsApp} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              <div className="w-14 h-14 rounded-full bg-[#25d366] flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/70 font-medium">WhatsApp</span>
-            </button>
+            <ShareButton
+              onClick={handleWhatsApp}
+              label="WhatsApp"
+              bg="#25d366"
+              glow="0 4px 20px rgba(37,211,102,0.4)"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+            </ShareButton>
 
-            {/* More (native share) */}
-            <button
+            {/* Copy Link */}
+            <ShareButton onClick={handleCopyLink} label="Copy link" glass>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </ShareButton>
+
+            {/* More */}
+            <ShareButton
               onClick={async () => {
                 if (navigator.share) {
-                  try {
-                    await navigator.share({ title: eventName, url: galleryUrl });
-                  } catch { /* cancelled */ }
+                  try { await navigator.share({ title: eventName, url: galleryUrl }); }
+                  catch { /* cancelled */ }
                 } else {
                   await copyToClipboard(galleryUrl);
                   showToast('Link copied!');
                 }
               }}
-              className="flex flex-col items-center gap-1.5 flex-shrink-0"
+              label="More"
+              glass
             >
-              <div className="w-14 h-14 rounded-full bg-[#3a3a3a] flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
-                </svg>
-              </div>
-              <span className="text-[11px] text-white/70 font-medium">More</span>
-            </button>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" />
+              </svg>
+            </ShareButton>
           </div>
+        </div>
+
+        {/* Cancel */}
+        <div className="px-5 pb-10">
+          <button
+            onClick={onClose}
+            className="w-full py-4 rounded-2xl text-[15px] font-semibold transition-all active:scale-[0.98]"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              color: 'rgba(255,255,255,0.6)',
+            } as React.CSSProperties}
+          >
+            Cancel
+          </button>
         </div>
 
         {/* Toast */}
         {toastMessage && (
-          <div className="absolute top-[-52px] left-1/2 -translate-x-1/2 bg-white text-gray-900 text-sm font-medium px-4 py-2 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2 whitespace-nowrap">
+          <div className="absolute top-[-52px] left-1/2 -translate-x-1/2 bg-white text-gray-900 text-sm font-semibold px-5 py-2 rounded-full shadow-xl animate-in fade-in slide-in-from-bottom-2 whitespace-nowrap">
             {toastMessage}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Shared share button ──────────────────────────────────────
+
+function ShareButton({
+  onClick,
+  disabled,
+  label,
+  children,
+  bg,
+  gradient,
+  glow,
+  glass,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
+  children: React.ReactNode;
+  bg?: string;
+  gradient?: string;
+  glow?: string;
+  glass?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col items-center gap-2 flex-shrink-0 transition-all active:scale-95 disabled:opacity-60"
+    >
+      <div
+        className="w-[58px] h-[58px] rounded-2xl flex items-center justify-center"
+        style={{
+          background: gradient ?? bg ?? (glass ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.08)'),
+          boxShadow: glow ?? (glass ? 'none' : undefined),
+          border: glass ? '1px solid rgba(255,255,255,0.12)' : undefined,
+          backdropFilter: glass ? 'blur(10px)' : undefined,
+          WebkitBackdropFilter: glass ? 'blur(10px)' : undefined,
+        } as React.CSSProperties}
+      >
+        {children}
+      </div>
+      <span className="text-[11px] font-medium text-white/50">{label}</span>
+    </button>
   );
 }
 
@@ -298,9 +392,9 @@ function TemplatePreview({
   photoUrl: string;
   eventName: string;
 }) {
-  const shortName = eventName.length > 18 ? eventName.slice(0, 18) + '...' : eventName;
+  const shortName = eventName.length > 16 ? eventName.slice(0, 16) + '…' : eventName;
 
-  const imgStyle: React.CSSProperties = {
+  const imgFill: React.CSSProperties = {
     position: 'absolute',
     inset: 0,
     width: '100%',
@@ -313,10 +407,10 @@ function TemplatePreview({
       return (
         <div className="relative w-full h-full bg-gray-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={imgStyle} />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80" />
+          <img src={photoUrl} alt="" style={imgFill} />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90" />
           <div className="absolute bottom-3 left-0 right-0 text-center px-2">
-            <div className="text-[8px] font-bold text-white uppercase tracking-wide leading-tight">
+            <div className="text-[8px] font-black text-white uppercase tracking-wider leading-tight drop-shadow">
               {shortName}
             </div>
           </div>
@@ -325,15 +419,15 @@ function TemplatePreview({
 
     case 'polaroid':
       return (
-        <div className="relative w-full h-full bg-gray-800 flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-full bg-gray-700 flex items-center justify-center overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={{ ...imgStyle, filter: 'blur(8px) brightness(0.4)', transform: 'scale(1.3)' }} />
-          <div className="relative bg-white rounded-[4px] p-[4px] pb-[14px] w-[75%] shadow-lg z-10">
+          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(10px) brightness(0.35)', transform: 'scale(1.4)' }} />
+          <div className="relative bg-white rounded-[3px] p-[5px] pb-[16px] w-[74%] shadow-2xl z-10">
             <div className="aspect-square w-full rounded-[2px] overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photoUrl} alt="" className="w-full h-full object-cover" />
             </div>
-            <div className="text-[6px] font-bold text-gray-900 text-center mt-[6px] uppercase tracking-wide leading-tight">
+            <div className="text-[6px] font-black text-gray-800 text-center mt-[7px] uppercase tracking-wider leading-tight">
               {shortName}
             </div>
           </div>
@@ -344,32 +438,44 @@ function TemplatePreview({
       return (
         <div className="relative w-full h-full bg-gray-900">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={imgStyle} />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80" />
+          <img src={photoUrl} alt="" style={imgFill} />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90" />
           <div className="absolute bottom-3 left-0 right-0 text-center px-2">
-            <div className="text-[9px] font-bold text-white uppercase tracking-wide leading-tight">
+            <div className="text-[9px] font-black text-white uppercase tracking-wider leading-tight drop-shadow-lg">
               {shortName}
             </div>
           </div>
-          {/* Logo placeholder at top — only shown if organizer has logo */}
         </div>
       );
 
     case 'glass-frame':
       return (
-        <div className="relative w-full h-full bg-gray-800 overflow-hidden">
+        <div className="relative w-full h-full overflow-hidden">
+          {/* Blurred bg */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={{ ...imgStyle, filter: 'blur(8px) brightness(0.35)', transform: 'scale(1.3)' }} />
-          <div className="absolute top-3 left-2 right-2 z-10">
-            <div className="bg-white/10 rounded-lg p-[3px] border border-white/10">
-              <div className="aspect-square w-full rounded-[4px] overflow-hidden">
+          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(12px) brightness(0.3) saturate(1.4)', transform: 'scale(1.4)' }} />
+          {/* Glass tint */}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, rgba(120,120,180,0.15) 0%, rgba(0,0,0,0.4) 100%)' }} />
+          {/* Glass card */}
+          <div className="absolute top-[8px] left-[6px] right-[6px] z-10">
+            <div
+              className="rounded-[10px] overflow-hidden"
+              style={{
+                padding: '3px',
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+              }}
+            >
+              <div className="aspect-square w-full rounded-[8px] overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoUrl} alt="" className="w-full h-full object-cover" />
               </div>
             </div>
           </div>
+          {/* Name */}
           <div className="absolute bottom-3 left-0 right-0 text-center px-2 z-10">
-            <div className="text-[8px] font-bold text-white uppercase tracking-wide leading-tight">
+            <div className="text-[8px] font-black text-white uppercase tracking-wider leading-tight drop-shadow">
               {shortName}
             </div>
           </div>
