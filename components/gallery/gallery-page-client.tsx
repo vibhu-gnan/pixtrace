@@ -476,7 +476,6 @@ export function GalleryPageClient({
                     onClose={() => setHeaderShareSheetOpen(false)}
                     photoUrl={mobileCoverUrl || coverUrl || media[0].full_url || media[0].original_url}
                     eventName={eventName}
-                    eventSubtitle={`${totalCount} Photos${albums.length > 1 ? ` · ${albums.length} Albums` : ''}`}
                     logoUrl={logoUrl}
                     galleryUrl={typeof window !== 'undefined' ? getGalleryUrl() : ''}
                 />
