@@ -467,8 +467,8 @@ function TemplatePreview({
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
               }}
             >
-              {/* Natural aspect ratio — 3:2 landscape crop for preview */}
-              <div className="w-full rounded-[9px] overflow-hidden" style={{ aspectRatio: '3/2' }}>
+              {/* 4:5 portrait frame — matches generated canvas */}
+              <div className="w-full rounded-[9px] overflow-hidden" style={{ aspectRatio: '4/5' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoUrl} alt="" className="w-full h-full object-cover" />
               </div>
