@@ -167,6 +167,9 @@ export function ShareSheet({
     <div
       className="fixed inset-0 z-[9999] flex items-end justify-center"
       onClick={handleBackdropClick}
+      onTouchStart={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
     >
       {/* Blurred backdrop */}
       <div className="absolute inset-0 bg-black/60 animate-in fade-in duration-200" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as React.CSSProperties} />
