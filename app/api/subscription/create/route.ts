@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
         .eq('id', organizer.id);
     }
 
-    const subscription = await razorpay.subscriptions.create({
+    // customer_id is supported by Razorpay API but missing from their TS types
+    const subscription = await (razorpay.subscriptions.create as Function)({
       plan_id: plan.razorpay_plan_id,
       customer_id: customerId,
       total_count: 120,
