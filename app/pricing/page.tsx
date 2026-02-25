@@ -8,6 +8,22 @@ import type { PricingPlan } from '@/types';
 
 const pricingPlans: PricingPlan[] = [
   {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    currency: '₹',
+    interval: 'month',
+    description: 'Get started with basic gallery hosting. No credit card required.',
+    features: [
+      '1 GB Storage',
+      '1 Event',
+      'Basic Analytics',
+      'Email Support',
+    ],
+    highlighted: false,
+    cta_text: 'Get Started Free',
+  },
+  {
     id: 'starter',
     name: 'Starter',
     price: 2499,
@@ -19,9 +35,10 @@ const pricingPlans: PricingPlan[] = [
       'Up to 5 Events',
       'Original Quality Downloads',
       'Basic Analytics',
+      'Email Support',
     ],
     highlighted: false,
-    cta_text: 'Contact Us',
+    cta_text: 'Get Started',
   },
   {
     id: 'pro',
@@ -36,9 +53,10 @@ const pricingPlans: PricingPlan[] = [
       'Custom Branding & Domain',
       'Priority Support',
       'Client Proofing',
+      'Custom Watermarking',
     ],
     highlighted: true,
-    cta_text: 'Contact Us',
+    cta_text: 'Get Started',
   },
   {
     id: 'enterprise',
@@ -54,43 +72,56 @@ const pricingPlans: PricingPlan[] = [
       'API Access',
     ],
     highlighted: false,
-    cta_text: 'Contact Us',
+    cta_text: 'Contact Sales',
   },
 ];
 
 const comparisonFeatures = [
   {
     feature: 'Storage Capacity',
+    free: '1 GB',
     starter: '10 GB',
     pro: '50 GB',
     enterprise: 'Unlimited',
   },
   {
     feature: 'Active Events',
+    free: '1',
     starter: '5',
     pro: 'Unlimited',
     enterprise: 'Unlimited',
   },
   {
+    feature: 'Original Downloads',
+    free: false,
+    starter: true,
+    pro: true,
+    enterprise: true,
+  },
+  {
     feature: 'Custom Branding',
+    free: false,
     starter: false,
     pro: true,
     enterprise: true,
   },
   {
     feature: 'Client Proofing',
+    free: false,
     starter: false,
     pro: true,
     enterprise: true,
   },
   {
     feature: 'Watermarking',
+    free: 'Standard',
     starter: 'Standard',
     pro: 'Custom',
     enterprise: 'Custom + AI',
   },
   {
     feature: 'Support Level',
+    free: 'Email',
     starter: 'Email',
     pro: 'Priority Email & Chat',
     enterprise: '24/7 Dedicated Agent',
@@ -98,28 +129,12 @@ const comparisonFeatures = [
 ];
 
 function PricingCard({ plan }: { plan: PricingPlan }) {
-  const [showContactOptions, setShowContactOptions] = useState(false);
-
-  const handleContactClick = () => {
-    setShowContactOptions(true);
-  };
-
-  const handleEmailClick = () => {
-    try {
-      const subject = encodeURIComponent(`PIXTRACE Plan Inquiry - ${plan.name}`);
-      window.location.href = `mailto:vtrader2005@gmail.com?subject=${subject}`;
-    } catch (error) {
-      console.error('Email client error:', error);
-      alert('Unable to open email client. Please email us directly at vtrader2005@gmail.com');
-    }
-  };
-
-  const handlePhoneClick = () => {
-    window.location.href = 'tel:8688146351';
-  };
+  const ctaHref = plan.id === 'enterprise'
+    ? '/enterprise'
+    : `/sign-up?plan=${plan.id}`;
 
   return (
-    <div 
+    <div
       className={`
         relative flex flex-col rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1
         ${plan.highlighted
@@ -156,6 +171,8 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
                 /{plan.interval}
               </span>
             </>
+          ) : plan.id === 'free' ? (
+            <span className="text-3xl font-bold text-white">₹0</span>
           ) : (
             <span className="text-3xl font-bold text-white">Custom</span>
           )}
@@ -165,10 +182,10 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
       <ul className="space-y-4 mb-8 flex-grow">
         {plan.features.map((feature, index) => (
           <li key={index} className={`flex items-start gap-3 ${plan.highlighted ? 'text-white' : 'text-slate-300'}`}>
-            <span 
+            <span
               className={`material-icons text-xl ${
-                plan.highlighted 
-                  ? 'text-primary bg-white rounded-full p-[2px]' 
+                plan.highlighted
+                  ? 'text-primary bg-white rounded-full p-[2px]'
                   : 'text-primary'
               }`}
               aria-hidden="true"
@@ -182,56 +199,19 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
         ))}
       </ul>
 
-      {plan.id === 'starter' ? (
-  <a
-    href="https://rzp.io/rzp/uXSCNaBp"
-    target="_blank"
-    rel="noopener noreferrer"
-    className={`
-      w-full py-3 px-4 rounded-lg font-medium transition-all text-center block
-      ${plan.highlighted
-        ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 font-semibold'
-        : 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white'
-      }
-    `}
-  >
-    Buy Now
-  </a>
-) : !showContactOptions ? (
-  <button
-    onClick={handleContactClick}
-    className={`
-      w-full py-3 px-4 rounded-lg font-medium transition-all
-      ${plan.highlighted
-        ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 font-semibold'
-        : 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white'
-      }
-    `}
-    aria-label={`Contact us about ${plan.name} plan`}
-  >
-    Contact Us
-  </button>
-) : (
-      
-        <div className="space-y-3">
-          <button
-            onClick={handleEmailClick}
-            className="w-full py-3 px-4 rounded-lg border border-slate-600 bg-slate-800/50 text-white hover:bg-slate-700 transition-all font-medium flex items-center justify-center gap-2"
-            aria-label="Email us about plan"
-          >
-            <span className="material-icons text-sm" aria-hidden="true">email</span>
-            Email: vtrader2005@gmail.com
-          </button>
-          <button
-            onClick={handlePhoneClick}
-            className="w-full py-3 px-4 rounded-lg bg-primary text-white hover:bg-blue-600 transition-all font-semibold flex items-center justify-center gap-2"
-            aria-label="Call us about plan"
-          >
-            <span className="material-icons text-sm" aria-hidden="true">phone</span>
-            Call: 8688146351
-          </button>
-        </div>
-      )}
+      <Link
+        href={ctaHref}
+        className={`
+          w-full py-3 px-4 rounded-lg font-medium transition-all text-center block
+          ${plan.highlighted
+            ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:bg-blue-600 font-semibold'
+            : 'border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white'
+          }
+        `}
+        aria-label={`${plan.cta_text} - ${plan.name} plan`}
+      >
+        {plan.cta_text}
+      </Link>
     </div>
   );
 }
@@ -244,65 +224,49 @@ function ComparisonTable() {
         <table className="w-full text-left border-collapse min-w-[500px]">
           <thead>
             <tr className="border-b border-slate-800">
-              <th className="p-4 pl-6 font-medium text-slate-400 w-1/3">Features</th>
-              <th className="p-4 font-medium text-white text-center w-1/5">Starter</th>
-              <th className="p-4 font-medium text-primary text-center w-1/5 bg-primary/5">Pro</th>
-              <th className="p-4 font-medium text-white text-center w-1/5">Enterprise</th>
+              <th className="p-4 pl-6 font-medium text-slate-400 w-1/4">Features</th>
+              <th className="p-4 font-medium text-slate-400 text-center">Free</th>
+              <th className="p-4 font-medium text-white text-center">Starter</th>
+              <th className="p-4 font-medium text-primary text-center bg-primary/5">Pro</th>
+              <th className="p-4 font-medium text-white text-center">Enterprise</th>
             </tr>
           </thead>
           <tbody className="text-sm">
-            {comparisonFeatures.map((row, index) => (
-              <tr 
-                key={index}
-                className={`
-                  border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors
-                  ${index === comparisonFeatures.length - 1 ? 'border-b-0' : ''}
-                `}
-              >
-                <td className="p-4 pl-6 text-slate-300">{row.feature}</td>
-                <td className="p-4 text-center">
-                  {typeof row.starter === 'boolean' ? (
-                    <span 
-                      className={`material-icons text-lg ${
-                        row.starter ? 'text-primary' : 'text-slate-600'
-                      }`}
+            {comparisonFeatures.map((row, index) => {
+              const renderCell = (value: string | boolean, highlight?: boolean) => {
+                if (typeof value === 'boolean') {
+                  return (
+                    <span
+                      className={`material-icons text-lg ${value ? 'text-primary' : 'text-slate-600'}`}
                       aria-hidden="true"
                     >
-                      {row.starter ? 'check' : 'remove'}
+                      {value ? 'check' : 'remove'}
                     </span>
-                  ) : (
-                    <span className={row.feature === 'Storage Capacity' ? 'text-slate-400' : 'text-slate-400'}>
-                      {row.starter}
-                    </span>
-                  )}
-                </td>
-                <td className="p-4 text-center bg-primary/5">
-                  {typeof row.pro === 'boolean' ? (
-                    <span className="material-icons text-lg text-primary" aria-hidden="true">
-                      {row.pro ? 'check' : 'remove'}
-                    </span>
-                  ) : (
-                    <span className={row.feature === 'Storage Capacity' || row.feature === 'Active Events' ? 'text-white font-medium' : 'text-white'}>
-                      {row.pro}
-                    </span>
-                  )}
-                </td>
-                <td className="p-4 text-center">
-                  {typeof row.enterprise === 'boolean' ? (
-                    <span 
-                      className={`material-icons text-lg ${
-                        row.enterprise ? 'text-primary' : 'text-slate-400'
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {row.enterprise ? 'check' : 'remove'}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">{row.enterprise}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  );
+                }
+                return (
+                  <span className={highlight ? 'text-white font-medium' : 'text-slate-400'}>
+                    {value}
+                  </span>
+                );
+              };
+
+              return (
+                <tr
+                  key={index}
+                  className={`
+                    border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors
+                    ${index === comparisonFeatures.length - 1 ? 'border-b-0' : ''}
+                  `}
+                >
+                  <td className="p-4 pl-6 text-slate-300">{row.feature}</td>
+                  <td className="p-4 text-center">{renderCell(row.free)}</td>
+                  <td className="p-4 text-center">{renderCell(row.starter)}</td>
+                  <td className="p-4 text-center bg-primary/5">{renderCell(row.pro, true)}</td>
+                  <td className="p-4 text-center">{renderCell(row.enterprise)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -421,7 +385,7 @@ export default function PricingPage() {
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-24 px-2 sm:px-0 relative">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-24 px-2 sm:px-0 relative">
             {pricingPlans.map((plan) => (
               <PricingCard key={plan.id} plan={plan} />
             ))}
