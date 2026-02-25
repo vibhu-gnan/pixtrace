@@ -453,7 +453,7 @@ function TemplatePreview({
         <div className="relative w-full h-full overflow-hidden bg-black">
           {/* Soft-blurred photo bg — details still visible */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(8px) brightness(0.38) saturate(1.3)', transform: 'scale(1.3)' }} />
+          <img src={photoUrl} alt="" style={{ ...imgFill, filter: 'blur(6px) brightness(0.42) saturate(1.3)', transform: 'scale(1.2)' }} />
           {/* Light darken overlay */}
           <div className="absolute inset-0 bg-black/20" />
           {/* Glass card */}

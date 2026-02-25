@@ -21,6 +21,7 @@ interface GalleryPageClientProps {
     photoOrder?: 'oldest_first' | 'newest_first';
     logoUrl?: string;
     coverUrl?: string;
+    mobileCoverUrl?: string;
 }
 
 export function GalleryPageClient({
@@ -36,6 +37,7 @@ export function GalleryPageClient({
     photoOrder = 'oldest_first',
     logoUrl,
     coverUrl,
+    mobileCoverUrl,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -472,7 +474,7 @@ export function GalleryPageClient({
                 <ShareSheet
                     isOpen={headerShareSheetOpen}
                     onClose={() => setHeaderShareSheetOpen(false)}
-                    photoUrl={coverUrl || media[0].full_url || media[0].original_url}
+                    photoUrl={mobileCoverUrl || coverUrl || media[0].full_url || media[0].original_url}
                     eventName={eventName}
                     eventSubtitle={`${totalCount} Photos${albums.length > 1 ? ` · ${albums.length} Albums` : ''}`}
                     logoUrl={logoUrl}

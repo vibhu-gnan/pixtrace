@@ -96,6 +96,8 @@ export default async function GalleryEventPage({
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');
     const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
+    // Mobile hero slide is portrait-optimized — perfect for 9:16 story cards
+    const mobileCoverUrl = mobileHeroSlides[0]?.url || '';
     const firstSlideUrl = heroSlides[0]?.url || coverUrl;
     const hasSlideshow = heroSlides.length > 1;
 
@@ -168,6 +170,7 @@ export default async function GalleryEventPage({
             photoOrder={photoOrder}
             logoUrl={event.theme?.logoUrl}
             coverUrl={coverUrl}
+            mobileCoverUrl={mobileCoverUrl}
           />
         </div>
 

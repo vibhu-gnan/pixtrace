@@ -225,7 +225,7 @@ function renderGlassFrame(
   // Use a higher scale than drawBlurredBackground (0.15 vs 0.05) so the
   // photo is recognizable, not a solid color.
   const bgTemp = document.createElement('canvas');
-  const bgScale = 0.15; // 15% — keeps shapes & light detail
+  const bgScale = 0.20; // 20% — light blur, photo clearly visible (level B)
   bgTemp.width = Math.round(W * bgScale);
   bgTemp.height = Math.round(H * bgScale);
   const bgCtx = bgTemp.getContext('2d')!;
@@ -237,8 +237,8 @@ function renderGlassFrame(
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bgTemp, 0, 0, W, H);
 
-  // Moderate darken — photo still visible, just moody
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  // Light darken — photo clearly visible, just moody (level B)
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
   ctx.fillRect(0, 0, W, H);
 
   // ─── Glass card — photo keeps natural aspect ratio ─────────
