@@ -48,6 +48,18 @@ function toPgVector(embedding: number[]): string {
 }
 
 /**
+ * Parse a pgvector string "[0.1,0.2,...]" into a number[].
+ * Supabase returns vector columns as strings, not arrays.
+ */
+function parseEmbedding(raw: unknown): number[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    return JSON.parse(raw);
+  }
+  return [];
+}
+
+/**
  * Search face embeddings using the RPC function.
  * Returns raw results with embeddings for prototype building.
  */
@@ -69,7 +81,11 @@ async function searchFaces(
     throw new Error(`pgvector search failed: ${error.message}`);
   }
 
-  return (data || []) as RawFaceResult[];
+  // Parse embedding from pgvector string to number[]
+  return (data || []).map((row: any) => ({
+    ...row,
+    embedding: parseEmbedding(row.embedding),
+  })) as RawFaceResult[];
 }
 
 /**
