@@ -1,28 +1,32 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { useFaceSearch, type FaceSearchState } from '@/lib/face/use-face-search';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useFaceSearch, type FaceSearchResults } from '@/lib/face/use-face-search';
 import { SelfieCamera } from './selfie-camera';
-import { FaceSearchResultsView } from './face-search-results';
 
-interface FaceSearchSheetProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface FaceSearchModalProps {
   eventHash: string;
-  albums: { id: string; name: string }[];
-  onPhotoClick: (mediaId: string) => void;
+  onResults: (results: FaceSearchResults) => void;
+  onClose: () => void;
 }
 
-export function FaceSearchSheet({
-  isOpen,
-  onClose,
+export function FaceSearchModal({
   eventHash,
-  albums,
-  onPhotoClick,
-}: FaceSearchSheetProps) {
+  onResults,
+  onClose,
+}: FaceSearchModalProps) {
   const { state, setState, results, error, search, reset } = useFaceSearch(eventHash);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const selfieBlobRef = useRef<Blob | null>(null);
+  const deliveredRef = useRef(false);
+
+  // When search succeeds with matches, deliver results to parent
+  useEffect(() => {
+    if (state === 'results' && results && results.totalMatches > 0 && !deliveredRef.current) {
+      deliveredRef.current = true;
+      onResults(results);
+    }
+  }, [state, results, onResults]);
 
   const handleCapture = useCallback((blob: Blob) => {
     selfieBlobRef.current = blob;
@@ -32,6 +36,7 @@ export function FaceSearchSheet({
 
   const handleSearch = useCallback(() => {
     if (selfieBlobRef.current) {
+      deliveredRef.current = false;
       search(selfieBlobRef.current);
     }
   }, [search]);
@@ -40,6 +45,7 @@ export function FaceSearchSheet({
     if (selfiePreview) URL.revokeObjectURL(selfiePreview);
     setSelfiePreview(null);
     selfieBlobRef.current = null;
+    deliveredRef.current = false;
     setState('capturing');
   }, [selfiePreview, setState]);
 
@@ -50,13 +56,6 @@ export function FaceSearchSheet({
     reset();
     onClose();
   }, [selfiePreview, reset, onClose]);
-
-  const handlePhotoClick = useCallback((mediaId: string) => {
-    onPhotoClick(mediaId);
-    handleClose();
-  }, [onPhotoClick, handleClose]);
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -84,9 +83,7 @@ export function FaceSearchSheet({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3">
-          <h2 className="text-lg font-semibold text-white">
-            {state === 'results' || state === 'no_results' ? 'Your Photos' : 'Find Your Photos'}
-          </h2>
+          <h2 className="text-lg font-semibold text-white">Find Your Photos</h2>
           <button
             onClick={handleClose}
             className="w-8 h-8 flex items-center justify-center rounded-full"
@@ -145,15 +142,6 @@ export function FaceSearchSheet({
               <div className="text-sm text-gray-300">Finding your photos...</div>
               <div className="text-xs text-gray-500">This may take a few seconds</div>
             </div>
-          )}
-
-          {/* RESULTS state */}
-          {state === 'results' && results && (
-            <FaceSearchResultsView
-              results={results}
-              albums={albums}
-              onPhotoClick={handlePhotoClick}
-            />
           )}
 
           {/* NO RESULTS state */}

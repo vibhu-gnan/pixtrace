@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GalleryGrid } from './gallery-grid';
 import { getPublicGalleryPage } from '@/actions/gallery';
 import type { GalleryMediaItem } from '@/actions/gallery';
 
 import { GallerySkeleton } from './gallery-skeleton';
 import { ShareSheet } from '@/components/story/share-sheet';
-import { FaceSearchButton } from './face-search-button';
-import { FaceSearchSheet } from './face-search-sheet';
+import { FaceSearchModal } from './face-search-modal';
+import { FaceSearchResultsBar } from './face-search-results-bar';
+import type { FaceSearchResult, FaceSearchResults } from '@/lib/face/use-face-search';
 
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
@@ -53,6 +54,9 @@ export function GalleryPageClient({
     const [revoked, setRevoked] = useState(false);
     const [copied, setCopied] = useState(false);
     const [faceSearchOpen, setFaceSearchOpen] = useState(false);
+    const [faceSearchResults, setFaceSearchResults] = useState<FaceSearchResult[] | null>(null);
+    const [faceSearchActive, setFaceSearchActive] = useState(false);
+    const faceSearchActiveRef = useRef(false);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
@@ -68,6 +72,54 @@ export function GalleryPageClient({
     const albumNamesRef = useRef<Record<string, string>>(
         Object.fromEntries(albums.map(a => [a.id, a.name]))
     );
+
+    // Keep face search ref in sync
+    useEffect(() => { faceSearchActiveRef.current = faceSearchActive; }, [faceSearchActive]);
+
+    // Derive display media: face search results or normal gallery
+    const displayMedia = useMemo(() => {
+        if (!faceSearchActive || !faceSearchResults) return media;
+        const albumMap = new Map(albums.map(a => [a.id, a.name]));
+        const sorted = [...faceSearchResults].sort((a, b) => b.score - a.score);
+        let mapped: GalleryMediaItem[] = sorted.map(r => ({
+            id: r.media_id,
+            album_id: r.album_id,
+            album_name: albumMap.get(r.album_id) || 'Unknown',
+            original_filename: '',
+            media_type: 'image' as const,
+            width: r.width,
+            height: r.height,
+            thumbnail_url: r.thumbnail_url,
+            blur_url: '',
+            full_url: r.full_url,
+            original_url: r.original_url,
+            created_at: undefined,
+        }));
+        if (activeAlbum) {
+            mapped = mapped.filter(m => m.album_id === activeAlbum);
+        }
+        return mapped;
+    }, [faceSearchActive, faceSearchResults, media, activeAlbum, albums]);
+
+    // Face search result handlers
+    const handleFaceSearchResults = useCallback((results: FaceSearchResults) => {
+        const allResults = [...results.tier1, ...results.tier2];
+        setFaceSearchResults(allResults);
+        setFaceSearchActive(true);
+        faceSearchActiveRef.current = true;
+        setFaceSearchOpen(false);
+        setActiveAlbum(null);
+        setTimeout(() => {
+            document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }, []);
+
+    const handleDismissFaceSearch = useCallback(() => {
+        setFaceSearchActive(false);
+        setFaceSearchResults(null);
+        faceSearchActiveRef.current = false;
+        setActiveAlbum(null);
+    }, []);
 
     // Track gallery view — fire exactly once, guarded against StrictMode double-mount
     const viewTrackedRef = useRef(false);
@@ -85,6 +137,13 @@ export function GalleryPageClient({
 
     // Reset when album changes
     useEffect(() => {
+        // When face search is active, album changes only filter displayMedia (via useMemo) — no fetch needed
+        if (faceSearchActive) {
+            if (!isInitialMount.current) {
+                document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
         setError('');
         // Only scroll on album switch, not on initial page load
         if (isInitialMount.current) {
@@ -123,7 +182,7 @@ export function GalleryPageClient({
                 .catch(() => setError('Failed to load photos'))
                 .finally(() => setLoading(false));
         }
-    }, [activeAlbum, eventHash, initialMedia, totalCount, photoOrder]);
+    }, [activeAlbum, faceSearchActive, eventHash, initialMedia, totalCount, photoOrder]);
 
     // Keep refs in sync with state (read latest values without stale closures)
     useEffect(() => { mediaRef.current = media; }, [media]);
@@ -154,6 +213,7 @@ export function GalleryPageClient({
 
     // Load more photos — reads ALL state from refs (no stale closures)
     const loadMore = useCallback(async () => {
+        if (faceSearchActiveRef.current) return; // Face search results are not paginated
         if (loadingRef.current || !hasMoreRef.current) return;
         loadingRef.current = true;
         setLoading(true);
@@ -432,28 +492,30 @@ export function GalleryPageClient({
             </div>
 
             {/* ── Photo Grid ───────────────────────────────────── */}
-            <div className="pt-1 relative">
-                <GalleryGrid media={media} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading} />
+            <div className={`pt-1 relative${faceSearchActive ? ' pb-16' : ''}`}>
+                <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} />
 
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.
                     This ensures loading fires while the user is still viewing images,
                     not after they've scrolled past into empty space. */}
-                <div
-                    ref={sentinelRef}
-                    className="absolute bottom-0 left-0 w-full pointer-events-none"
-                    style={{ height: '1px' }}
-                    aria-hidden="true"
-                />
+                {!faceSearchActive && (
+                    <div
+                        ref={sentinelRef}
+                        className="absolute bottom-0 left-0 w-full pointer-events-none"
+                        style={{ height: '1px' }}
+                        aria-hidden="true"
+                    />
+                )}
             </div>
 
             {/* ── Loading / Error / End ──────────────────────────── */}
-            {loading && (
+            {loading && !faceSearchActive && (
                 <div className="w-full">
                     <GallerySkeleton />
                 </div>
             )}
-            {error && (
+            {error && !faceSearchActive && (
                 <div className="py-8 text-center">
                     <p className="text-sm text-red-500 mb-2">{error}</p>
                     <button
@@ -464,8 +526,8 @@ export function GalleryPageClient({
                     </button>
                 </div>
             )}
-            {!hasMore && !loading && media.length > 0 && (
-                <div className="py-8 flex justify-center">
+            {((!hasMore && !loading && media.length > 0 && !faceSearchActive) || (faceSearchActive && displayMedia.length > 0)) && (
+                <div className={`py-8 flex justify-center${faceSearchActive ? ' pb-20' : ''}`}>
                     <button
                         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                         className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
@@ -474,6 +536,27 @@ export function GalleryPageClient({
                     </button>
                 </div>
             )}
+
+            {/* ── Find Your Photos CTA (floating, always visible) ── */}
+            {!revoked && media.length > 0 && faceSearchEnabled && !faceSearchActive && (
+                <div className="fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none">
+                    <button
+                        onClick={() => setFaceSearchOpen(true)}
+                        className="pointer-events-auto flex items-center gap-2.5 px-6 py-3 rounded-full text-white text-sm font-medium shadow-lg transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-bottom duration-500"
+                        style={{
+                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                            boxShadow: '0 8px 30px rgba(99,102,241,0.4)',
+                        }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
+                        </svg>
+                        Find Your Photos
+                    </button>
+                </div>
+            )}
+
             {/* Share sheet for gallery header */}
             {media.length > 0 && (
                 <ShareSheet
@@ -486,29 +569,21 @@ export function GalleryPageClient({
                 />
             )}
 
-            {/* Face Search — only when organizer has enabled it */}
-            {!revoked && media.length > 0 && faceSearchEnabled && (
-                <>
-                    <FaceSearchButton onClick={() => setFaceSearchOpen(true)} />
-                    <FaceSearchSheet
-                        isOpen={faceSearchOpen}
-                        onClose={() => setFaceSearchOpen(false)}
-                        eventHash={eventHash}
-                        albums={albums}
-                        onPhotoClick={(mediaId) => {
-                            // Find the photo in the loaded media and open lightbox
-                            // The GalleryGrid component handles its own lightbox
-                            const photoEl = document.querySelector(`[data-media-id="${mediaId}"]`);
-                            if (photoEl) {
-                                (photoEl as HTMLElement).click();
-                            } else {
-                                // Photo might not be loaded yet — open via URL
-                                window.history.pushState({}, '', `?photo=${mediaId}`);
-                                window.location.reload();
-                            }
-                        }}
-                    />
-                </>
+            {/* Face Search Modal — selfie capture + confirm + loading */}
+            {faceSearchOpen && (
+                <FaceSearchModal
+                    eventHash={eventHash}
+                    onResults={handleFaceSearchResults}
+                    onClose={() => setFaceSearchOpen(false)}
+                />
+            )}
+
+            {/* Face Search Results Bar — floating bottom bar */}
+            {faceSearchActive && faceSearchResults && (
+                <FaceSearchResultsBar
+                    count={displayMedia.length}
+                    onDismiss={handleDismissFaceSearch}
+                />
             )}
         </>
     );
