@@ -8,7 +8,7 @@ import type { GalleryMediaItem } from '@/actions/gallery';
 import { GallerySkeleton } from './gallery-skeleton';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
-import { FaceSearchResultsBar } from './face-search-results-bar';
+import { FaceSearchToggle } from './face-search-toggle';
 import type { FaceSearchResult, FaceSearchResults } from '@/lib/face/use-face-search';
 
 interface GalleryPageClientProps {
@@ -116,10 +116,29 @@ export function GalleryPageClient({
 
     const handleDismissFaceSearch = useCallback(() => {
         setFaceSearchActive(false);
-        setFaceSearchResults(null);
         faceSearchActiveRef.current = false;
         setActiveAlbum(null);
+        // Keep faceSearchResults cached so toggling back doesn't re-trigger modal
     }, []);
+
+    // Toggle handler for ALL/Mine pill
+    const handleFaceToggle = useCallback(() => {
+        if (faceSearchActive) {
+            // Switch back to ALL
+            handleDismissFaceSearch();
+        } else if (faceSearchResults && faceSearchResults.length > 0) {
+            // We have cached results — switch to Mine without re-searching
+            setFaceSearchActive(true);
+            faceSearchActiveRef.current = true;
+            setActiveAlbum(null);
+            setTimeout(() => {
+                document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        } else {
+            // No cached results — open selfie modal
+            setFaceSearchOpen(true);
+        }
+    }, [faceSearchActive, faceSearchResults, handleDismissFaceSearch]);
 
     // Track gallery view — fire exactly once, guarded against StrictMode double-mount
     const viewTrackedRef = useRef(false);
@@ -537,24 +556,12 @@ export function GalleryPageClient({
                 </div>
             )}
 
-            {/* ── Find Your Photos CTA (floating, always visible) ── */}
-            {!revoked && media.length > 0 && faceSearchEnabled && !faceSearchActive && (
-                <div className="fixed bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none">
-                    <button
-                        onClick={() => setFaceSearchOpen(true)}
-                        className="pointer-events-auto flex items-center gap-2.5 px-6 py-3 rounded-full text-white text-sm font-medium shadow-lg transition-all hover:scale-105 active:scale-95 animate-in slide-in-from-bottom duration-500"
-                        style={{
-                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                            boxShadow: '0 8px 30px rgba(99,102,241,0.4)',
-                        }}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                            <circle cx="12" cy="13" r="4" />
-                        </svg>
-                        Find Your Photos
-                    </button>
-                </div>
+            {/* ── ALL / Mine Toggle (floating, always visible) ── */}
+            {!revoked && media.length > 0 && faceSearchEnabled && (
+                <FaceSearchToggle
+                    active={faceSearchActive}
+                    onToggle={handleFaceToggle}
+                />
             )}
 
             {/* Share sheet for gallery header */}
@@ -578,13 +585,6 @@ export function GalleryPageClient({
                 />
             )}
 
-            {/* Face Search Results Bar — floating bottom bar */}
-            {faceSearchActive && faceSearchResults && (
-                <FaceSearchResultsBar
-                    count={displayMedia.length}
-                    onDismiss={handleDismissFaceSearch}
-                />
-            )}
         </>
     );
 }
