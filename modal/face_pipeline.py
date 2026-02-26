@@ -51,6 +51,22 @@ L2_EPS = 1e-10
 # Utility functions (pure, no class dependency)
 # ---------------------------------------------------------------------------
 
+def to_native(obj):
+    """Recursively convert numpy types to Python native types for JSON."""
+    import numpy as np
+    if isinstance(obj, dict):
+        return {k: to_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_native(v) for v in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
 def l2_normalize(x, eps=L2_EPS):
     """L2-normalize a vector or batch of vectors."""
     import numpy as np
@@ -271,8 +287,8 @@ class FacePipeline:
                 results.append({
                     "face_index": idx,
                     "embedding": embedding,
-                    "confidence": confidence,
-                    "bbox": list(facial_area),
+                    "confidence": float(confidence),
+                    "bbox": [int(x) for x in facial_area],
                 })
             except Exception as e:
                 print(f"Error processing face {idx}: {e}")
@@ -353,7 +369,7 @@ class FacePipeline:
                     # Write embeddings to Supabase
                     rows = []
                     for face in faces:
-                        rows.append({
+                        rows.append(to_native({
                             "media_id": media_id,
                             "event_id": event_id,
                             "face_index": face["face_index"],
@@ -363,7 +379,7 @@ class FacePipeline:
                             "bbox_y1": face["bbox"][1],
                             "bbox_x2": face["bbox"][2],
                             "bbox_y2": face["bbox"][3],
-                        })
+                        }))
                     supabase.table("face_embeddings").insert(rows).execute()
 
                     results_summary["faces_found"] += face_count
