@@ -76,14 +76,28 @@ def l2_normalize(x, eps=L2_EPS):
 
 
 def decode_image(image_bytes: bytes):
-    """Decode image bytes to BGR numpy array (OpenCV format)."""
+    """Decode image bytes to BGR numpy array (OpenCV format).
+    Falls back to Pillow for formats OpenCV can't handle (e.g., WebP, HEIC)."""
     import numpy as np
     import cv2
+
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if img is None:
+    if img is not None:
+        return img
+
+    # Fallback: use Pillow which handles more formats
+    try:
+        from PIL import Image
+        import io
+        pil_img = Image.open(io.BytesIO(image_bytes))
+        pil_img = pil_img.convert("RGB")
+        img = np.array(pil_img)
+        # Convert RGB to BGR for OpenCV
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        return img
+    except Exception:
         raise ValueError("Failed to decode image")
-    return img
 
 
 def detect_faces(detector, img_rgb):
@@ -455,9 +469,16 @@ class FacePipeline:
         try:
             image_bytes = base64.b64decode(image_b64)
         except Exception:
-            return {"error": "invalid base64"}, 400
+            return {"error": "invalid_base64"}
 
-        faces = self.process_single_image(image_bytes)
+        try:
+            faces = self.process_single_image(image_bytes)
+        except ValueError as e:
+            print(f"Image decode error: {e}")
+            return {"error": "invalid_image", "message": str(e)}
+        except Exception as e:
+            print(f"Face processing error: {e}")
+            return {"error": "processing_failed", "message": str(e)[:200]}
 
         if len(faces) == 0:
             return {"error": "no_face_detected", "face_count": 0}

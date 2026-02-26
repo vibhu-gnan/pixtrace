@@ -73,19 +73,28 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    if (!embedResp.ok) {
+    const embedResult = await embedResp.json().catch(() => null);
+
+    if (!embedResp.ok || !embedResult) {
+      console.error('Modal embed_selfie error:', embedResp.status, embedResult);
       return NextResponse.json(
         { error: 'Face processing service unavailable' },
         { status: 503 },
       );
     }
 
-    const embedResult = await embedResp.json();
-
-    if (embedResult.error === 'no_face_detected') {
+    // Handle all error responses from Modal
+    if (embedResult.error) {
+      const errorMap: Record<string, { error: string; message: string; status: number }> = {
+        no_face_detected: { error: 'no_face_detected', message: 'No face detected in your selfie. Please try again with better lighting and face the camera directly.', status: 422 },
+        invalid_image: { error: 'invalid_image', message: 'Could not process your photo. Please try taking a new selfie.', status: 422 },
+        invalid_embedding: { error: 'low_quality_selfie', message: 'Could not generate a valid face embedding. Please try again with better lighting.', status: 422 },
+        processing_failed: { error: 'processing_failed', message: 'Face processing failed. Please try again.', status: 500 },
+      };
+      const mapped = errorMap[embedResult.error] || { error: embedResult.error, message: embedResult.message || 'Unknown error', status: 500 };
       return NextResponse.json(
-        { error: 'no_face_detected', message: 'No face detected in your selfie. Please try again with better lighting and face the camera directly.' },
-        { status: 422 },
+        { error: mapped.error, message: mapped.message },
+        { status: mapped.status },
       );
     }
 
