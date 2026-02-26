@@ -98,6 +98,19 @@ export async function POST(request: NextRequest) {
 
     const selfieEmbedding: number[] = embedResult.embedding;
 
+    // Validate embedding for NaN/Inf
+    if (!selfieEmbedding || selfieEmbedding.length !== 512 || selfieEmbedding.some((v: number) => !Number.isFinite(v))) {
+      console.error('Invalid embedding from Modal:', {
+        length: selfieEmbedding?.length,
+        hasNaN: selfieEmbedding?.some((v: number) => Number.isNaN(v)),
+        sample: selfieEmbedding?.slice(0, 5),
+      });
+      return NextResponse.json(
+        { error: 'low_quality_selfie', message: 'Could not generate a valid face embedding. Please try again with better lighting.' },
+        { status: 422 },
+      );
+    }
+
     // Run 3-iteration refinement search
     const adminClient = createAdminClient();
     const { tier1, tier2 } = await runFaceSearch(adminClient, selfieEmbedding, event.id);

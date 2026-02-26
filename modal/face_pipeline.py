@@ -467,8 +467,14 @@ class FacePipeline:
             (f["bbox"][2] - f["bbox"][0]) * (f["bbox"][3] - f["bbox"][1])
         ))
 
-        return {
-            "embedding": best_face["embedding"],
+        # Validate embedding for NaN/Inf
+        import math
+        embedding = best_face["embedding"]
+        if any(math.isnan(v) or math.isinf(v) for v in embedding):
+            return {"error": "invalid_embedding", "face_count": 0}
+
+        return to_native({
+            "embedding": embedding,
             "confidence": best_face["confidence"],
             "face_count": len(faces),
-        }
+        })
