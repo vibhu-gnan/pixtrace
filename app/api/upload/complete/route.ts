@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
         });
 
         // Fire-and-forget: trigger face processing immediately
-        const triggerUrl = `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/face/trigger`;
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+        const triggerUrl = `${baseUrl}/api/face/trigger`;
         fetch(triggerUrl, {
           method: 'POST',
           headers: {

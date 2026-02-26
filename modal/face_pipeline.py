@@ -22,6 +22,7 @@ image = (
         "opencv-python-headless==4.9.0.80",
         "numpy>=1.26,<2.0",
         "Pillow>=10.0",
+        "tf-keras",
         "retina-face>=0.0.17",
         "insightface>=0.7.3",
         "onnxruntime-gpu>=1.17",
