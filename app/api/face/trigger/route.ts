@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
     batches.get(eventId)!.push({ media_id: item.id, r2_url: r2Url });
   }
 
-  const modalUrl = process.env.MODAL_ENDPOINT_URL;
-  if (!modalUrl) {
-    console.error('MODAL_ENDPOINT_URL not set');
+  const processGalleryUrl = process.env.MODAL_PROCESS_GALLERY_URL;
+  if (!processGalleryUrl) {
+    console.error('MODAL_PROCESS_GALLERY_URL not set');
     return NextResponse.json({ error: 'GPU server not configured' }, { status: 503 });
   }
 
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   for (const [eventId, items] of batches) {
     try {
-      const resp = await fetch(`${modalUrl}/process-gallery`, {
+      const resp = await fetch(processGalleryUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

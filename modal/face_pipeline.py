@@ -27,6 +27,7 @@ image = (
         "onnxruntime-gpu>=1.17",
         "supabase>=2.0",
         "requests>=2.31",
+        "fastapi[standard]",
     )
 )
 
@@ -176,7 +177,7 @@ def generate_embedding(model, aligned_face_bgr):
 @app.cls(
     gpu="T4",
     timeout=600,
-    container_idle_timeout=300,
+    scaledown_window=300,
     volumes={"/models": model_volume},
     secrets=[modal.Secret.from_name("pixtrace-env")],
 )
@@ -278,7 +279,7 @@ class FacePipeline:
 
         return results
 
-    @modal.web_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST")
     def process_gallery(self, request: dict):
         """
         Batch process gallery photos.
@@ -413,7 +414,7 @@ class FacePipeline:
 
         return results_summary
 
-    @modal.web_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST")
     def embed_selfie(self, request: dict):
         """
         Generate embedding for a single selfie image.

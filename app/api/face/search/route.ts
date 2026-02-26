@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert selfie to base64 and send to Modal for embedding
-    const modalUrl = process.env.MODAL_ENDPOINT_URL;
-    if (!modalUrl) {
+    const embedSelfieUrl = process.env.MODAL_EMBED_SELFIE_URL;
+    if (!embedSelfieUrl) {
       return NextResponse.json(
         { error: 'Face search service not configured' },
         { status: 503 },
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     const selfieBuffer = await selfie.arrayBuffer();
     const selfieBase64 = Buffer.from(selfieBuffer).toString('base64');
 
-    const embedResp = await fetch(`${modalUrl}/embed-selfie`, {
+    const embedResp = await fetch(embedSelfieUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
