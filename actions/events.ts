@@ -439,21 +439,30 @@ export async function updateEventPermissions(eventId: string, payload: {
     return { error: 'Failed to update permissions' };
   }
 
-  // When face search is enabled, trigger processing of any pending jobs
+  // When face search is enabled, trigger processing of ALL pending jobs.
+  // This is non-blocking: we fire the trigger and don't wait for it to complete.
+  // The trigger route itself loops through all batches and handles Modal cold starts.
   if (payload.faceSearchEnabled === true) {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-      if (baseUrl) {
-        fetch(`${baseUrl}/api/face/trigger`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
-          },
-        }).catch(() => {}); // Non-blocking
-      }
-    } catch {
-      // Don't fail the toggle if trigger fails
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+    if (baseUrl) {
+      fetch(`${baseUrl}/api/face/trigger`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
+        },
+      })
+        .then(async (resp) => {
+          if (!resp.ok) {
+            console.error('Face trigger failed:', resp.status, await resp.text().catch(() => ''));
+          } else {
+            const data = await resp.json().catch(() => null);
+            console.log('Face trigger result:', data);
+          }
+        })
+        .catch((err) => {
+          console.error('Face trigger error:', err);
+        });
     }
   }
 

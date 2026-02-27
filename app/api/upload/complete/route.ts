@@ -97,15 +97,16 @@ export async function POST(request: NextRequest) {
         });
 
         // Fire-and-forget: trigger face processing immediately
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
-        const triggerUrl = `${baseUrl}/api/face/trigger`;
-        fetch(triggerUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
-          },
-        }).catch(() => {}); // Non-blocking, ignore errors
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+        if (baseUrl) {
+          fetch(`${baseUrl}/api/face/trigger`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
+            },
+          }).catch((err) => console.error('Face trigger fire-and-forget error:', err));
+        }
       } catch (jobErr) {
         // Don't fail the upload if face job creation fails
         console.error('Failed to enqueue face processing job:', jobErr);
