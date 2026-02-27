@@ -560,6 +560,7 @@ export function GalleryPageClient({
             {!revoked && media.length > 0 && faceSearchEnabled && (
                 <FaceSearchToggle
                     active={faceSearchActive}
+                    hasSearched={faceSearchResults !== null && faceSearchResults.length > 0}
                     onToggle={handleFaceToggle}
                 />
             )}
