@@ -20,6 +20,7 @@ export default async function PermissionsPage({ params }: { params: Promise<{ ev
         initialAllowSlideshow={event.allow_slideshow ?? true}
         initialPhotoOrder={event.photo_order ?? 'oldest_first'}
         initialFaceSearchEnabled={event.face_search_enabled ?? false}
+        initialShowFaceScores={event.show_face_scores ?? false}
       />
     </div>
   );

@@ -82,13 +82,15 @@ interface PermissionsFormProps {
     initialAllowSlideshow: boolean;
     initialPhotoOrder: 'oldest_first' | 'newest_first';
     initialFaceSearchEnabled: boolean;
+    initialShowFaceScores: boolean;
 }
 
-export default function PermissionsForm({ eventId, initialAllowDownload, initialAllowSlideshow, initialPhotoOrder, initialFaceSearchEnabled }: PermissionsFormProps) {
+export default function PermissionsForm({ eventId, initialAllowDownload, initialAllowSlideshow, initialPhotoOrder, initialFaceSearchEnabled, initialShowFaceScores }: PermissionsFormProps) {
     const [downloadAccess, setDownloadAccess] = useState<'everyone' | 'no_one'>(initialAllowDownload ? 'everyone' : 'no_one');
     const [slideshowEnabled, setSlideshowEnabled] = useState(initialAllowSlideshow);
     const [photoOrder, setPhotoOrder] = useState<'oldest_first' | 'newest_first'>(initialPhotoOrder);
     const [faceSearchEnabled, setFaceSearchEnabled] = useState(initialFaceSearchEnabled);
+    const [showFaceScores, setShowFaceScores] = useState(initialShowFaceScores);
     const [faceProgress, setFaceProgress] = useState<FaceProcessingProgress | null>(null);
 
     // Future proofing UI state (not yet connected to real columns)
@@ -101,6 +103,7 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
     const [isSlideshowPending, startSlideshowTransition] = useTransition();
     const [isPhotoOrderPending, startPhotoOrderTransition] = useTransition();
     const [isFaceSearchPending, startFaceSearchTransition] = useTransition();
+    const [isFaceScoresPending, startFaceScoresTransition] = useTransition();
 
     // Optimistic updates could be added, but simple transition is fine for settings
 
@@ -175,6 +178,23 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                 console.error(err);
                 setFaceSearchEnabled(prevVal);
                 setError('Failed to update face search settings');
+            }
+        });
+    };
+
+    const handleShowFaceScoresChange = (checked: boolean) => {
+        const prevVal = showFaceScores;
+        setShowFaceScores(checked);
+        setError(null);
+
+        startFaceScoresTransition(async () => {
+            try {
+                const result = await updateEventPermissions(eventId, { showFaceScores: checked });
+                if (result.error) throw new Error(result.error);
+            } catch (err) {
+                console.error(err);
+                setShowFaceScores(prevVal);
+                setError('Failed to update face score display settings');
             }
         });
     };
@@ -352,6 +372,19 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                         <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-100">
                             <p className="text-sm text-gray-500">
                                 No photos have been queued for face processing yet. Photos will be processed when uploaded or when the processing pipeline runs.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Show Face Scores Sub-toggle */}
+                    {faceSearchEnabled && (
+                        <div className={`mt-4 pl-4 border-l-2 border-gray-200 ${isFaceScoresPending ? 'opacity-60 pointer-events-none' : ''}`}>
+                            <div className="flex items-center gap-3 mb-1">
+                                <Toggle checked={showFaceScores} onChange={handleShowFaceScoresChange} />
+                                <span className="text-sm text-gray-600">Show confidence scores</span>
+                            </div>
+                            <p className="text-sm text-gray-400">
+                                Display match confidence scores on gallery thumbnails when visitors use face search.
                             </p>
                         </div>
                     )}

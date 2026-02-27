@@ -15,9 +15,10 @@ interface GalleryGridProps {
     initialPhotoId?: string;
     allowDownload?: boolean;
     loading?: boolean;
+    showFaceScores?: boolean;
 }
 
-export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhotoId, allowDownload = true, loading = false }: GalleryGridProps) {
+export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhotoId, allowDownload = true, loading = false, showFaceScores = false }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -139,6 +140,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
                                 key={item.id}
                                 item={item}
                                 onClick={() => openLightbox(item.id)}
+                                showFaceScores={showFaceScores}
                             />
                         ))}
                     </div>
@@ -166,9 +168,11 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
 function MasonryThumbnail({
     item,
     onClick,
+    showFaceScores = false,
 }: {
     item: GalleryMediaItem;
     onClick: () => void;
+    showFaceScores?: boolean;
 }) {
     const [loaded, setLoaded] = useState(false);
     const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
@@ -207,8 +211,8 @@ function MasonryThumbnail({
                 className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-            {/* DEBUG: face search score overlay — TEMPORARY, remove before production */}
-            {item._debugScore !== undefined && (
+            {/* Face search score overlay — controlled by event permissions */}
+            {showFaceScores && item._debugScore !== undefined && (
                 <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold leading-none"
                     style={{
                         background: item._debugScore >= 0.40 ? 'rgba(34,197,94,0.85)' : item._debugScore >= 0.29 ? 'rgba(234,179,8,0.85)' : 'rgba(239,68,68,0.85)',

@@ -409,6 +409,7 @@ export async function updateEventPermissions(eventId: string, payload: {
   allowDownload?: boolean;
   allowSlideshow?: boolean;
   faceSearchEnabled?: boolean;
+  showFaceScores?: boolean;
   allowDownloadRequest?: boolean; // Future proofing
   allowViewRequest?: boolean;     // Future proofing
   downloadAccess?: 'everyone' | 'no_one';
@@ -427,6 +428,7 @@ export async function updateEventPermissions(eventId: string, payload: {
   if (typeof payload.allowDownload !== 'undefined') updates.allow_download = payload.allowDownload;
   if (typeof payload.allowSlideshow !== 'undefined') updates.allow_slideshow = payload.allowSlideshow;
   if (typeof payload.faceSearchEnabled !== 'undefined') updates.face_search_enabled = payload.faceSearchEnabled;
+  if (typeof payload.showFaceScores !== 'undefined') updates.show_face_scores = payload.showFaceScores;
 
   const { error } = await supabase
     .from('events')

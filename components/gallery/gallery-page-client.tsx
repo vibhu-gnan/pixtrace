@@ -28,6 +28,7 @@ interface GalleryPageClientProps {
     coverUrl?: string;
     mobileCoverUrl?: string;
     faceSearchEnabled?: boolean;
+    showFaceScores?: boolean;
 }
 
 export function GalleryPageClient({
@@ -45,6 +46,7 @@ export function GalleryPageClient({
     coverUrl,
     mobileCoverUrl,
     faceSearchEnabled = false,
+    showFaceScores = false,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -553,7 +555,7 @@ export function GalleryPageClient({
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className={`pt-1 relative${faceSearchActive ? ' pb-16' : ''}`}>
-                <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} />
+                <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} showFaceScores={showFaceScores} />
 
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.
