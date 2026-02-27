@@ -9,7 +9,20 @@ export async function GET(request: NextRequest) {
   const redirect = searchParams.get('redirect') || '/dashboard';
 
   // Prevent open redirect - only allow relative paths
-  const safeRedirect = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/dashboard';
+  let safeRedirect = '/dashboard';
+  if (redirect.startsWith('/') && !redirect.startsWith('//')) {
+    safeRedirect = redirect;
+  } else {
+    // Handle full URLs from the same origin (e.g. gallery auth passes full URL)
+    try {
+      const redirectUrl = new URL(redirect);
+      if (redirectUrl.origin === origin) {
+        safeRedirect = redirectUrl.pathname + redirectUrl.search;
+      }
+    } catch {
+      // Invalid URL, keep default /dashboard
+    }
+  }
 
   if (code) {
     try {

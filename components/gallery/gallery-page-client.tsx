@@ -214,7 +214,7 @@ export function GalleryPageClient({
         setAuthModalOpen(false);
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('face', '1');
-        signInWithGoogle(currentUrl.toString());
+        signInWithGoogle(currentUrl.pathname + currentUrl.search);
     }, [signInWithGoogle]);
 
     // Track gallery view — fire exactly once, guarded against StrictMode double-mount
