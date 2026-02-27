@@ -27,6 +27,7 @@ export interface EventData {
   allow_download?: boolean;
   allow_slideshow?: boolean;
   face_search_enabled?: boolean;
+  show_face_scores?: boolean;
   photo_order?: 'oldest_first' | 'newest_first';
 }
 
