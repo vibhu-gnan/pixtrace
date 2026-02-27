@@ -32,6 +32,7 @@ export interface GalleryEvent {
     allow_download?: boolean;
     allow_slideshow?: boolean;
     face_search_enabled?: boolean;
+    show_face_scores?: boolean;
 }
 
 export interface GalleryMediaItem {
