@@ -233,8 +233,8 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    const tier1Results = tier1.map(buildResult).filter(Boolean);
-    const tier2Results = tier2.map(buildResult).filter(Boolean);
+    const tier1Results = tier1.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult).filter(Boolean);
+    const tier2Results = tier2.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult).filter(Boolean);
 
     return NextResponse.json({
       tier1: tier1Results,

@@ -10,8 +10,10 @@ export const FACE_SEARCH = {
   GAMMA: 0.5,
   /** Tier 1 threshold — high confidence, used for prototype building */
   TIER_1_THRESHOLD: 0.40,
-  /** Tier 2 threshold — wider net for borderline matches */
+  /** Tier 2 threshold — wider net for borderline matches (used internally for prototype building) */
   TIER_2_THRESHOLD: 0.29,
+  /** Display threshold — minimum score to show a photo in gallery results */
+  DISPLAY_THRESHOLD: 0.55,
   /** Maximum refinement cycles for prototype iteration */
   REFINEMENT_CYCLES: 3,
   /** Max candidates to retrieve from pgvector per query */

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { FACE_SEARCH } from '@/lib/face/constants';
 import { runRecallSearch } from '@/lib/face/recall-search';
 import { getThumbnailUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
@@ -120,8 +121,8 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    const tier1Results = tier1.map(buildResult).filter(Boolean);
-    const tier2Results = tier2.map(buildResult).filter(Boolean);
+    const tier1Results = tier1.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult).filter(Boolean);
+    const tier2Results = tier2.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult).filter(Boolean);
 
     return NextResponse.json({
       has_profile: true,
