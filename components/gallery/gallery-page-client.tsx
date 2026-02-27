@@ -9,7 +9,6 @@ import { GallerySkeleton } from './gallery-skeleton';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
 import { FaceSearchToggle } from './face-search-toggle';
-import { GalleryAuthModal } from './gallery-auth-modal';
 import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
 import { useFaceProfile } from '@/lib/face/use-face-profile';
 import type { FaceSearchResult, FaceSearchResults } from '@/lib/face/use-face-search';
@@ -62,8 +61,7 @@ export function GalleryPageClient({
     const faceSearchActiveRef = useRef(false);
 
     // Auth + face profile state
-    const [authModalOpen, setAuthModalOpen] = useState(false);
-    const { user, accessToken, loading: authLoading, signInWithGoogle } = useGalleryAuth();
+    const { user, accessToken, loading: authLoading } = useGalleryAuth();
     const { hasProfile, loading: recalling, recallResults, checkProfile, runRecall } = useFaceProfile(eventHash, accessToken);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
@@ -93,28 +91,6 @@ export function GalleryPageClient({
         }
     }, [user, faceSearchEnabled, authLoading, checkProfile]);
 
-    // ── Handle post-OAuth redirect: auto-open selfie if ?face=1 ──
-    const faceIntentHandledRef = useRef(false);
-    useEffect(() => {
-        if (faceIntentHandledRef.current || authLoading || !faceSearchEnabled) return;
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('face') !== '1') return;
-        if (!user) return; // wait for auth to resolve
-
-        faceIntentHandledRef.current = true;
-
-        // Clean up URL param
-        const url = new URL(window.location.href);
-        url.searchParams.delete('face');
-        window.history.replaceState({}, '', url.toString());
-
-        // Check profile; if none exists, open selfie modal
-        checkProfile().then((profileExists) => {
-            if (!profileExists) {
-                setFaceSearchOpen(true);
-            }
-        });
-    }, [user, authLoading, faceSearchEnabled, checkProfile]);
 
     // ── Handle recall results → set as face search results ──
     useEffect(() => {
@@ -189,17 +165,11 @@ export function GalleryPageClient({
             setTimeout(() => {
                 document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
-        } else if (!user) {
-            // Not authenticated — show auth modal
-            setAuthModalOpen(true);
-        } else if (hasProfile) {
-            // Authenticated + has stored profile — run recall search
-            runRecall();
         } else {
-            // Authenticated + no profile — open selfie modal
+            // Open selfie modal directly — no auth required
             setFaceSearchOpen(true);
         }
-    }, [faceSearchActive, faceSearchResults, user, hasProfile, handleDismissFaceSearch, runRecall]);
+    }, [faceSearchActive, faceSearchResults, handleDismissFaceSearch]);
 
     // Re-scan handler: retake selfie to update stored profile
     const handleRescan = useCallback(() => {
@@ -209,13 +179,6 @@ export function GalleryPageClient({
         setFaceSearchOpen(true);
     }, []);
 
-    // Handle auth modal sign-in
-    const handleAuthSignIn = useCallback(() => {
-        setAuthModalOpen(false);
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('face', '1');
-        signInWithGoogle(currentUrl.pathname + currentUrl.search);
-    }, [signInWithGoogle]);
 
     // Track gallery view — fire exactly once, guarded against StrictMode double-mount
     const viewTrackedRef = useRef(false);
@@ -655,14 +618,6 @@ export function GalleryPageClient({
                     eventName={eventName}
                     logoUrl={logoUrl}
                     galleryUrl={typeof window !== 'undefined' ? getGalleryUrl() : ''}
-                />
-            )}
-
-            {/* Gallery Auth Modal — Google sign-in for face search */}
-            {authModalOpen && (
-                <GalleryAuthModal
-                    onSignIn={handleAuthSignIn}
-                    onClose={() => setAuthModalOpen(false)}
                 />
             )}
 
