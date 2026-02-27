@@ -104,7 +104,7 @@ export async function runFaceSearch(
   supabase: SupabaseClient,
   selfieEmbedding: number[],
   eventId: string,
-): Promise<{ tier1: FaceMatch[]; tier2: FaceMatch[] }> {
+): Promise<{ tier1: FaceMatch[]; tier2: FaceMatch[]; prototype: number[] }> {
   const {
     TIER_1_THRESHOLD,
     TIER_2_THRESHOLD,
@@ -216,5 +216,5 @@ export async function runFaceSearch(
   tier1.sort((a, b) => b.score - a.score);
   tier2.sort((a, b) => b.score - a.score);
 
-  return { tier1, tier2 };
+  return { tier1, tier2, prototype: currentProto };
 }

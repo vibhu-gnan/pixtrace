@@ -6,16 +6,18 @@ import { SelfieCamera } from './selfie-camera';
 
 interface FaceSearchModalProps {
   eventHash: string;
+  accessToken?: string | null;
   onResults: (results: FaceSearchResults) => void;
   onClose: () => void;
 }
 
 export function FaceSearchModal({
   eventHash,
+  accessToken,
   onResults,
   onClose,
 }: FaceSearchModalProps) {
-  const { state, setState, results, error, search, reset } = useFaceSearch(eventHash);
+  const { state, setState, results, error, search, reset } = useFaceSearch(eventHash, accessToken);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const selfieBlobRef = useRef<Blob | null>(null);
   const deliveredRef = useRef(false);

@@ -120,12 +120,68 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Run 3-iteration refinement search
+    // Optionally extract auth user for profile saving
+    const authHeader = request.headers.get('Authorization');
+    let authUserId: string | null = null;
+    let authUserEmail: string | null = null;
+    let authUserName: string | null = null;
+
     const adminClient = createAdminClient();
-    const { tier1, tier2 } = await runFaceSearch(adminClient, selfieEmbedding, event.id);
+
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { data: { user: authUser } } = await adminClient.auth.getUser(token);
+      if (authUser) {
+        authUserId = authUser.id;
+        authUserEmail = authUser.email || null;
+        authUserName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || null;
+      }
+    }
+
+    // Run 3-iteration refinement search
+    const { tier1, tier2, prototype } = await runFaceSearch(adminClient, selfieEmbedding, event.id);
 
     // Collect all matching media_ids
     const allMatches = [...tier1, ...tier2];
+
+    // Save face profile if user is authenticated and search produced results
+    if (authUserId && prototype && allMatches.length > 0) {
+      try {
+        const { data: galleryUser } = await adminClient
+          .from('gallery_users')
+          .upsert(
+            {
+              auth_id: authUserId,
+              email: authUserEmail || 'unknown',
+              name: authUserName,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'auth_id' }
+          )
+          .select('id')
+          .single();
+
+        if (galleryUser) {
+          const pgVector = `[${prototype.join(',')}]`;
+          await adminClient
+            .from('face_search_profiles')
+            .upsert(
+              {
+                gallery_user_id: galleryUser.id,
+                event_id: event.id,
+                prototype_embedding: pgVector,
+                match_count: allMatches.length,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'gallery_user_id,event_id' }
+            );
+        }
+      } catch (err) {
+        // Non-critical: log but don't fail the search
+        console.error('Failed to save face profile:', err);
+      }
+    }
+
     if (allMatches.length === 0) {
       return NextResponse.json({
         tier1: [],

@@ -23,7 +23,7 @@ export interface FaceSearchResults {
   searchTimeMs: number;
 }
 
-export function useFaceSearch(eventHash: string) {
+export function useFaceSearch(eventHash: string, accessToken?: string | null) {
   const [state, setState] = useState<FaceSearchState>('idle');
   const [results, setResults] = useState<FaceSearchResults | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +38,15 @@ export function useFaceSearch(eventHash: string) {
       formData.append('eventHash', eventHash);
       if (albumId) formData.append('albumId', albumId);
 
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const resp = await fetch('/api/face/search', {
         method: 'POST',
         body: formData,
+        headers,
       });
 
       const data = await resp.json();
@@ -70,7 +76,7 @@ export function useFaceSearch(eventHash: string) {
       setError('Unable to connect to face search service. Please try again later.');
       setState('error');
     }
-  }, [eventHash]);
+  }, [eventHash, accessToken]);
 
   const reset = useCallback(() => {
     setState('idle');

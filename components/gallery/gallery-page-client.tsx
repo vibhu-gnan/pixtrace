@@ -9,6 +9,9 @@ import { GallerySkeleton } from './gallery-skeleton';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
 import { FaceSearchToggle } from './face-search-toggle';
+import { GalleryAuthModal } from './gallery-auth-modal';
+import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
+import { useFaceProfile } from '@/lib/face/use-face-profile';
 import type { FaceSearchResult, FaceSearchResults } from '@/lib/face/use-face-search';
 
 interface GalleryPageClientProps {
@@ -58,6 +61,11 @@ export function GalleryPageClient({
     const [faceSearchActive, setFaceSearchActive] = useState(false);
     const faceSearchActiveRef = useRef(false);
 
+    // Auth + face profile state
+    const [authModalOpen, setAuthModalOpen] = useState(false);
+    const { user, accessToken, loading: authLoading, signInWithGoogle } = useGalleryAuth();
+    const { hasProfile, loading: recalling, recallResults, checkProfile, runRecall } = useFaceProfile(eventHash, accessToken);
+
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
     const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,6 +83,52 @@ export function GalleryPageClient({
 
     // Keep face search ref in sync
     useEffect(() => { faceSearchActiveRef.current = faceSearchActive; }, [faceSearchActive]);
+
+    // ── Check for face profile when user is authenticated ──
+    const profileCheckedRef = useRef(false);
+    useEffect(() => {
+        if (user && faceSearchEnabled && !authLoading && !profileCheckedRef.current) {
+            profileCheckedRef.current = true;
+            checkProfile();
+        }
+    }, [user, faceSearchEnabled, authLoading, checkProfile]);
+
+    // ── Handle post-OAuth redirect: auto-open selfie if ?face=1 ──
+    const faceIntentHandledRef = useRef(false);
+    useEffect(() => {
+        if (faceIntentHandledRef.current || authLoading || !faceSearchEnabled) return;
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('face') !== '1') return;
+        if (!user) return; // wait for auth to resolve
+
+        faceIntentHandledRef.current = true;
+
+        // Clean up URL param
+        const url = new URL(window.location.href);
+        url.searchParams.delete('face');
+        window.history.replaceState({}, '', url.toString());
+
+        // Check profile; if none exists, open selfie modal
+        checkProfile().then((profileExists) => {
+            if (!profileExists) {
+                setFaceSearchOpen(true);
+            }
+        });
+    }, [user, authLoading, faceSearchEnabled, checkProfile]);
+
+    // ── Handle recall results → set as face search results ──
+    useEffect(() => {
+        if (recallResults && recallResults.totalMatches > 0) {
+            const allResults = [...recallResults.tier1, ...recallResults.tier2];
+            setFaceSearchResults(allResults);
+            setFaceSearchActive(true);
+            faceSearchActiveRef.current = true;
+            setActiveAlbum(null);
+            setTimeout(() => {
+                document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+    }, [recallResults]);
 
     // Derive display media: face search results or normal gallery
     const displayMedia = useMemo(() => {
@@ -134,11 +188,33 @@ export function GalleryPageClient({
             setTimeout(() => {
                 document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
+        } else if (!user) {
+            // Not authenticated — show auth modal
+            setAuthModalOpen(true);
+        } else if (hasProfile) {
+            // Authenticated + has stored profile — run recall search
+            runRecall();
         } else {
-            // No cached results — open selfie modal
+            // Authenticated + no profile — open selfie modal
             setFaceSearchOpen(true);
         }
-    }, [faceSearchActive, faceSearchResults, handleDismissFaceSearch]);
+    }, [faceSearchActive, faceSearchResults, user, hasProfile, handleDismissFaceSearch, runRecall]);
+
+    // Re-scan handler: retake selfie to update stored profile
+    const handleRescan = useCallback(() => {
+        setFaceSearchActive(false);
+        faceSearchActiveRef.current = false;
+        setFaceSearchResults(null);
+        setFaceSearchOpen(true);
+    }, []);
+
+    // Handle auth modal sign-in
+    const handleAuthSignIn = useCallback(() => {
+        setAuthModalOpen(false);
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('face', '1');
+        signInWithGoogle(currentUrl.toString());
+    }, [signInWithGoogle]);
 
     // Track gallery view — fire exactly once, guarded against StrictMode double-mount
     const viewTrackedRef = useRef(false);
@@ -343,6 +419,7 @@ export function GalleryPageClient({
         const url = new URL(window.location.href);
         url.searchParams.delete('album');
         url.searchParams.delete('photo');
+        url.searchParams.delete('face');
         return url.toString();
     }, []);
 
@@ -561,7 +638,10 @@ export function GalleryPageClient({
                 <FaceSearchToggle
                     active={faceSearchActive}
                     hasSearched={faceSearchResults !== null && faceSearchResults.length > 0}
+                    hasProfile={hasProfile}
+                    recalling={recalling}
                     onToggle={handleFaceToggle}
+                    onRescan={user ? handleRescan : undefined}
                 />
             )}
 
@@ -577,10 +657,19 @@ export function GalleryPageClient({
                 />
             )}
 
+            {/* Gallery Auth Modal — Google sign-in for face search */}
+            {authModalOpen && (
+                <GalleryAuthModal
+                    onSignIn={handleAuthSignIn}
+                    onClose={() => setAuthModalOpen(false)}
+                />
+            )}
+
             {/* Face Search Modal — selfie capture + confirm + loading */}
             {faceSearchOpen && (
                 <FaceSearchModal
                     eventHash={eventHash}
+                    accessToken={accessToken}
                     onResults={handleFaceSearchResults}
                     onClose={() => setFaceSearchOpen(false)}
                 />
