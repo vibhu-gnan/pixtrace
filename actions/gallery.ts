@@ -47,6 +47,8 @@ export interface GalleryMediaItem {
     full_url: string;
     original_url: string;
     created_at?: string;
+    /** DEBUG: face search combined score — TEMPORARY, remove before production */
+    _debugScore?: number;
 }
 
 const PAGE_SIZE = 30;

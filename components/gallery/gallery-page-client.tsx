@@ -148,6 +148,7 @@ export function GalleryPageClient({
             full_url: r.full_url,
             original_url: r.original_url,
             created_at: undefined,
+            _debugScore: r.score, // DEBUG: temporary score overlay
         }));
         if (activeAlbum) {
             mapped = mapped.filter(m => m.album_id === activeAlbum);

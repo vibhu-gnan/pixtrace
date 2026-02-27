@@ -207,6 +207,17 @@ function MasonryThumbnail({
                 className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+            {/* DEBUG: face search score overlay — TEMPORARY, remove before production */}
+            {item._debugScore !== undefined && (
+                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold leading-none"
+                    style={{
+                        background: item._debugScore >= 0.40 ? 'rgba(34,197,94,0.85)' : item._debugScore >= 0.29 ? 'rgba(234,179,8,0.85)' : 'rgba(239,68,68,0.85)',
+                        color: 'white',
+                    }}
+                >
+                    {item._debugScore.toFixed(3)}
+                </div>
+            )}
         </div>
     );
 }
