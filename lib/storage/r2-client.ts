@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // R2 S3-compatible client
 export const r2Client = new S3Client({
@@ -13,14 +14,35 @@ export const r2Client = new S3Client({
 export const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!;
 
 /**
- * Get public URL for R2 object
- * If using custom domain, replace with your domain
+ * Generate a presigned GET URL for reading from the private R2 bucket.
+ * Signing is local (HMAC, no network call) — ~0.1ms per URL.
+ * @param key R2 object key
+ * @param expiresIn Seconds until URL expires (default: 4 hours)
  */
-export function getR2PublicUrl(key: string): string {
-  if (process.env.R2_PUBLIC_URL) {
-    return `${process.env.R2_PUBLIC_URL}/${key}`;
+export async function getSignedR2Url(key: string, expiresIn = 14400): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+  });
+  return getSignedUrl(r2Client, command, { expiresIn });
+}
+
+/**
+ * Fetch an R2 object directly via the SDK (for server-side proxy routes).
+ * Returns the response body as a Uint8Array.
+ */
+export async function getR2Object(key: string): Promise<{ body: Uint8Array; contentType: string }> {
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+  });
+  const response = await r2Client.send(command);
+  if (!response.Body) {
+    throw new Error(`R2 object has no body: ${key}`);
   }
-  return `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev/${key}`;
+  const body = await response.Body.transformToByteArray();
+  const contentType = response.ContentType || 'application/octet-stream';
+  return { body, contentType };
 }
 
 /**

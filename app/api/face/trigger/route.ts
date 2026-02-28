@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { FACE_SEARCH } from '@/lib/face/constants';
-import { getR2PublicUrl } from '@/lib/storage/r2-client';
+import { getSignedR2Url } from '@/lib/storage/r2-client';
+import crypto from 'crypto';
 
 export const maxDuration = 300; // 5 min — Modal cold starts can take 2+ min
 
 export async function POST(request: NextRequest) {
-  // Verify shared secret
+  // Verify shared secret (timing-safe comparison)
   const secret = request.headers.get('X-Face-Secret') || '';
-  if (secret !== process.env.FACE_PROCESSING_SECRET) {
+  const expected = process.env.FACE_PROCESSING_SECRET || '';
+  if (!expected || !secret) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  const secretBuf = Buffer.from(secret);
+  const expectedBuf = Buffer.from(expected);
+  if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
     // Group by event_id for batched Modal calls
     const batches = new Map<string, { media_id: string; r2_url: string }[]>();
     for (const item of mediaItems) {
-      const r2Url = getR2PublicUrl(item.r2_key);
+      const r2Url = await getSignedR2Url(item.r2_key);
       const eventId = item.event_id;
       if (!batches.has(eventId)) batches.set(eventId, []);
       batches.get(eventId)!.push({ media_id: item.id, r2_url: r2Url });

@@ -105,15 +105,16 @@ export async function POST(request: NextRequest) {
 
     const mediaMap = new Map(mediaItems.map(m => [m.id, m]));
 
-    const buildResult = (match: typeof allMatches[0]) => {
+    const buildResult = async (match: typeof allMatches[0]) => {
       const m = mediaMap.get(match.mediaId);
       if (!m) return null;
       return {
         media_id: m.id,
         album_id: m.album_id,
-        thumbnail_url: getThumbnailUrl(m.r2_key, 200, m.preview_r2_key),
-        full_url: getPreviewUrl(m.r2_key, m.preview_r2_key),
-        original_url: getOriginalUrl(m.r2_key),
+        r2_key: m.r2_key,
+        thumbnail_url: await getThumbnailUrl(m.r2_key, 200, m.preview_r2_key),
+        full_url: await getPreviewUrl(m.r2_key, m.preview_r2_key),
+        original_url: await getOriginalUrl(m.r2_key),
         width: m.width,
         height: m.height,
         score: Math.round(match.score * 1000) / 1000,
@@ -121,8 +122,8 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    const tier1Results = tier1.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult).filter(Boolean);
-    const tier2Results = tier2.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult).filter(Boolean);
+    const tier1Results = (await Promise.all(tier1.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult))).filter(Boolean);
+    const tier2Results = (await Promise.all(tier2.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult))).filter(Boolean);
 
     return NextResponse.json({
       has_profile: true,

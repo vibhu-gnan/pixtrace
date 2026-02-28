@@ -1,38 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getR2Object } from '@/lib/storage/r2-client';
 
-const ALLOWED_HOSTS = [
-  'pub-326a39b9ee76449da28abc06e2fe351a.r2.dev',
-];
+const ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+const MAX_PROXY_SIZE = 25 * 1024 * 1024; // 25MB max
 
 export async function GET(request: NextRequest) {
-  const url = request.nextUrl.searchParams.get('url');
-  if (!url) {
-    return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 });
+  const r2Key = request.nextUrl.searchParams.get('r2Key');
+  if (!r2Key) {
+    return NextResponse.json({ error: 'Missing r2Key parameter' }, { status: 400 });
   }
 
-  let parsed: URL;
+  // Basic path-traversal prevention
+  if (r2Key.includes('..') || r2Key.startsWith('/')) {
+    return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
+  }
+
   try {
-    parsed = new URL(url);
-  } catch {
-    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    const { body, contentType } = await getR2Object(r2Key);
+
+    if (body.byteLength > MAX_PROXY_SIZE) {
+      return NextResponse.json({ error: 'File too large' }, { status: 413 });
+    }
+
+    const safeContentType = ALLOWED_CONTENT_TYPES.find(t => contentType.startsWith(t)) || 'image/jpeg';
+
+    return new NextResponse(Buffer.from(body), {
+      headers: {
+        'Content-Type': safeContentType,
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Length': body.byteLength.toString(),
+      },
+    });
+  } catch (err) {
+    console.error('Proxy image error:', err);
+    return NextResponse.json({ error: 'Image not found' }, { status: 404 });
   }
-
-  if (!ALLOWED_HOSTS.includes(parsed.hostname)) {
-    return NextResponse.json({ error: 'Host not allowed' }, { status: 403 });
-  }
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    return NextResponse.json({ error: 'Upstream fetch failed' }, { status: 502 });
-  }
-
-  const contentType = res.headers.get('content-type') || 'image/jpeg';
-  const buffer = await res.arrayBuffer();
-
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=86400',
-    },
-  });
 }

@@ -72,7 +72,7 @@ export function EventLogoSettings({ eventId, initialLogoUrl, initialLogoDisplay 
             });
 
             if (!res.ok) throw new Error('Failed to get upload URL');
-            const { uploadUrl, url } = await res.json();
+            const { uploadUrl, key } = await res.json();
 
             // 2. Upload to R2
             const uploadRes = await fetch(uploadUrl, {
@@ -83,11 +83,12 @@ export function EventLogoSettings({ eventId, initialLogoUrl, initialLogoDisplay 
 
             if (!uploadRes.ok) throw new Error('Failed to upload file');
 
-            // 3. Update event in DB
-            const result = await updateEventLogo(eventId, url);
+            // 3. Update event in DB (store R2 key, not public URL)
+            const result = await updateEventLogo(eventId, key);
             if (result.error) throw new Error(result.error);
 
-            setLogoUrl(url);
+            // Use proxy URL for immediate preview
+            setLogoUrl(`/api/proxy-image?r2Key=${encodeURIComponent(key)}`);
             // Default to cover_and_loading for new logos
             if (logoDisplay === 'none') {
                 setLogoDisplay('cover_and_loading');

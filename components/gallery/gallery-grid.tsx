@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PhotoLightbox } from '@/components/event/photo-lightbox';
 import type { GalleryMediaItem } from '@/actions/gallery';
 import type { MediaItem } from '@/actions/media';
@@ -43,7 +43,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
         return () => window.removeEventListener('resize', updateColumns);
     }, []);
 
-    const images = media.filter((m) => m.media_type === 'image');
+    const images = useMemo(() => media.filter((m) => m.media_type === 'image'), [media]);
 
     // Build index map for lightbox (must be above early return to satisfy hooks rules)
     const indexMap = useMemo(() => {
@@ -70,7 +70,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
         id: img.id,
         album_id: img.album_id,
         event_id: '',
-        r2_key: '',
+        r2_key: img.r2_key,
         original_filename: img.original_filename,
         media_type: img.media_type,
         mime_type: null,
@@ -84,6 +84,31 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
         full_url: img.full_url,
         original_url: img.original_url,
     })), [images]);
+
+    // Distribute images into columns for masonry layout (memoized for perf with 500+ images)
+    // Must be before early return to satisfy hooks rules
+    const columnArrays = useMemo(() => {
+        const cols: GalleryMediaItem[][] = Array.from({ length: columns }, () => []);
+        const colHeights = new Array(columns).fill(0);
+
+        images.forEach((img) => {
+            const minIdx = colHeights.indexOf(Math.min(...colHeights));
+            cols[minIdx].push(img);
+            const w = img.width || 3;
+            const h = img.height || 4;
+            colHeights[minIdx] += h / w;
+        });
+
+        return cols;
+    }, [images, columns]);
+
+    const openLightbox = useCallback((imageId: string) => {
+        const idx = indexMap.get(imageId);
+        if (idx !== undefined) {
+            setLightboxIndex(idx);
+            setLightboxOpen(true);
+        }
+    }, [indexMap]);
 
     if (images.length === 0) {
         // Show spinner while loading (e.g. album switch), empty state only when truly empty
@@ -107,26 +132,6 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
                 <p className="text-sm text-gray-400">Photos will appear here once they are uploaded.</p>
             </div>
         );
-    }
-
-    // Distribute images into columns for masonry layout
-    const columnArrays: GalleryMediaItem[][] = Array.from({ length: columns }, () => []);
-    const columnHeights = new Array(columns).fill(0);
-
-    images.forEach((img) => {
-        const minIdx = columnHeights.indexOf(Math.min(...columnHeights));
-        columnArrays[minIdx].push(img);
-        const w = img.width || 3;
-        const h = img.height || 4;
-        columnHeights[minIdx] += h / w;
-    });
-
-    function openLightbox(imageId: string) {
-        const idx = indexMap.get(imageId);
-        if (idx !== undefined) {
-            setLightboxIndex(idx);
-            setLightboxOpen(true);
-        }
     }
 
     return (

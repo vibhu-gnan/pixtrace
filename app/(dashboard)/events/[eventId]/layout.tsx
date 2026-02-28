@@ -28,7 +28,7 @@ export default async function EventLayout({
       .eq('id', event.cover_media_id)
       .single();
     if (mediaRow) {
-      coverPreviewUrl = getPreviewUrl(mediaRow.r2_key, mediaRow.preview_r2_key);
+      coverPreviewUrl = await getPreviewUrl(mediaRow.r2_key, mediaRow.preview_r2_key);
     }
   }
 

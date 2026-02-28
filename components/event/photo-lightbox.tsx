@@ -510,7 +510,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     setDownloadSuccess(false);
 
     try {
-      const downloadUrl = `/api/download?url=${encodeURIComponent(currentPhoto.original_url)}&filename=${encodeURIComponent(currentPhoto.original_filename)}`;
+      const downloadUrl = `/api/download?r2Key=${encodeURIComponent(currentPhoto.r2_key)}&filename=${encodeURIComponent(currentPhoto.original_filename)}`;
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = currentPhoto.original_filename;
@@ -698,6 +698,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
         isOpen={shareSheetOpen}
         onClose={() => setShareSheetOpen(false)}
         photoUrl={currentPhoto.full_url}
+        photoR2Key={currentPhoto.r2_key}
         eventName={eventName}
         logoUrl={logoUrl}
         galleryUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/gallery/${eventHash}`}

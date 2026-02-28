@@ -39,6 +39,7 @@ export interface GalleryMediaItem {
     id: string;
     album_id: string;
     album_name: string;
+    r2_key: string;
     original_filename: string;
     media_type: 'image' | 'video';
     width: number | null;
@@ -69,6 +70,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     albums: { id: string; name: string }[];
     totalCount: number;
     coverUrl: string | null;
+    coverR2Key: string | null;
     heroSlides: HeroSlide[];
     mobileHeroSlides: HeroSlide[];  // portrait/mobile override — empty means use heroSlides
     heroMode: HeroMode;
@@ -98,36 +100,39 @@ export async function getPublicGallery(identifier: string): Promise<{
         .single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first' };
+        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first' };
     }
 
-    // 2. Fetch albums for this event
-    const { data: albums } = await (supabase
-        .from('albums')
-        .select('id, name, sort_order')
-        .eq('event_id', event.id)
-        .order('sort_order', { ascending: true }) as unknown as Promise<{ data: AlbumRow[] | null; error: unknown }>);
-
-    // 3. Get total count of media
-    const { count } = await supabase
-        .from('media')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', event.id);
-
-    // 4. Fetch first page of media (order controlled by theme.photo_order)
+    // 2-4. Fetch albums, count, and first page of media in parallel (3 independent queries)
     const photoOrderSetting = resolvePhotoOrder(event.theme);
     const ascending = photoOrderSetting !== 'newest_first';
 
-    const { data: mediaRows, error: mediaError } = await (supabase
-        .from('media')
-        .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
-        .eq('event_id', event.id)
-        .order('created_at', { ascending })
-        .range(0, PAGE_SIZE - 1) as unknown as Promise<{ data: MediaRow[] | null; error: unknown }>);
+    const [albumsResult, countResult, mediaResult] = await Promise.all([
+        supabase
+            .from('albums')
+            .select('id, name, sort_order')
+            .eq('event_id', event.id)
+            .order('sort_order', { ascending: true }) as unknown as Promise<{ data: AlbumRow[] | null; error: unknown }>,
+        supabase
+            .from('media')
+            .select('id', { count: 'exact', head: true })
+            .eq('event_id', event.id),
+        supabase
+            .from('media')
+            .select('id, album_id, r2_key, original_filename, media_type, width, height, thumbnail_r2_key, preview_r2_key, created_at')
+            .eq('event_id', event.id)
+            .order('created_at', { ascending })
+            .range(0, PAGE_SIZE - 1) as unknown as Promise<{ data: MediaRow[] | null; error: unknown }>,
+    ]);
+
+    const albums = albumsResult.data;
+    const count = (countResult as any).count;
+    const mediaRows = mediaResult.data;
+    const mediaError = mediaResult.error;
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first' };
+        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first' };
     }
 
     // Build album name lookup
@@ -136,14 +141,16 @@ export async function getPublicGallery(identifier: string): Promise<{
         albumMap.set(a.id, a.name);
     }
 
-    const media = mapMediaRows(mediaRows || [], albumMap);
+    const media = await mapMediaRows(mediaRows || [], albumMap);
 
     // 5. Resolve cover image URL (may not be in first page of media)
     let coverUrl: string | null = null;
+    let coverR2Key: string | null = null;
     if (event.cover_media_id) {
         const inPage = media.find(m => m.id === event.cover_media_id);
         if (inPage) {
             coverUrl = inPage.full_url || inPage.original_url;
+            coverR2Key = inPage.r2_key;
         } else {
             const { data: coverRow } = await (supabase
                 .from('media')
@@ -151,7 +158,8 @@ export async function getPublicGallery(identifier: string): Promise<{
                 .eq('id', event.cover_media_id)
                 .single() as unknown as Promise<{ data: CoverRow | null; error: unknown }>);
             if (coverRow) {
-                coverUrl = getPreviewUrl(coverRow.r2_key, coverRow.preview_r2_key) || getOriginalUrl(coverRow.r2_key);
+                coverUrl = await getPreviewUrl(coverRow.r2_key, coverRow.preview_r2_key) || await getOriginalUrl(coverRow.r2_key);
+                coverR2Key = coverRow.preview_r2_key || coverRow.r2_key;
             }
         }
     }
@@ -170,14 +178,14 @@ export async function getPublicGallery(identifier: string): Promise<{
             .eq('event_id', event.id) as unknown as Promise<{ data: SlideRow[] | null; error: unknown }>);
 
         const mediaMap = new Map((slideshowMedia ?? []).map(m => [m.id, m]));
-        heroSlides = (heroConfig.slideshowMediaIds as string[])
-            .map((id: string) => {
+        heroSlides = await Promise.all(
+            (heroConfig.slideshowMediaIds as string[]).map(async (id: string) => {
                 const m = mediaMap.get(id);
                 if (!m) return null;
-                const url = getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key);
+                const url = await getPreviewUrl(m.r2_key, m.preview_r2_key) || await getOriginalUrl(m.r2_key);
                 return { url, mediaId: id };
             })
-            .filter((s): s is HeroSlide => s !== null);
+        ).then(slides => slides.filter((s): s is HeroSlide => s !== null));
 
     } else if (heroMode === 'auto') {
         const { data: autoMedia } = await (supabase
@@ -188,10 +196,12 @@ export async function getPublicGallery(identifier: string): Promise<{
             .order('created_at', { ascending: true })
             .limit(5) as unknown as Promise<{ data: SlideRow[] | null; error: unknown }>);
 
-        heroSlides = (autoMedia ?? []).map(m => ({
-            url: getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key),
-            mediaId: m.id,
-        }));
+        heroSlides = await Promise.all(
+            (autoMedia ?? []).map(async (m) => ({
+                url: await getPreviewUrl(m.r2_key, m.preview_r2_key) || await getOriginalUrl(m.r2_key),
+                mediaId: m.id,
+            }))
+        );
 
     } else {
         if (coverUrl) {
@@ -210,14 +220,14 @@ export async function getPublicGallery(identifier: string): Promise<{
             .eq('event_id', event.id) as unknown as Promise<{ data: MobileSlideRow[] | null; error: unknown }>);
 
         const mobileMap = new Map((mobileMedia ?? []).map(m => [m.id, m]));
-        mobileHeroSlides = (heroConfig.mobileSlideshowMediaIds as string[])
-            .map((id: string) => {
+        mobileHeroSlides = await Promise.all(
+            (heroConfig.mobileSlideshowMediaIds as string[]).map(async (id: string) => {
                 const m = mobileMap.get(id);
                 if (!m) return null;
-                const url = getPreviewUrl(m.r2_key, m.preview_r2_key) || getOriginalUrl(m.r2_key);
+                const url = await getPreviewUrl(m.r2_key, m.preview_r2_key) || await getOriginalUrl(m.r2_key);
                 return { url, mediaId: id, width: m.width ?? undefined, height: m.height ?? undefined } as HeroSlide;
             })
-            .filter((s): s is HeroSlide => s !== null);
+        ).then(slides => slides.filter((s): s is HeroSlide => s !== null));
     }
 
     return {
@@ -226,6 +236,7 @@ export async function getPublicGallery(identifier: string): Promise<{
         albums: (albums || []).map(a => ({ id: a.id, name: a.name })),
         totalCount: count || 0,
         coverUrl,
+        coverR2Key,
         heroSlides,
         mobileHeroSlides,
         heroMode,
@@ -304,30 +315,31 @@ export async function getPublicGalleryPage(
     const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
     return {
-        media: mapMediaRows(pageRows, albumMap),
+        media: await mapMediaRows(pageRows, albumMap),
         hasMore,
     };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function mapMediaRows(
+async function mapMediaRows(
     rows: any[],
     albumMap: Map<string, string>,
-): GalleryMediaItem[] {
-    return rows.map((item: any) => ({
+): Promise<GalleryMediaItem[]> {
+    return Promise.all(rows.map(async (item: any) => ({
         id: item.id,
         album_id: item.album_id,
         album_name: albumMap.get(item.album_id) || 'Unknown',
+        r2_key: item.r2_key,
         original_filename: item.original_filename,
         media_type: item.media_type,
         width: item.width,
         height: item.height,
-        thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
-        blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
-        full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
-        original_url: item.media_type === 'image' ? getOriginalUrl(item.r2_key) : '',
+        thumbnail_url: item.media_type === 'image' ? await getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
+        blur_url: item.media_type === 'image' ? await getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
+        full_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
+        original_url: item.media_type === 'image' ? await getOriginalUrl(item.r2_key) : '',
         created_at: item.created_at || new Date().toISOString(), // Fallback for old items
-    }));
+    })));
 }
 

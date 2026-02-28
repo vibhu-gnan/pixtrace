@@ -8,6 +8,7 @@ import { DeleteEventButton } from '@/components/dashboard/delete-event-button';
 import { EditEventDetails } from '@/components/dashboard/edit-event-details';
 import { QRCodeGenerator } from '@/components/dashboard/qr-code-generator';
 import { EventLinkActions } from '@/components/event/event-link-actions';
+import { getSignedR2Url } from '@/lib/storage/r2-client';
 
 export default async function SettingsPage({
   params,
@@ -23,6 +24,11 @@ export default async function SettingsPage({
   }
 
   const galleryUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/gallery/${eventData.event_hash}`;
+  // Backward compat: old logos stored as full URLs, new ones as R2 keys
+  const logoRaw = (eventData.theme as any)?.logoUrl as string | undefined;
+  const resolvedLogoUrl = logoRaw
+    ? (logoRaw.startsWith('http://') || logoRaw.startsWith('https://') ? logoRaw : await getSignedR2Url(logoRaw))
+    : null;
 
   const startDate = eventData.event_date ? new Date(eventData.event_date) : null;
   const endDate = eventData.event_end_date ? new Date(eventData.event_end_date) : null;
@@ -82,7 +88,7 @@ export default async function SettingsPage({
           <section>
             <EventLogoSettings
               eventId={eventData.id}
-              initialLogoUrl={(eventData.theme as any)?.logoUrl}
+              initialLogoUrl={resolvedLogoUrl}
               initialLogoDisplay={(eventData.theme as any)?.logoDisplay}
             />
           </section>

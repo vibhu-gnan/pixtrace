@@ -73,15 +73,7 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
   const batchResults = await Promise.all(batches);
   const allMedia: any[] = batchResults.flat();
 
-  const media = allMedia;
-  const error = null;
-
-  if (error) {
-    console.error('Error fetching media:', error);
-    return [];
-  }
-
-  return (media || []).map((item: any) => ({
+  return Promise.all(allMedia.map(async (item: any) => ({
     id: item.id,
     album_id: item.album_id,
     event_id: item.event_id,
@@ -93,12 +85,12 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
     width: item.width,
     height: item.height,
     processing_status: item.processing_status,
-    thumbnail_url: item.media_type === 'image' ? getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
-    blur_url: item.media_type === 'image' ? getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
-    full_url: item.media_type === 'image' ? getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
-    original_url: item.media_type === 'image' ? getOriginalUrl(item.r2_key) : '',
+    thumbnail_url: item.media_type === 'image' ? await getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
+    blur_url: item.media_type === 'image' ? await getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
+    full_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
+    original_url: item.media_type === 'image' ? await getOriginalUrl(item.r2_key) : '',
     created_at: item.created_at || new Date().toISOString(),
-  }));
+  })));
 }
 
 export async function deleteMedia(mediaId: string, eventId: string) {

@@ -2,6 +2,7 @@ export type StoryTemplate = 'full-bleed' | 'polaroid' | 'immersive' | 'glass-fra
 
 export interface StoryCardOptions {
   photoUrl: string;
+  photoR2Key?: string;
   eventName: string;
   eventSubtitle?: string;
   logoUrl?: string;
@@ -13,7 +14,7 @@ const H = 1920;
 const PADDING = 40;
 
 export async function generateStoryCard(options: StoryCardOptions): Promise<Blob> {
-  const photo = await loadImageFromUrl(options.photoUrl);
+  const photo = await loadImageFromUrl(options.photoUrl, options.photoR2Key);
   const logo = options.logoUrl ? await loadImageFromUrl(options.logoUrl).catch(() => null) : null;
 
   const canvas = document.createElement('canvas');
@@ -318,10 +319,10 @@ function renderGlassFrame(
 
 // ─── Shared Utilities ────────────────────────────────────────
 
-async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
-  // Proxy external R2 URLs through our API to avoid CORS issues with canvas
-  const fetchUrl = url.includes('r2.dev')
-    ? `/api/proxy-image?url=${encodeURIComponent(url)}`
+async function loadImageFromUrl(url: string, r2Key?: string): Promise<HTMLImageElement> {
+  // Proxy R2 images through our API to avoid CORS issues with canvas
+  const fetchUrl = r2Key
+    ? `/api/proxy-image?r2Key=${encodeURIComponent(r2Key)}`
     : url;
 
   const res = await fetch(fetchUrl);

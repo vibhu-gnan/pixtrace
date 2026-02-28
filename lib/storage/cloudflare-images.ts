@@ -1,65 +1,58 @@
 /**
  * Image URL utilities
  *
- * Serves pre-computed preview variants (1200x1200 WebP) from R2.
- * Falls back to original R2 URL when preview is not available
- * (e.g., for older photos uploaded before variant generation was added).
+ * Generates time-limited presigned URLs for images stored in the private R2 bucket.
+ * Falls back to preview variant (1200x1200 WebP) when available.
  *
- * Note: Thumbnails are not generated separately — the preview variant
- * is used for grid display, blur placeholders, and lightbox.
+ * All functions are async because URL signing uses HMAC (local, ~0.1ms per URL).
+ * URLs expire after 4 hours by default.
  */
 
-/**
- * Get the base R2 public URL for an object
- */
-function getR2DirectUrl(r2Key: string): string {
-  const publicUrl = process.env.R2_PUBLIC_URL || `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev`;
-  return `${publicUrl}/${r2Key}`;
-}
+import { getSignedR2Url } from './r2-client';
 
 /**
- * Get the original (full resolution) image URL directly from R2
+ * Get the original (full resolution) image URL via presigned URL
  */
-export function getOriginalUrl(r2Key: string): string {
-  return getR2DirectUrl(r2Key);
+export async function getOriginalUrl(r2Key: string): Promise<string> {
+  return getSignedR2Url(r2Key);
 }
 
 /**
  * Get thumbnail URL (for grid display)
  * Uses the preview variant if available, falls back to original
  */
-export function getThumbnailUrl(
+export async function getThumbnailUrl(
   r2Key: string,
   _size: number = 200,
   previewR2Key?: string | null,
-): string {
+): Promise<string> {
   if (previewR2Key) {
-    return getR2DirectUrl(previewR2Key);
+    return getSignedR2Url(previewR2Key);
   }
-  return getR2DirectUrl(r2Key);
+  return getSignedR2Url(r2Key);
 }
 
 /**
  * Get preview URL (for lightbox view)
  * Uses pre-computed 1200x1200 WebP variant if available, falls back to original
  */
-export function getPreviewUrl(
+export async function getPreviewUrl(
   r2Key: string,
   previewR2Key?: string | null,
-): string {
+): Promise<string> {
   if (previewR2Key) {
-    return getR2DirectUrl(previewR2Key);
+    return getSignedR2Url(previewR2Key);
   }
-  return getR2DirectUrl(r2Key);
+  return getSignedR2Url(r2Key);
 }
 
 /**
  * Get blur placeholder URL (for progressive loading)
  * Uses preview variant as placeholder
  */
-export function getBlurPlaceholderUrl(
+export async function getBlurPlaceholderUrl(
   r2Key: string,
   previewR2Key?: string | null,
-): string {
+): Promise<string> {
   return getThumbnailUrl(r2Key, 200, previewR2Key);
 }

@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import { getPublicGallery } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 import { HeroSlideshow } from '@/components/gallery/hero-slideshow';
+import { getSignedR2Url } from '@/lib/storage/r2-client';
 
 // ISR: serve from edge cache, revalidate every hour
 export const revalidate = 3600;
@@ -20,7 +21,7 @@ const getCachedGallery = cache((eventHash: string) => getPublicGallery(eventHash
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { eventHash } = await params;
-    const { event, media, coverUrl: resolvedCoverUrl } = await getCachedGallery(eventHash);
+    const { event, media, coverR2Key } = await getCachedGallery(eventHash);
 
     if (!event) {
       return {
@@ -28,8 +29,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       };
     }
 
+    // OG images use the stable proxy URL (not presigned URLs which expire)
     const fallbackImage = media.find((m) => m.media_type === 'image');
-    const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url;
+    const ogR2Key = coverR2Key || fallbackImage?.r2_key;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const ogImageUrl = ogR2Key ? `${appUrl}/api/proxy-image?r2Key=${encodeURIComponent(ogR2Key)}` : undefined;
 
     return {
       title: `${event.name} | PIXTRACE Gallery`,
@@ -37,13 +41,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: {
         title: event.name,
         description: event.description || `View photos from ${event.name}`,
-        images: coverUrl ? [{ url: coverUrl }] : [],
+        images: ogImageUrl ? [{ url: ogImageUrl }] : [],
       },
       twitter: {
         card: 'summary_large_image',
         title: event.name,
         description: event.description || `View photos from ${event.name}`,
-        images: coverUrl ? [coverUrl] : [],
+        images: ogImageUrl ? [ogImageUrl] : [],
       },
     };
   } catch (error) {
@@ -93,6 +97,12 @@ export default async function GalleryEventPage({
       }
     }
 
+    // Resolve logo: old logos are full URLs, new ones are R2 keys
+    const rawLogoUrl = event.theme?.logoUrl;
+    const resolvedLogoUrl = rawLogoUrl
+        ? (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://') ? rawLogoUrl : await getSignedR2Url(rawLogoUrl))
+        : undefined;
+
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');
     const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
@@ -130,10 +140,10 @@ export default async function GalleryEventPage({
           {/* Centered event info */}
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20 px-4">
             {/* Logo on cover — only if logoDisplay allows it (default: show) */}
-            {event.theme?.logoUrl && ((event.theme as Record<string, unknown>)?.logoDisplay ?? 'cover_and_loading') === 'cover_and_loading' ? (
+            {resolvedLogoUrl && ((event.theme as Record<string, unknown>)?.logoDisplay ?? 'cover_and_loading') === 'cover_and_loading' ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={event.theme.logoUrl}
+                src={resolvedLogoUrl}
                 alt={event.name}
                 className="mb-4 sm:mb-6 h-20 sm:h-24 md:h-32 max-w-[80vw] object-contain drop-shadow-lg"
               />
@@ -169,7 +179,7 @@ export default async function GalleryEventPage({
             initialAlbumId={initialAlbumId}
             allowDownload={event.allow_download ?? true}
             photoOrder={photoOrder}
-            logoUrl={event.theme?.logoUrl}
+            logoUrl={resolvedLogoUrl}
             coverUrl={coverUrl}
             mobileCoverUrl={mobileCoverUrl}
             faceSearchEnabled={event.face_search_enabled ?? false}

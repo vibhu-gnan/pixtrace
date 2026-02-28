@@ -7,6 +7,7 @@ interface ShareSheetProps {
   isOpen: boolean;
   onClose: () => void;
   photoUrl: string;
+  photoR2Key?: string;
   eventName: string;
   eventSubtitle?: string;
   logoUrl?: string;
@@ -24,6 +25,7 @@ export function ShareSheet({
   isOpen,
   onClose,
   photoUrl,
+  photoR2Key,
   eventName,
   eventSubtitle,
   logoUrl,
@@ -86,6 +88,7 @@ export function ShareSheet({
       const { generateStoryCard } = await import('@/lib/story/story-card-generator');
       const blob = await generateStoryCard({
         photoUrl,
+        photoR2Key,
         eventName,
         eventSubtitle,
         logoUrl: showLogo ? logoUrl : undefined,
@@ -99,7 +102,7 @@ export function ShareSheet({
       console.error('Story generation failed:', err);
       return null;
     }
-  }, [photoUrl, eventName, eventSubtitle, logoUrl, showLogo, selectedTemplate]);
+  }, [photoUrl, photoR2Key, eventName, eventSubtitle, logoUrl, showLogo, selectedTemplate]);
 
   const handleShareStory = useCallback(async () => {
     if (generating) return;

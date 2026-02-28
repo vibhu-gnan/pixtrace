@@ -117,6 +117,7 @@ export function GalleryPageClient({
             id: r.media_id,
             album_id: r.album_id,
             album_name: albumMap.get(r.album_id) || 'Unknown',
+            r2_key: r.r2_key,
             original_filename: '',
             media_type: 'image' as const,
             width: r.width,
@@ -617,6 +618,7 @@ export function GalleryPageClient({
                     isOpen={headerShareSheetOpen}
                     onClose={() => setHeaderShareSheetOpen(false)}
                     photoUrl={mobileCoverUrl || coverUrl || media[0].full_url || media[0].original_url}
+                    photoR2Key={media[0]?.r2_key}
                     eventName={eventName}
                     logoUrl={logoUrl}
                     galleryUrl={typeof window !== 'undefined' ? getGalleryUrl() : ''}

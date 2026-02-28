@@ -1,7 +1,8 @@
 'use server';
 
 import { cache } from 'react';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { getPublicClient } from '@/lib/supabase/public';
+import { getSignedR2Url } from '@/lib/storage/r2-client';
 
 export type LogoDisplay = 'cover_and_loading' | 'loading_only' | 'none';
 
@@ -26,21 +27,25 @@ export const getGalleryTheme = cache(async (eventHash: string): Promise<GalleryT
     try {
         if (!eventHash || eventHash.length > 32) return FALLBACK;
 
-        const supabase = createAdminClient();
+        const supabase = getPublicClient();
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase
             .from('events')
             .select('theme')
             .eq('event_hash', eventHash)
             .eq('is_public', true)
-            .single();
+            .single() as unknown as Promise<{ data: { theme: unknown } | null; error: unknown }>);
 
         if (error || !data) return FALLBACK;
 
         const theme = data.theme as Record<string, unknown> | null;
         if (!theme) return FALLBACK;
 
-        const logoUrl = typeof theme.logoUrl === 'string' ? theme.logoUrl : null;
+        const logoRaw = typeof theme.logoUrl === 'string' ? theme.logoUrl : null;
+        // Backward compat: old logos stored as full URLs, new ones as R2 keys
+        const logoUrl = logoRaw
+            ? (logoRaw.startsWith('http://') || logoRaw.startsWith('https://') ? logoRaw : await getSignedR2Url(logoRaw))
+            : null;
         const rawDisplay = theme.logoDisplay;
 
         // Validate logoDisplay — only accept known values
