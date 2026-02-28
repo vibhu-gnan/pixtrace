@@ -2,13 +2,32 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is not set');
+// Lazy initialization — only create the connection when actually used
+// This prevents resource leaks since the project uses Supabase JS client
+// for all queries (direct Postgres connections fail on campus/mobile networks)
+let _db: ReturnType<typeof drizzle> | null = null;
+
+export function getDb() {
+  if (!_db) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    const queryClient = postgres(process.env.DATABASE_URL, {
+      prepare: false,
+      idle_timeout: 20,
+      max: 3, // Low limit since this is rarely used
+    });
+    _db = drizzle(queryClient, { schema });
+  }
+  return _db;
 }
 
-// Connection for queries (prepare: false required for Supabase pgbouncer)
-const queryClient = postgres(process.env.DATABASE_URL, { prepare: false });
-export const db = drizzle(queryClient, { schema });
+// Legacy export — kept for backward compatibility but now lazy-initialized
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(_target, prop) {
+    return (getDb() as any)[prop];
+  },
+});
 
 // Type exports
 export type Organizer = typeof schema.organizers.$inferSelect;

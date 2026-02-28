@@ -21,7 +21,7 @@ export async function runRecallSearch(
 
   const pgVector = `[${prototypeEmbedding.join(',')}]`;
 
-  const { data, error } = await supabase.rpc('search_face_embeddings', {
+  const { data, error } = await supabase.rpc('search_face_embeddings_lite', {
     query_embedding: pgVector,
     target_event_id: eventId,
     similarity_threshold: TIER_2_THRESHOLD,

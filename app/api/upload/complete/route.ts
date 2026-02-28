@@ -75,7 +75,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Track storage usage (original + variant sizes like thumbnail/preview)
-    const variantSizeBytes = body.variantSizeBytes || 0;
+    // Cap variantSizeBytes to a reasonable max (2x original) to prevent billing manipulation
+    const rawVariantSize = typeof body.variantSizeBytes === 'number' ? body.variantSizeBytes : 0;
+    const variantSizeBytes = Math.max(0, Math.min(rawVariantSize, fileSize * 2));
     const totalBytes = fileSize + variantSizeBytes;
     if (totalBytes > 0) {
       try {

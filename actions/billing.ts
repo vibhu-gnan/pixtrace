@@ -5,39 +5,48 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getRazorpayClient } from '@/lib/razorpay/client';
 
 export async function getSubscriptionDetails() {
-  const organizer = await getCurrentOrganizer();
-  if (!organizer) return null;
+  try {
+    const organizer = await getCurrentOrganizer();
+    if (!organizer) return null;
 
-  const supabase = createAdminClient();
+    const supabase = createAdminClient();
 
-  const [subResult, planResult, paymentsResult] = await Promise.all([
-    supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('organizer_id', organizer.id)
-      .in('status', ['active', 'pending', 'halted'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('plans')
-      .select('*')
-      .eq('id', organizer.plan_id)
-      .single(),
-    supabase
-      .from('payment_history')
-      .select('*')
-      .eq('organizer_id', organizer.id)
-      .order('created_at', { ascending: false })
-      .limit(20),
-  ]);
+    const [subResult, planResult, paymentsResult] = await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('organizer_id', organizer.id)
+        .in('status', ['active', 'pending', 'halted'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('plans')
+        .select('*')
+        .eq('id', organizer.plan_id)
+        .single(),
+      supabase
+        .from('payment_history')
+        .select('*')
+        .eq('organizer_id', organizer.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]);
 
-  return {
-    organizer,
-    subscription: subResult.data,
-    plan: planResult.data,
-    payments: paymentsResult.data || [],
-  };
+    if (subResult.error) console.error('Error fetching subscription:', subResult.error);
+    if (planResult.error) console.error('Error fetching plan:', planResult.error);
+    if (paymentsResult.error) console.error('Error fetching payments:', paymentsResult.error);
+
+    return {
+      organizer,
+      subscription: subResult.data,
+      plan: planResult.data,
+      payments: paymentsResult.data || [],
+    };
+  } catch (err) {
+    console.error('Error in getSubscriptionDetails:', err);
+    return null;
+  }
 }
 
 export async function cancelSubscription() {

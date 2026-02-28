@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PhotoLightbox } from '@/components/event/photo-lightbox';
+import { refreshMediaUrl } from '@/lib/gallery/url-refresh';
 import type { GalleryMediaItem } from '@/actions/gallery';
 import type { MediaItem } from '@/actions/media';
 
@@ -144,6 +145,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
                             <MasonryThumbnail
                                 key={item.id}
                                 item={item}
+                                eventHash={eventHash}
                                 onClick={() => openLightbox(item.id)}
                                 showFaceScores={showFaceScores}
                             />
@@ -172,21 +174,34 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
 
 function MasonryThumbnail({
     item,
+    eventHash,
     onClick,
     showFaceScores = false,
 }: {
     item: GalleryMediaItem;
+    eventHash?: string;
     onClick: () => void;
     showFaceScores?: boolean;
 }) {
     const [loaded, setLoaded] = useState(false);
     const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
+    const refreshAttempted = useRef(false);
 
     const handleImageError = () => {
+        // Fallback chain: full_url → thumbnail_url → original_url → server refresh
         if (imgSrc === item.full_url && item.thumbnail_url) {
             setImgSrc(item.thumbnail_url);
         } else if (imgSrc !== item.original_url) {
             setImgSrc(item.original_url);
+        } else if (!refreshAttempted.current && eventHash) {
+            // All local variants failed — URLs likely expired. Refresh from server.
+            refreshAttempted.current = true;
+            refreshMediaUrl(eventHash, item.id).then(urls => {
+                if (urls) {
+                    const freshUrl = urls.thumbnail || urls.preview || urls.original;
+                    if (freshUrl) setImgSrc(freshUrl);
+                }
+            });
         }
     };
 

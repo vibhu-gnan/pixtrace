@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert selfie to base64 and send to Modal for embedding
-    const embedSelfieUrl = process.env.MODAL_EMBED_SELFIE_URL;
+    // Convert selfie to base64 and send to Modal CPU endpoint for embedding
+    const embedSelfieUrl = process.env.MODAL_EMBED_SELFIE_CPU_URL || process.env.MODAL_EMBED_SELFIE_URL;
     if (!embedSelfieUrl) {
       return NextResponse.json(
         { error: 'Face search service not configured' },

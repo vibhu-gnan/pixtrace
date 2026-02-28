@@ -40,12 +40,15 @@ export async function getCurrentOrganizer(): Promise<OrganizerProfile | null> {
   }
 
   // Create organizer profile if it doesn't exist
+  // user.email can be undefined for some OAuth providers (e.g., Apple "Hide My Email")
+  const email = user.email || `${user.id}@noemail.pixtrace.in`;
+
   const { data: newOrganizer, error } = await supabase
     .from('organizers')
     .upsert(
       {
         auth_id: user.id,
-        email: user.email!,
+        email,
         name: user.user_metadata?.full_name || user.email?.split('@')[0] || null,
         avatar_url: user.user_metadata?.avatar_url || null,
       },

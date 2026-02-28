@@ -78,6 +78,16 @@ export async function getAlbums(eventId: string): Promise<AlbumData[]> {
 
   const supabase = createAdminClient();
 
+  // Verify event belongs to organizer before fetching albums
+  const { data: event } = await supabase
+    .from('events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return [];
+
   const { data: albums, error } = await supabase
     .from('albums')
     .select(`

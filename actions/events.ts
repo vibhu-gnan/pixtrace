@@ -631,6 +631,24 @@ export async function updateEventLogoDisplay(eventId: string, logoDisplay: strin
 
 const MAX_PRELOADER_SIZE = 51200; // 50KB
 
+// Sanitize HTML to prevent stored XSS — strip <script>, event handlers, and dangerous elements
+function sanitizePreloaderHtml(html: string): string {
+  return html
+    // Remove all script tags and their content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // Remove event handler attributes (onclick, onload, onerror, etc.)
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    // Remove javascript: protocol in href/src/action attributes
+    .replace(/(href|src|action)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1=""')
+    // Remove data: protocol in src (can embed scripts)
+    .replace(/src\s*=\s*(?:"data:[^"]*"|'data:[^']*')/gi, 'src=""')
+    // Remove <iframe>, <object>, <embed>, <form>, <meta> tags
+    .replace(/<\/?(iframe|object|embed|form|meta|link|base)\b[^>]*>/gi, '')
+    // Remove style expressions (IE) and -moz-binding
+    .replace(/expression\s*\(/gi, '')
+    .replace(/-moz-binding\s*:/gi, '');
+}
+
 export async function updateEventCustomPreloader(eventId: string, html: string | null) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
@@ -639,6 +657,9 @@ export async function updateEventCustomPreloader(eventId: string, html: string |
   if (html && html.length > MAX_PRELOADER_SIZE) {
     return { error: 'Custom preloader HTML must be under 50KB' };
   }
+
+  // Sanitize HTML to prevent stored XSS
+  const sanitizedHtml = html ? sanitizePreloaderHtml(html) : null;
 
   const supabase = createAdminClient();
 
@@ -654,8 +675,8 @@ export async function updateEventCustomPreloader(eventId: string, html: string |
   const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
 
   // Set or clear the custom preloader
-  const updatedTheme = html
-    ? { ...currentTheme, customPreloader: html }
+  const updatedTheme = sanitizedHtml
+    ? { ...currentTheme, customPreloader: sanitizedHtml }
     : { ...currentTheme, customPreloader: undefined };
 
   const { error } = await supabase

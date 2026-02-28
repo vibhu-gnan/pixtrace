@@ -1,11 +1,15 @@
 """
-PIXTRACE Face Processing Pipeline — Modal GPU Server
+PIXTRACE Face Processing Pipeline — Modal Server
 
-Two endpoints:
-  POST /process-gallery  — Batch process gallery photos (detect + align + embed)
-  POST /embed-selfie     — Single selfie embedding for face search
+Three endpoints across two classes:
+  FacePipeline (GPU T4, batch processing):
+    POST /process-gallery  — Batch process gallery photos (detect + align + embed)
 
-Writes results directly to Supabase (pgvector) via service_role key.
+  SelfieEmbedder (CPU-only, cost-optimized):
+    POST /embed-selfie     — Single selfie embedding for face search
+
+FacePipeline writes results directly to Supabase (pgvector) via service_role key.
+SelfieEmbedder is stateless — returns embedding JSON, no DB writes.
 """
 
 import modal
@@ -15,7 +19,8 @@ import os
 # Modal app definition
 # ---------------------------------------------------------------------------
 
-image = (
+# GPU image — full stack for batch gallery processing (includes Supabase client)
+gpu_image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
     .pip_install(
@@ -32,7 +37,23 @@ image = (
     )
 )
 
-app = modal.App("pixtrace-face-pipeline", image=image)
+# CPU image — lightweight for single selfie embedding (no Supabase, no GPU runtime)
+cpu_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install("libgl1-mesa-glx", "libglib2.0-0")
+    .pip_install(
+        "opencv-python-headless==4.9.0.80",
+        "numpy>=1.26,<2.0",
+        "Pillow>=10.0",
+        "tf-keras",
+        "retina-face>=0.0.17",
+        "insightface>=0.7.3",
+        "onnxruntime>=1.17",
+        "fastapi[standard]",
+    )
+)
+
+app = modal.App("pixtrace-face-pipeline")
 
 model_volume = modal.Volume.from_name("pixtrace-models", create_if_missing=True)
 
@@ -201,14 +222,71 @@ def generate_embedding(model, aligned_face_bgr):
     return embedding.tolist()
 
 
+def _process_single_image(recognizer, image_bytes: bytes) -> list[dict]:
+    """
+    Full pipeline for one image:
+    1. Decode -> 2. Detect faces -> 3. Crop -> 4. Align -> 5. Embed
+
+    Returns list of face dicts, each with:
+      face_index, embedding (512 floats), confidence, bbox (x1,y1,x2,y2)
+
+    If 0 faces detected on first try, retries detection once.
+    """
+    import cv2
+
+    img_bgr = decode_image(image_bytes)
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+
+    # Detect faces (with retry on 0 faces)
+    faces = detect_faces(None, img_rgb)
+    if len(faces) == 0:
+        # Retry once — compensate transient model failure
+        faces = detect_faces(None, img_rgb)
+
+    if len(faces) == 0:
+        return []
+
+    results = []
+    for idx, face in enumerate(faces):
+        try:
+            facial_area = face["facial_area"]
+            landmarks = face["landmarks"]
+            confidence = face["score"]
+
+            # Crop with padding
+            face_crop, padded_bbox = crop_face(img_bgr, facial_area)
+
+            if face_crop.size == 0:
+                continue
+
+            # Align (eye rotation + resize to 112x112)
+            aligned = align_face(face_crop, landmarks, padded_bbox)
+
+            # Generate embedding
+            embedding = generate_embedding(recognizer, aligned)
+
+            results.append({
+                "face_index": idx,
+                "embedding": embedding,
+                "confidence": float(confidence),
+                "bbox": [int(x) for x in facial_area],
+            })
+        except Exception as e:
+            print(f"Error processing face {idx}: {e}")
+            continue
+
+    return results
+
+
 # ---------------------------------------------------------------------------
-# Main pipeline class
+# GPU class — batch gallery processing only
 # ---------------------------------------------------------------------------
 
 @app.cls(
+    image=gpu_image,
     gpu="T4",
     timeout=600,
-    scaledown_window=300,
+    scaledown_window=60,
     volumes={"/models": model_volume},
     secrets=[modal.Secret.from_name("pixtrace-env")],
 )
@@ -249,66 +327,11 @@ class FacePipeline:
             model_volume.commit()
             print("Model downloaded and cached in volume.")
 
-        # Load the recognition model
+        # Load the recognition model (GPU)
         self.recognizer = get_model(model_path)
         self.recognizer.prepare(ctx_id=0)
 
-        print("Models loaded successfully.")
-
-    def process_single_image(self, image_bytes: bytes) -> list[dict]:
-        """
-        Full pipeline for one image:
-        1. Decode → 2. Detect faces → 3. Crop → 4. Align → 5. Embed
-
-        Returns list of face dicts, each with:
-          face_index, embedding (512 floats), confidence, bbox (x1,y1,x2,y2)
-
-        If 0 faces detected on first try, retries detection once.
-        """
-        import cv2
-
-        img_bgr = decode_image(image_bytes)
-        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-
-        # Detect faces (with retry on 0 faces)
-        faces = detect_faces(None, img_rgb)
-        if len(faces) == 0:
-            # Retry once — compensate transient model failure
-            faces = detect_faces(None, img_rgb)
-
-        if len(faces) == 0:
-            return []
-
-        results = []
-        for idx, face in enumerate(faces):
-            try:
-                facial_area = face["facial_area"]
-                landmarks = face["landmarks"]
-                confidence = face["score"]
-
-                # Crop with padding
-                face_crop, padded_bbox = crop_face(img_bgr, facial_area)
-
-                if face_crop.size == 0:
-                    continue
-
-                # Align (eye rotation + resize to 112x112)
-                aligned = align_face(face_crop, landmarks, padded_bbox)
-
-                # Generate embedding
-                embedding = generate_embedding(self.recognizer, aligned)
-
-                results.append({
-                    "face_index": idx,
-                    "embedding": embedding,
-                    "confidence": float(confidence),
-                    "bbox": [int(x) for x in facial_area],
-                })
-            except Exception as e:
-                print(f"Error processing face {idx}: {e}")
-                continue
-
-        return results
+        print("FacePipeline (GPU) models loaded successfully.")
 
     @modal.fastapi_endpoint(method="POST")
     def process_gallery(self, request: dict):
@@ -376,7 +399,7 @@ class FacePipeline:
                 image_bytes = resp.content
 
                 # Run face pipeline
-                faces = self.process_single_image(image_bytes)
+                faces = _process_single_image(self.recognizer, image_bytes)
                 face_count = len(faces)
 
                 if face_count > 0:
@@ -445,6 +468,62 @@ class FacePipeline:
 
         return results_summary
 
+
+# ---------------------------------------------------------------------------
+# CPU class — single selfie embedding (cost-optimized, no GPU needed)
+# ---------------------------------------------------------------------------
+
+@app.cls(
+    image=cpu_image,
+    cpu=2,
+    memory=2048,
+    timeout=120,
+    scaledown_window=60,
+    volumes={"/models": model_volume},
+    secrets=[modal.Secret.from_name("pixtrace-env")],
+)
+class SelfieEmbedder:
+
+    @modal.enter()
+    def load_models(self):
+        """Load InsightFace recognition model on CPU."""
+        from insightface.model_zoo import get_model
+
+        model_path = "/models/w600k_r50.onnx"
+
+        if not os.path.exists(model_path):
+            # Model should already be cached by FacePipeline's first run.
+            # If not, download it here (CPU-only providers).
+            import insightface
+
+            print("Downloading InsightFace model to volume (CPU)...")
+            model_dir = "/models"
+            os.makedirs(model_dir, exist_ok=True)
+
+            app_model = insightface.app.FaceAnalysis(
+                name="buffalo_l",
+                root="/models",
+                providers=["CPUExecutionProvider"],
+            )
+            app_model.prepare(ctx_id=-1, det_size=(640, 640))
+
+            from glob import glob
+            onnx_files = glob("/models/models/buffalo_l/*.onnx")
+            for f in onnx_files:
+                if "w600k" in f.lower():
+                    import shutil
+                    shutil.copy2(f, model_path)
+                    break
+
+            model_volume.commit()
+            print("Model downloaded and cached in volume (CPU).")
+
+        # Load recognition model with CPU execution
+        self.recognizer = get_model(model_path)
+        self.recognizer.prepare(ctx_id=-1)
+
+        print("SelfieEmbedder (CPU) model loaded successfully.")
+
     @modal.fastapi_endpoint(method="POST")
     def embed_selfie(self, request: dict):
         """
@@ -472,7 +551,7 @@ class FacePipeline:
             return {"error": "invalid_base64"}
 
         try:
-            faces = self.process_single_image(image_bytes)
+            faces = _process_single_image(self.recognizer, image_bytes)
         except ValueError as e:
             print(f"Image decode error: {e}")
             return {"error": "invalid_image", "message": str(e)}

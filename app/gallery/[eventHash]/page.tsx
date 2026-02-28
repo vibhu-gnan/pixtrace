@@ -99,9 +99,19 @@ export default async function GalleryEventPage({
 
     // Resolve logo: old logos are full URLs, new ones are R2 keys
     const rawLogoUrl = event.theme?.logoUrl;
-    const resolvedLogoUrl = rawLogoUrl
-        ? (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://') ? rawLogoUrl : await getSignedR2Url(rawLogoUrl))
-        : undefined;
+    let resolvedLogoUrl: string | undefined;
+    if (rawLogoUrl) {
+        if (rawLogoUrl.startsWith('http://') || rawLogoUrl.startsWith('https://')) {
+            resolvedLogoUrl = rawLogoUrl;
+        } else {
+            try {
+                resolvedLogoUrl = await getSignedR2Url(rawLogoUrl);
+            } catch {
+                // Logo signing failed — gallery still renders, just without logo
+                resolvedLogoUrl = undefined;
+            }
+        }
+    }
 
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');

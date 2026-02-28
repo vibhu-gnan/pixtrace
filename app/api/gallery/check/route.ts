@@ -36,8 +36,8 @@ export async function GET(request: Request) {
 
         return res;
     } catch (e) {
-        // On error, assume public to avoid breaking the gallery
+        // Fail closed: on error, treat as private (never expose private events on DB outage)
         console.error('Gallery check error:', e);
-        return NextResponse.json({ public: true });
+        return NextResponse.json({ public: false }, { status: 503 });
     }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { MediaItem } from '@/actions/media';
 import { ShareSheet } from '@/components/story/share-sheet';
+import { refreshMediaUrl } from '@/lib/gallery/url-refresh';
 
 type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
@@ -355,9 +356,14 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < media.length - 1;
 
-  // Reset zoom when navigating between photos
+  // URL refresh state — overrides displayImage when presigned URLs expire
+  const [refreshedSrc, setRefreshedSrc] = useState<string | null>(null);
+  const refreshAttemptedIndex = useRef<number>(-1);
+
+  // Reset zoom and refresh state when navigating between photos
   useEffect(() => {
     zoom.resetZoom();
+    setRefreshedSrc(null);
   }, [currentIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset state and timer when index changes or lightbox opens
@@ -584,10 +590,26 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     }
   }, [zoom, canGoNext, canGoPrev, handleNext, handlePrevious, shareSheetOpen]);
 
+  // Handle expired presigned URLs: when the <img> fails, refresh from server
+  const handleImageError = useCallback(() => {
+    if (!eventHash || !currentPhoto) return;
+    if (refreshAttemptedIndex.current === currentIndex) return; // Only try once per photo
+    refreshAttemptedIndex.current = currentIndex;
+
+    refreshMediaUrl(eventHash, currentPhoto.id).then(urls => {
+      if (urls) {
+        const freshUrl = urls.preview || urls.original || urls.thumbnail;
+        if (freshUrl) setRefreshedSrc(freshUrl);
+      }
+    });
+  }, [eventHash, currentPhoto, currentIndex]);
+
   if (!currentPhoto) return null;
 
-  const displayImage =
-    loadingPhase === 'thumbnail'
+  // If we have a refreshed URL (after expiry recovery), use it. Otherwise use normal phase logic.
+  const displayImage = refreshedSrc
+    ? refreshedSrc
+    : loadingPhase === 'thumbnail'
       ? currentPhoto.thumbnail_url
       : loadingPhase === 'preview' || loadingPhase === 'loading_original'
         ? currentPhoto.full_url
@@ -684,6 +706,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
               src={displayImage}
               alt={currentPhoto.original_filename}
               draggable={false}
+              onError={handleImageError}
               className={`max-w-full max-h-full object-contain select-none ${loadingPhase === 'thumbnail' ? 'opacity-70' : 'opacity-100'}`}
               style={zoom.imageStyle}
             />

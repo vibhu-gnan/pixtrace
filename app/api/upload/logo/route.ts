@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { r2Client, R2_BUCKET_NAME } from '@/lib/storage/r2-client';
+import { getR2Client, getR2BucketName, R2ConfigError } from '@/lib/storage/r2-client';
 import { nanoid } from 'nanoid';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -50,14 +50,14 @@ export async function POST(request: NextRequest) {
         const key = `logos/${organizer.id}/${eventId}/${uniqueId}.${ext}`;
 
         const command = new PutObjectCommand({
-            Bucket: R2_BUCKET_NAME,
+            Bucket: getR2BucketName(),
             Key: key,
             ContentType: contentType,
             ContentLength: MAX_LOGO_SIZE, // Enforce max size at S3 level
         });
 
-        // Generate presigned URL valid for 15 minutes (not 1 hour)
-        const signedUrl = await getSignedUrl(r2Client, command, { expiresIn: 900 });
+        // Generate presigned URL valid for 15 minutes
+        const signedUrl = await getSignedUrl(getR2Client(), command, { expiresIn: 900 });
 
         return NextResponse.json({
             uploadUrl: signedUrl,
@@ -65,6 +65,12 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         console.error('Error generating presigned URL:', error);
+
+        // Distinguish config errors (503) from transient errors (500)
+        if (error instanceof R2ConfigError) {
+            return NextResponse.json({ error: 'Storage not configured' }, { status: 503 });
+        }
+
         return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 });
     }
 }

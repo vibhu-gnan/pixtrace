@@ -12,16 +12,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
   }
 
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('[Razorpay Webhook] RAZORPAY_WEBHOOK_SECRET not configured');
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 503 });
+  }
+
   const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!)
+    .createHmac('sha256', webhookSecret)
     .update(body)
     .digest('hex');
 
-  if (expectedSignature !== signature) {
+  // Timing-safe comparison to prevent timing attacks
+  const sigBuffer = Buffer.from(signature, 'hex');
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  const event = JSON.parse(body);
+  let event: any;
+  try {
+    event = JSON.parse(body);
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const supabase = createAdminClient();
 
   console.log(`[Razorpay Webhook] ${event.event}`);

@@ -1,6 +1,6 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { r2Client, R2_BUCKET_NAME } from './r2-client';
+import { getR2Client, getR2BucketName } from './r2-client';
 
 export interface PresignedUrlOptions {
   key: string;
@@ -25,13 +25,13 @@ export async function generatePresignedUrl(
   const { key, contentType, expiresIn = 900 } = options;
 
   const command = new PutObjectCommand({
-    Bucket: R2_BUCKET_NAME,
+    Bucket: getR2BucketName(),
     Key: key,
     ContentType: contentType,
     CacheControl: 'public, max-age=31536000, immutable',
   });
 
-  const url = await getSignedUrl(r2Client, command, {
+  const url = await getSignedUrl(getR2Client(), command, {
     expiresIn,
   });
 

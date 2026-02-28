@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getR2Object } from '@/lib/storage/r2-client';
+import { getR2Object, R2ConfigError, R2AccessError } from '@/lib/storage/r2-client';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -37,8 +37,26 @@ export async function GET(request: NextRequest) {
                 'Cache-Control': 'private, no-store',
             },
         });
-    } catch (error) {
-        console.error('Download error:', error);
+    } catch (err) {
+        // ── Classified error responses ──
+        if (err instanceof R2ConfigError) {
+            console.error('[download] R2 not configured:', err.message);
+            return NextResponse.json({ error: 'Storage not configured' }, { status: 503 });
+        }
+
+        if (err instanceof R2AccessError) {
+            if (err.statusCode === 403) {
+                console.error('[download] R2 access denied:', err.message);
+                return NextResponse.json({ error: 'Storage access denied' }, { status: 502 });
+            }
+            if (err.statusCode === 404) {
+                return NextResponse.json({ error: 'File not found' }, { status: 404 });
+            }
+            console.error('[download] R2 service error:', err.message);
+            return NextResponse.json({ error: 'Storage temporarily unavailable' }, { status: 502 });
+        }
+
+        console.error('[download] Unexpected error:', err);
         return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 }
