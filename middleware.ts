@@ -27,7 +27,12 @@ export async function middleware(request: NextRequest) {
 
   // Short slug routes (e.g., /abc123 for gallery) — check if it looks like an event hash
   // Event hashes are 12-char nanoid strings, no slashes after the first segment
-  const isSlugRoute = /^\/[a-zA-Z0-9_-]{6,32}$/.test(pathname);
+  // Exclude known app routes to prevent auth bypass on /dashboard, /settings, etc.
+  const KNOWN_APP_ROUTES = new Set([
+    '/dashboard', '/settings', '/billing', '/events', '/profile', '/account',
+    '/onboarding', '/create', '/manage', '/admin', '/analytics',
+  ]);
+  const isSlugRoute = /^\/[a-zA-Z0-9_-]{6,32}$/.test(pathname) && !KNOWN_APP_ROUTES.has(pathname);
 
   if (isPublicRoute || isSlugRoute || pathname === '/') {
     return NextResponse.next();
@@ -47,6 +52,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|robots\\.txt|sitemap\\.xml|site\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

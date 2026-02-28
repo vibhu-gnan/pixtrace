@@ -1,40 +1,59 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pixtrace.in';
+
 export const metadata: Metadata = {
-  title: "PIXTRACE - Premium Event Gallery",
-  description: "The premium gallery platform that delivers original quality photos to your guests instantly via simple QR codes.",
-  keywords: ["event photography", "gallery platform", "photo sharing", "QR code gallery", "photographer tools"],
-  authors: [{ name: "PIXTRACE Inc." }],
-  creator: "PIXTRACE Inc.",
-  publisher: "PIXTRACE Inc.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'PIXTRACE - Event Photo Gallery & QR Code Sharing for Photographers',
+    template: '%s | PIXTRACE',
+  },
+  description: 'PIXTRACE is the premium event gallery platform for photographers. Share original-quality photos with guests instantly via QR codes. Supports weddings, corporate events & more.',
+  keywords: [
+    'event photography gallery',
+    'photo sharing platform',
+    'QR code photo gallery',
+    'wedding photo gallery',
+    'event photo delivery',
+    'photographer gallery tool',
+    'photo sharing QR code',
+    'online event gallery',
+    'client photo delivery',
+    'event gallery India',
+  ],
+  authors: [{ name: 'PIXTRACE', url: siteUrl }],
+  creator: 'PIXTRACE',
+  publisher: 'PIXTRACE',
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://pixtrace.com'),
+  alternates: {
+    canonical: siteUrl,
+  },
   openGraph: {
-    title: "PIXTRACE - Premium Event Gallery",
-    description: "The premium gallery platform that delivers original quality photos to your guests instantly via simple QR codes.",
-    url: "https://pixtrace.com",
-    siteName: "PIXTRACE",
+    title: 'PIXTRACE - Event Photo Gallery & QR Code Sharing for Photographers',
+    description: 'Share original-quality event photos with guests instantly via QR codes. The premium gallery platform for weddings, corporate events & more.',
+    url: siteUrl,
+    siteName: 'PIXTRACE',
     images: [
       {
-        url: "/og-image.jpg",
+        url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: "PIXTRACE - Premium Event Gallery Platform",
+        alt: 'PIXTRACE - Event Photo Gallery Platform with QR Code Sharing',
       },
     ],
-    locale: "en_US",
-    type: "website",
+    locale: 'en_IN',
+    type: 'website',
   },
   twitter: {
-    card: "summary_large_image",
-    title: "PIXTRACE - Premium Event Gallery",
-    description: "The premium gallery platform that delivers original quality photos to your guests instantly via simple QR codes.",
-    images: ["/og-image.jpg"],
+    card: 'summary_large_image',
+    title: 'PIXTRACE - Event Photo Gallery & QR Code Sharing',
+    description: 'Share original-quality event photos via QR codes. The premium gallery platform for photographers.',
+    images: ['/og-image.jpg'],
   },
   icons: {
     icon: '/favicon.ico',
@@ -48,9 +67,9 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
     },
   },
 };

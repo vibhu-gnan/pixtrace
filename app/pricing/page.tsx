@@ -447,7 +447,7 @@ export default function PricingPage() {
                 </a>
               </div>
               <div className="mt-4 md:mt-0 text-slate-600 text-sm">
-                © 2023 PIXTRACE Inc.
+                &copy; {new Date().getFullYear()} PIXTRACE. All rights reserved.
               </div>
             </div>
           </div>
