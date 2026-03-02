@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { deleteObjects } from '@/lib/storage/r2-client';
+import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 
 export interface AlbumData {
   id: string;
@@ -174,7 +174,8 @@ export async function deleteAlbum(albumId: string, eventId: string) {
     const { data } = await supabase
       .from('media')
       .select('r2_key, thumbnail_r2_key, preview_r2_key')
-      .eq('album_id', albumId);
+      .eq('album_id', albumId)
+      .eq('event_id', eventId);
     mediaRows = data;
   } catch (fetchErr) {
     console.error('Error fetching R2 keys for album (continuing with deletion):', fetchErr);
@@ -191,24 +192,17 @@ export async function deleteAlbum(albumId: string, eventId: string) {
     return { error: 'Failed to delete album' };
   }
 
-  // Clean up R2 files (fire-and-forget, non-blocking)
-  // Wrapped in try-catch to ensure no crash even on unexpected errors
-  try {
-    if (mediaRows && mediaRows.length > 0) {
-      const r2Keys: string[] = [];
-      for (const row of mediaRows) {
-        if (row.r2_key) r2Keys.push(row.r2_key);
-        if (row.thumbnail_r2_key) r2Keys.push(row.thumbnail_r2_key);
-        if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
-      }
-      if (r2Keys.length > 0) {
-        deleteObjects(r2Keys).catch((err) => {
-          console.error('Error deleting R2 objects for album:', err);
-        });
-      }
+  // Clean up R2 files (fire-and-forget with orphan tracking)
+  if (mediaRows && mediaRows.length > 0) {
+    const r2Keys: string[] = [];
+    for (const row of mediaRows) {
+      if (row.r2_key) r2Keys.push(row.r2_key);
+      if (row.thumbnail_r2_key) r2Keys.push(row.thumbnail_r2_key);
+      if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
     }
-  } catch (cleanupErr) {
-    console.error('Unexpected error during R2 cleanup (album already deleted):', cleanupErr);
+    if (r2Keys.length > 0) {
+      deleteR2WithTracking(r2Keys, 'album_delete');
+    }
   }
 
   revalidatePath(`/events/${eventId}`);

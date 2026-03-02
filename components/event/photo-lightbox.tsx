@@ -516,10 +516,25 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     setDownloadSuccess(false);
 
     try {
-      const downloadUrl = `/api/download?r2Key=${encodeURIComponent(currentPhoto.r2_key)}&filename=${encodeURIComponent(currentPhoto.original_filename)}`;
+      // Request a signed download token from the server
+      const resp = await fetch('/api/gallery/download-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventHash,
+          mediaId: currentPhoto.id,
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error('Failed to get download token');
+      }
+
+      const { token, filename: serverFilename } = await resp.json();
+      const downloadUrl = `/api/download?token=${encodeURIComponent(token)}&filename=${encodeURIComponent(serverFilename || currentPhoto.original_filename)}`;
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = currentPhoto.original_filename;
+      link.download = serverFilename || currentPhoto.original_filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -527,11 +542,12 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 2000);
     } catch {
+      // Fallback: open the presigned original URL directly
       window.open(currentPhoto.original_url, '_blank');
     } finally {
       setIsDownloading(false);
     }
-  }, [currentPhoto, isDownloading]);
+  }, [currentPhoto, isDownloading, eventHash]);
 
   // Keep latest nav callbacks in refs so keyboard handler never goes stale
   const handlePreviousRef = useRef(handlePrevious);

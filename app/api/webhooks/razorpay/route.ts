@@ -133,8 +133,24 @@ export async function POST(request: NextRequest) {
         console.log(`[Razorpay Webhook] Unhandled event: ${event.event}`);
     }
   } catch (err) {
-    // Return 200 so Razorpay doesn't retry endlessly — error is logged for manual review
+    // Log the failed webhook to a dead-letter table for manual review / replay.
+    // Then return 500 so Razorpay retries (up to its retry limit).
     console.error(`[Razorpay Webhook] Handler error for ${event.event}:`, err);
+
+    // Best-effort: persist failed event for manual recovery
+    try {
+      await supabase.from('webhook_dead_letters').insert({
+        provider: 'razorpay',
+        event_type: event.event,
+        payload: event,
+        error_message: err instanceof Error ? err.message : String(err),
+      });
+    } catch (dlErr) {
+      // If even the dead-letter insert fails, we still return 500 for retry
+      console.error('[Razorpay Webhook] Dead-letter insert also failed:', dlErr);
+    }
+
+    return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

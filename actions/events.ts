@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
-import { deleteObjects } from '@/lib/storage/r2-client';
+import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { getOrganizerPlanLimits, canCreateEvent } from '@/lib/plans/limits';
 
 export interface EventData {
@@ -331,10 +331,8 @@ export async function deleteEvent(eventId: string) {
       if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
     }
     if (r2Keys.length > 0) {
-      // Fire-and-forget — don't block the redirect on R2 cleanup
-      deleteObjects(r2Keys).catch((err) => {
-        console.error('Error deleting R2 objects:', err);
-      });
+      // Fire-and-forget with orphan tracking — don't block the redirect
+      deleteR2WithTracking(r2Keys, 'event_delete');
     }
   }
 
