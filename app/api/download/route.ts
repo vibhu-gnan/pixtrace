@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getR2Object, R2ConfigError, R2AccessError } from '@/lib/storage/r2-client';
+import { verifyDownloadToken } from '@/lib/storage/download-token';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
-    const r2Key = searchParams.get('r2Key');
+    const token = searchParams.get('token');
     const filename = searchParams.get('filename') || 'download';
 
-    if (!r2Key) {
-        return NextResponse.json({ error: 'Missing r2Key parameter' }, { status: 400 });
+    if (!token) {
+        return NextResponse.json({ error: 'Missing token parameter' }, { status: 400 });
     }
 
-    // Basic path-traversal prevention
+    // Verify HMAC-signed token and extract r2Key
+    const r2Key = verifyDownloadToken(token);
+    if (!r2Key) {
+        return NextResponse.json({ error: 'Invalid or expired download link' }, { status: 403 });
+    }
+
+    // Defense-in-depth: path traversal prevention
     if (r2Key.includes('..') || r2Key.startsWith('/')) {
         return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
     }

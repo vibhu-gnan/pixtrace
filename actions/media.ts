@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { deleteObjects } from '@/lib/storage/r2-client';
+import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 import { decrementStorageUsed } from '@/lib/plans/limits';
 
@@ -138,23 +138,27 @@ export async function deleteMedia(mediaId: string, eventId: string) {
     });
   }
 
-  // Clean up R2 files (fire-and-forget)
+  // Clean up R2 files (fire-and-forget with orphan tracking)
   const r2Keys: string[] = [];
   if (mediaRow.r2_key) r2Keys.push(mediaRow.r2_key);
   if (mediaRow.thumbnail_r2_key) r2Keys.push(mediaRow.thumbnail_r2_key);
   if (mediaRow.preview_r2_key) r2Keys.push(mediaRow.preview_r2_key);
   if (r2Keys.length > 0) {
-    deleteObjects(r2Keys).catch((err) => {
-      console.error('Error deleting R2 objects:', err);
-    });
+    deleteR2WithTracking(r2Keys, 'media_delete');
   }
 
   revalidatePath(`/events/${eventId}`);
   return { success: true };
 }
 
+const MAX_BULK_DELETE = 500; // Safety cap: max media items per batch delete
+
 export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
   if (!mediaIds?.length) return { success: true, deleted: 0 };
+
+  if (mediaIds.length > MAX_BULK_DELETE) {
+    return { error: `Cannot delete more than ${MAX_BULK_DELETE} items at once` };
+  }
 
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
@@ -200,7 +204,7 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
     }
   }
 
-  // Clean up R2 files (fire-and-forget)
+  // Clean up R2 files (fire-and-forget with orphan tracking)
   if (mediaRows && mediaRows.length > 0) {
     const r2Keys: string[] = [];
     for (const row of mediaRows) {
@@ -209,9 +213,7 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
       if (row.preview_r2_key) r2Keys.push(row.preview_r2_key);
     }
     if (r2Keys.length > 0) {
-      deleteObjects(r2Keys).catch((err) => {
-        console.error('Error deleting R2 objects:', err);
-      });
+      deleteR2WithTracking(r2Keys, 'multi_media_delete');
     }
   }
 
