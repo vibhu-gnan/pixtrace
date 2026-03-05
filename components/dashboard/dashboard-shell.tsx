@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import type { PlanLimits } from '@/lib/plans/limits';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { Footer } from './footer';
+import { RouteProgress } from '@/components/UI/route-progress';
 
 interface DashboardShellProps {
   organizer: OrganizerProfile;
@@ -18,6 +19,10 @@ export function DashboardShell({ organizer, planLimits, children }: DashboardShe
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
+      <Suspense fallback={null}>
+        <RouteProgress />
+      </Suspense>
+
       {/* Sidebar */}
       <Sidebar
         organizer={organizer}
@@ -33,7 +38,9 @@ export function DashboardShell({ organizer, planLimits, children }: DashboardShe
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {children}
+          <div className="animate-page-in">
+            {children}
+          </div>
         </main>
 
         {/* Footer */}
