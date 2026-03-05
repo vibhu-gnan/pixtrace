@@ -29,6 +29,7 @@ export const organizers = pgTable('organizers', {
   name: varchar('name', { length: 255 }),
   avatarUrl: text('avatar_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  isAdmin: boolean('is_admin').default(false).notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   authIdIdx: index('organizers_auth_id_idx').on(table.authId),

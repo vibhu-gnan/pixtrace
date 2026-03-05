@@ -10,6 +10,7 @@ export interface OrganizerProfile {
   plan_id: string;
   razorpay_customer_id: string | null;
   storage_used_bytes: number;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 }
