@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { EventData } from '@/actions/events';
 import { deleteEvent } from '@/actions/events';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 // ─── SVG Icons ───────────────────────────────────────────────
 
@@ -230,9 +231,9 @@ export function EventCard({ event }: EventCardProps) {
       </Link>
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteConfirm(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => !deleteLoading && setShowDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4 animate-in zoom-in-95 duration-200">
             <p className="text-sm text-gray-700">
               Delete &quot;{event.name}&quot;? This will remove the event and all its photos. This cannot be undone.
             </p>
@@ -241,7 +242,7 @@ export function EventCard({ event }: EventCardProps) {
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleteLoading}
-                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>
@@ -249,8 +250,9 @@ export function EventCard({ event }: EventCardProps) {
                 type="button"
                 onClick={handleDelete}
                 disabled={deleteLoading}
-                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-500 disabled:opacity-50"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-500 disabled:cursor-wait transition-all"
               >
+                {deleteLoading && <LoadingSpinner size="sm" />}
                 {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>

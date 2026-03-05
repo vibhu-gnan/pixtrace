@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useTransition } from 'react';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 interface FilterTab {
   label: string;
@@ -18,6 +20,7 @@ export function FilterTabs({ tabs, paramName = 'status', defaultValue = '' }: Fi
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
   const current = searchParams.get(paramName) || defaultValue;
 
   const handleClick = (value: string) => {
@@ -28,18 +31,21 @@ export function FilterTabs({ tabs, paramName = 'status', defaultValue = '' }: Fi
       params.set(paramName, value);
     }
     params.delete('page');
-    router.push(`${pathname}?${params.toString()}`);
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`);
+    });
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={`flex flex-wrap gap-2 transition-opacity duration-200 ${isPending ? 'opacity-70' : ''}`}>
       {tabs.map((tab) => {
         const isActive = current === tab.value;
         return (
           <button
             key={tab.value}
             onClick={() => handleClick(tab.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            disabled={isPending}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all disabled:cursor-wait ${
               isActive
                 ? 'bg-brand-500 text-white shadow-sm'
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
@@ -48,12 +54,15 @@ export function FilterTabs({ tabs, paramName = 'status', defaultValue = '' }: Fi
             {tab.label}
             {tab.count !== undefined && (
               <span
-                className={`ml-1.5 text-xs ${
+                className={`text-xs ${
                   isActive ? 'text-brand-200' : 'text-gray-400'
                 }`}
               >
                 {tab.count}
               </span>
+            )}
+            {isPending && isActive && (
+              <LoadingSpinner size="sm" className="text-white" />
             )}
           </button>
         );

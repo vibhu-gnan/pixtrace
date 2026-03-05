@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createAlbum } from '@/actions/albums';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 interface CreateAlbumFormProps {
   eventId: string;
@@ -81,8 +82,9 @@ export function CreateAlbumForm({ eventId, onAlbumCreated, onCancel }: CreateAlb
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:cursor-wait transition-all"
         >
+          {loading && <LoadingSpinner size="sm" />}
           {loading ? 'Creating...' : 'Create Album'}
         </button>
         <button

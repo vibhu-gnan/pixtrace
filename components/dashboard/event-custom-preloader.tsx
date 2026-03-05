@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateEventCustomPreloader } from '@/actions/events';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 interface EventCustomPreloaderProps {
     eventId: string;
@@ -115,8 +116,9 @@ export function EventCustomPreloader({ eventId, initialHtml }: EventCustomPreloa
                             type="button"
                             onClick={handleSave}
                             disabled={isSaving || !hasChanges || isOverLimit || !html.trim()}
-                            className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                         >
+                            {isSaving && <LoadingSpinner size="sm" />}
                             {isSaving ? 'Saving...' : 'Save Preloader'}
                         </button>
                         {savedHtml && (

@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useTransition } from 'react';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 interface PaginationProps {
   currentPage: number;
@@ -14,6 +15,7 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const goToPage = useCallback(
     (page: number) => {
@@ -23,7 +25,9 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
       } else {
         params.set('page', String(page));
       }
-      router.push(`${pathname}?${params.toString()}`);
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`);
+      });
     },
     [router, pathname, searchParams]
   );
@@ -52,17 +56,20 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
   }
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-      <p className="text-sm text-gray-500">
-        Showing <span className="font-medium text-gray-700">{start}</span>–
-        <span className="font-medium text-gray-700">{end}</span> of{' '}
-        <span className="font-medium text-gray-700">{totalItems}</span>
-      </p>
+    <div className={`flex items-center justify-between px-6 py-4 border-t border-gray-100 transition-opacity duration-200 ${isPending ? 'opacity-60' : ''}`}>
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-gray-500">
+          Showing <span className="font-medium text-gray-700">{start}</span>–
+          <span className="font-medium text-gray-700">{end}</span> of{' '}
+          <span className="font-medium text-gray-700">{totalItems}</span>
+        </p>
+        {isPending && <LoadingSpinner size="sm" className="text-brand-500" />}
+      </div>
 
       <div className="flex items-center gap-1">
         <button
           onClick={() => goToPage(currentPage - 1)}
-          disabled={currentPage <= 1}
+          disabled={currentPage <= 1 || isPending}
           className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Prev
@@ -77,7 +84,8 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
             <button
               key={p}
               onClick={() => goToPage(p)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              disabled={isPending}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:cursor-wait ${
                 p === currentPage
                   ? 'bg-brand-500 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -90,7 +98,7 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
 
         <button
           onClick={() => goToPage(currentPage + 1)}
-          disabled={currentPage >= totalPages}
+          disabled={currentPage >= totalPages || isPending}
           className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Next

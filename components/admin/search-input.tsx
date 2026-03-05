@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useTransition } from 'react';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -23,6 +24,7 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const currentValue = searchParams.get(paramName) || '';
 
@@ -48,7 +50,9 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
         }
         // Reset to page 1 on search
         params.delete('page');
-        router.push(`${pathname}?${params.toString()}`);
+        startTransition(() => {
+          router.push(`${pathname}?${params.toString()}`);
+        });
       }, 300);
     },
     [router, pathname, searchParams, paramName]
@@ -63,14 +67,18 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
 
   return (
     <div className="relative w-full max-w-sm">
-      <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      {isPending ? (
+        <LoadingSpinner size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
+      ) : (
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      )}
       <input
         ref={inputRef}
         type="text"
         defaultValue={currentValue}
         onChange={handleChange}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-300 transition-shadow"
+        className={`w-full pl-10 pr-4 py-2 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-300 transition-all ${isPending ? 'border-brand-300' : ''}`}
       />
     </div>
   );

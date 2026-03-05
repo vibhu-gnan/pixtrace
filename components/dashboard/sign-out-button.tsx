@@ -17,8 +17,10 @@ function LogOutIcon({ className }: { className?: string }) {
 export function SignOutButton() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
       setError(null);
       const supabase = createClient();
@@ -33,6 +35,7 @@ export function SignOutButton() {
     } catch (err: any) {
       console.error('Sign out error:', err);
       setError(err.message || 'Failed to sign out');
+      setSigningOut(false);
     }
   };
 
@@ -40,11 +43,12 @@ export function SignOutButton() {
     <>
       <button
         onClick={handleSignOut}
-        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+        disabled={signingOut}
+        className={`p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all flex-shrink-0 ${signingOut ? 'animate-pulse cursor-wait' : ''}`}
         aria-label="Sign out"
         title="Sign out"
       >
-        <LogOutIcon />
+        <LogOutIcon className={signingOut ? 'animate-spin' : undefined} />
       </button>
       {error && (
         <div className="absolute top-full right-0 mt-2 p-2 bg-red-50 text-red-800 text-xs rounded-md shadow-lg z-50">

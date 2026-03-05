@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toggleUserAdmin, changeUserPlan } from '@/actions/admin';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 interface UserAdminActionsProps {
   userId: string;
@@ -54,12 +55,13 @@ export function UserAdminActions({ userId, isAdmin, currentPlan }: UserAdminActi
       <button
         onClick={handleToggleAdmin}
         disabled={isPending}
-        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all disabled:cursor-wait ${
           isAdmin
             ? 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
             : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
         }`}
       >
+        {isPending && <LoadingSpinner size="sm" />}
         {isAdmin ? 'Remove Admin' : 'Make Admin'}
       </button>
 
@@ -79,8 +81,9 @@ export function UserAdminActions({ userId, isAdmin, currentPlan }: UserAdminActi
         <button
           onClick={handleChangePlan}
           disabled={isPending || selectedPlan === currentPlan}
-          className="px-3 py-1.5 text-sm font-medium rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
+          {isPending && <LoadingSpinner size="sm" />}
           Update Plan
         </button>
       </div>

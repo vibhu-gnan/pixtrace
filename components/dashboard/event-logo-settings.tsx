@@ -4,6 +4,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateEventLogo, updateEventLogoDisplay } from '@/actions/events';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 type LogoDisplayOption = 'cover_and_loading' | 'loading_only' | 'none';
 
@@ -182,9 +183,10 @@ export function EventLogoSettings({ eventId, initialLogoUrl, initialLogoDisplay 
                             />
                             <label
                                 htmlFor="logo-upload"
-                                className={`inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer ${(isUploading || isRemoving) ? 'opacity-50 pointer-events-none' : ''
+                                className={`inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-all ${(isUploading || isRemoving) ? 'opacity-70 cursor-wait pointer-events-none' : ''
                                     }`}
                             >
+                                {isUploading && <LoadingSpinner size="sm" className="text-gray-500" />}
                                 {isUploading ? 'Uploading...' : logoUrl ? 'Change Logo' : 'Upload Logo'}
                             </label>
                         </div>

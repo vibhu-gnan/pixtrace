@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createEvent } from '@/actions/events';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 import Link from 'next/link';
 
 export default function NewEventPage() {
@@ -112,8 +113,9 @@ export default function NewEventPage() {
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-500 transition-all disabled:cursor-wait"
           >
+            {loading && <LoadingSpinner size="sm" />}
             {loading ? 'Creating...' : 'Create Event'}
           </button>
           <Link

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateInquiryStatus } from '@/actions/admin';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 interface InquiryActionsProps {
   inquiryId: string;
@@ -77,8 +78,9 @@ export function InquiryActions({
         <button
           onClick={handleSave}
           disabled={isPending}
-          className="px-3 py-1 text-xs font-medium rounded bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded bg-brand-500 text-white hover:bg-brand-600 disabled:cursor-wait transition-all"
         >
+          {isPending && <LoadingSpinner size="sm" />}
           {isPending ? 'Saving...' : 'Save'}
         </button>
         <button
