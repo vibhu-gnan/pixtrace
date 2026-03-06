@@ -1,5 +1,6 @@
 import { requireAdmin } from '@/lib/admin/auth';
 import { AdminShell } from '@/components/admin/admin-shell';
+import { RouteProgress } from '@/components/UI/route-progress';
 
 export default async function AdminLayout({
   children,
@@ -9,8 +10,11 @@ export default async function AdminLayout({
   const organizer = await requireAdmin();
 
   return (
-    <AdminShell organizer={organizer}>
-      {children}
-    </AdminShell>
+    <>
+      <RouteProgress />
+      <AdminShell organizer={organizer}>
+        {children}
+      </AdminShell>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 export default function UserDetailLoading() {
   return (
-    <div className="animate-page-in space-y-6 max-w-4xl">
+    <div className="skeleton-enter space-y-6 max-w-4xl">
       {/* Back link */}
       <div className="h-4 w-20 rounded skeleton-shimmer" />
 

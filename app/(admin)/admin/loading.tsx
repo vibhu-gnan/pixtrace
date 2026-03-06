@@ -1,6 +1,6 @@
 export default function AdminLoading() {
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="skeleton-enter space-y-6">
       <div className="h-7 w-44 rounded skeleton-shimmer" />
 
       {/* Stats row 1 */}

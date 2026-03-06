@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { getOrganizerPlanLimits } from '@/lib/plans/limits';
 import { DashboardShell } from '@/components/dashboard/dashboard-shell';
+import { RouteProgress } from '@/components/UI/route-progress';
 
 export default async function DashboardLayout({
   children,
@@ -17,8 +18,11 @@ export default async function DashboardLayout({
   const planLimits = await getOrganizerPlanLimits(organizer.id);
 
   return (
-    <DashboardShell organizer={organizer} planLimits={planLimits}>
-      {children}
-    </DashboardShell>
+    <>
+      <RouteProgress />
+      <DashboardShell organizer={organizer} planLimits={planLimits}>
+        {children}
+      </DashboardShell>
+    </>
   );
 }

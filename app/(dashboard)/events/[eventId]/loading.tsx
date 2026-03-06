@@ -1,6 +1,6 @@
 export default function EventLoading() {
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="skeleton-enter space-y-6">
       {/* Header skeleton */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">

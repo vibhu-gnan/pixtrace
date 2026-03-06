@@ -1,6 +1,6 @@
 export default function PermissionsLoading() {
   return (
-    <div className="animate-page-in space-y-6 max-w-2xl">
+    <div className="skeleton-enter space-y-6 max-w-2xl">
       <div className="h-7 w-36 rounded skeleton-shimmer" />
 
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">

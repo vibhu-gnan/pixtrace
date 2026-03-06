@@ -1,6 +1,6 @@
 export default function FaceJobsLoading() {
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="skeleton-enter space-y-6">
       <div className="flex items-center justify-between">
         <div className="h-7 w-36 rounded skeleton-shimmer" />
         <div className="h-9 w-32 rounded-lg skeleton-shimmer" />

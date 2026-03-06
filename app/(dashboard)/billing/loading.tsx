@@ -1,6 +1,6 @@
 export default function BillingLoading() {
   return (
-    <div className="animate-page-in space-y-6 max-w-4xl">
+    <div className="skeleton-enter space-y-6 max-w-4xl">
       <div className="h-7 w-28 rounded skeleton-shimmer" />
 
       {/* Current plan card */}

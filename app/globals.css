@@ -72,20 +72,16 @@ body {
   50%      { transform: scale(1.03); }
 }
 
-/* Page content fade-in */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Skeleton entrance — used only in loading.tsx files (temporary placeholders).
+   No fill-mode: element is visible (opacity 1) by default, so if the
+   animation fails to fire the content is never hidden. */
+@keyframes skeletonEnter {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
 }
 
-.animate-page-in {
-  animation: fadeInUp 0.25s ease-out both;
+.skeleton-enter {
+  animation: skeletonEnter 0.2s ease-out;
 }
 
 /* Skeleton shimmer */
@@ -119,7 +115,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-slideshow-img,
-  .animate-page-in {
+  .skeleton-enter {
     animation: none !important;
   }
   .skeleton-shimmer {

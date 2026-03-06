@@ -1,6 +1,6 @@
 export default function SettingsLoading() {
   return (
-    <div className="animate-page-in space-y-6 max-w-2xl">
+    <div className="skeleton-enter space-y-6 max-w-2xl">
       <div className="h-7 w-32 rounded skeleton-shimmer" />
 
       {/* Form sections */}

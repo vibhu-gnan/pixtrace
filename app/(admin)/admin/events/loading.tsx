@@ -1,6 +1,6 @@
 export default function AdminEventsLoading() {
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="skeleton-enter space-y-6">
       <div className="flex items-center justify-between">
         <div className="h-7 w-28 rounded skeleton-shimmer" />
         <div className="h-9 w-48 rounded-lg skeleton-shimmer" />

@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState } from 'react';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import { AdminSidebar } from './admin-sidebar';
 import { AdminTopBar } from './admin-top-bar';
-import { RouteProgress } from '@/components/UI/route-progress';
 
 interface AdminShellProps {
   organizer: OrganizerProfile;
@@ -16,10 +15,6 @@ export function AdminShell({ organizer, children }: AdminShellProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Suspense fallback={null}>
-        <RouteProgress />
-      </Suspense>
-
       <AdminSidebar
         organizer={organizer}
         open={sidebarOpen}

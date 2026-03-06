@@ -1,6 +1,6 @@
 export default function InquiriesLoading() {
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="skeleton-enter space-y-6">
       <div className="h-7 w-28 rounded skeleton-shimmer" />
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

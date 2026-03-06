@@ -1,6 +1,6 @@
 export default function DesignLoading() {
   return (
-    <div className="animate-page-in space-y-6">
+    <div className="skeleton-enter space-y-6">
       <div className="h-7 w-36 rounded skeleton-shimmer" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
