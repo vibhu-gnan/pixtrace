@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useUploadStore } from '@/lib/upload/upload-manager';
 import { UploadBanner } from './upload-banner';
 import { PhotoGrid } from './photo-grid';
@@ -103,6 +103,7 @@ interface PhotosPageClientProps {
 
 function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: initialAlbums, event, savedCoverPreviewUrl, initialHasMore = false, totalPhotos = 0, totalVideos = 0 }: PhotosPageClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const albumIdFromUrl = searchParams.get('album');
 
@@ -127,9 +128,24 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
   const failureCountRef = useRef(0);
   const requestIdRef = useRef(0); // Guards concurrent album switches
 
-  // Default to 'photos' view if there are photos, otherwise show albums
-  const [viewMode, setViewMode] = useState<ViewMode>(initialMedia.length > 0 ? 'photos' : 'albums');
-  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
+  // Default to albums (grid) view; respect ?album= URL param for deep links
+  const [viewMode, setViewMode] = useState<ViewMode>(albumIdFromUrl ? 'photos' : 'albums');
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(albumIdFromUrl || null);
+
+  // ─── URL Sync ─────────────────────────────────────────────
+  // Keep URL in sync with view state (shallow — no server re-fetch)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const params = new URLSearchParams();
+    if (activeAlbumId) params.set('album', activeAlbumId);
+    const qs = params.toString();
+    const url = qs ? `${pathname}?${qs}` : pathname;
+    window.history.replaceState(null, '', url);
+  }, [viewMode, activeAlbumId, pathname]);
 
   // ─── Cover Selection State ─────────────────────────────────
   const [coverSelectionMode, setCoverSelectionMode] = useState<null | 'single' | 'slideshow-custom' | 'slideshow-mobile'>(null);
@@ -148,13 +164,30 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
 
   // ─── Sync on server refresh (e.g. after upload completes) ──
   useEffect(() => {
-    setMedia(initialMedia);
-    setHasMore(initialHasMore);
-    hasMoreRef.current = initialHasMore;
-    mediaRef.current = initialMedia;
-    failureCountRef.current = 0;
-    setScrollError(null);
-  }, [initialMedia, initialHasMore]);
+    // Don't overwrite if we're viewing a specific album (data is album-filtered)
+    if (!activeAlbumId) {
+      setMedia(initialMedia);
+      setHasMore(initialHasMore);
+      hasMoreRef.current = initialHasMore;
+      mediaRef.current = initialMedia;
+      failureCountRef.current = 0;
+      setScrollError(null);
+    }
+  }, [initialMedia, initialHasMore, activeAlbumId]);
+
+  // Fetch album-specific media when arriving via ?album= deep link
+  const didInitialAlbumFetch = useRef(false);
+  useEffect(() => {
+    if (albumIdFromUrl && !didInitialAlbumFetch.current) {
+      didInitialAlbumFetch.current = true;
+      getMediaPage(eventId, null, undefined, albumIdFromUrl).then(({ media: albumMedia, hasMore: more }) => {
+        setMedia(albumMedia);
+        mediaRef.current = albumMedia;
+        hasMoreRef.current = more;
+        setHasMore(more);
+      }).catch(() => {});
+    }
+  }, [albumIdFromUrl, eventId]);
 
   // Keep refs in sync
   useEffect(() => { mediaRef.current = media; }, [media]);
@@ -165,17 +198,8 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
   const videoCount = totalVideos;
   const albumCount = initialAlbums.length;
 
-  // Build a map of albumId → first image preview URL for covers (fallback to thumbnail)
-  const albumCoverMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of media) {
-      if (item.media_type === 'image' && !map.has(item.album_id)) {
-        const coverUrl = item.preview_url || item.original_url;
-        if (coverUrl) map.set(item.album_id, coverUrl);
-      }
-    }
-    return map;
-  }, [media]);
+  // Album cover URLs are provided server-side via AlbumData.cover_url
+  // No client-side media scanning needed — scales regardless of media count
 
   // Filtered media for photos view
   const filteredMedia = useMemo(() => {
@@ -656,7 +680,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
               <AlbumCard
                 key={album.id}
                 album={album}
-                coverUrl={albumCoverMap.get(album.id) || null}
+                coverUrl={album.cover_url || null}
                 onClick={() => handleAlbumClick(album.id)}
               />
             ))}

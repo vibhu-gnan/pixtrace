@@ -14,6 +14,7 @@ export interface AlbumData {
   created_at: string;
   updated_at: string;
   media_count?: number;
+  cover_url?: string | null;
 }
 
 export async function createAlbum(eventId: string, formData: FormData) {
@@ -102,9 +103,47 @@ export async function getAlbums(eventId: string): Promise<AlbumData[]> {
     return [];
   }
 
+  // Fetch exactly one cover image per album via Postgres DISTINCT ON (returns N rows for N albums)
+  const albumIds = (albums || []).map((a: any) => a.id);
+  const coverMap = new Map<string, string>();
+
+  if (albumIds.length > 0) {
+    const { data: coverMedia, error: coverErr } = await supabase
+      .rpc('get_album_covers', { album_ids: albumIds });
+
+    if (coverMedia && !coverErr) {
+      for (const m of coverMedia) {
+        const key = m.preview_r2_key || m.r2_key;
+        if (key) {
+          coverMap.set(m.album_id, `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`);
+        }
+      }
+    } else {
+      // Fallback: if RPC unavailable (e.g. migration not yet applied on prod), use client-side dedup
+      const { data: fallbackMedia } = await supabase
+        .from('media')
+        .select('album_id, preview_r2_key, r2_key')
+        .in('album_id', albumIds)
+        .eq('media_type', 'image')
+        .order('created_at', { ascending: true });
+
+      if (fallbackMedia) {
+        for (const m of fallbackMedia) {
+          if (!coverMap.has(m.album_id)) {
+            const key = m.preview_r2_key || m.r2_key;
+            if (key) {
+              coverMap.set(m.album_id, `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
   return (albums || []).map((album: any) => ({
     ...album,
     media_count: album.media?.length || 0,
+    cover_url: coverMap.get(album.id) || null,
     media: undefined,
   }));
 }
