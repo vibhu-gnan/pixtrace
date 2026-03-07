@@ -94,7 +94,7 @@ export function CoverBar({
   const currentPreviewUrl = useMemo(() => {
     if (heroMode === 'single' && coverSingleSelectedId) {
       const found = images.find(m => m.id === coverSingleSelectedId);
-      return found?.thumbnail_url ?? null;
+      return found?.preview_url ?? null;
     }
     return savedCoverPreviewUrl;
   }, [heroMode, coverSingleSelectedId, images, savedCoverPreviewUrl]);
@@ -266,7 +266,7 @@ export function CoverBar({
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={images.find(m => m.id === coverSingleSelectedId)?.thumbnail_url}
+                      src={images.find(m => m.id === coverSingleSelectedId)?.preview_url}
                       alt="Selected"
                       className="w-full h-full object-cover"
                     />
@@ -341,7 +341,7 @@ export function CoverBar({
                     return (
                       <div key={id} className="relative flex-shrink-0 w-16 h-12 rounded-md overflow-hidden bg-gray-100 group">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.thumbnail_url} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
+                        <img src={item.preview_url} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
                         <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">{index + 1}</span>
                         <button onClick={() => handleRemoveFromSlideshow(id)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <XIcon className="w-3 h-3" />
@@ -385,7 +385,7 @@ export function CoverBar({
                     return (
                       <div key={id} className="relative flex-shrink-0 w-10 h-14 rounded-md overflow-hidden bg-gray-100 group">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.thumbnail_url} alt={`Mobile slide ${index + 1}`} className="w-full h-full object-cover" />
+                        <img src={item.preview_url} alt={`Mobile slide ${index + 1}`} className="w-full h-full object-cover" />
                         <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">{index + 1}</span>
                         <button onClick={() => handleRemoveFromMobileSlideshow(id)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <XIcon className="w-3 h-3" />
@@ -433,7 +433,7 @@ export function CoverBar({
               {images.slice(0, 5).map((img, i) => (
                 <div key={img.id} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white bg-gray-100" style={{ zIndex: 5 - i }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                  <img src={img.preview_url} alt="" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>

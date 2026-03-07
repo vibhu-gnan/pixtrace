@@ -301,8 +301,8 @@ interface PhotoThumbnailProps {
 
 function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLongPress, onView, coverSelectionMode, isCoverSelected, onCoverClick }: PhotoThumbnailProps) {
   const [loaded, setLoaded] = useState(false);
-  // Fallback chain: preview → thumbnail → original
-  const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
+  // Fallback chain: preview (1200×1200) → original
+  const [imgSrc, setImgSrc] = useState(item.preview_url || item.original_url);
 
   const handleClick = () => {
     if (coverSelectionMode) {
@@ -322,10 +322,8 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
   };
 
   const handleImageError = () => {
-    // Fallback: preview failed → try thumbnail → try original
-    if (imgSrc === item.full_url && item.thumbnail_url) {
-      setImgSrc(item.thumbnail_url);
-    } else if (imgSrc !== item.original_url) {
+    // Fallback: preview failed → try original
+    if (imgSrc !== item.original_url && item.original_url) {
       setImgSrc(item.original_url);
     }
   };
@@ -369,11 +367,6 @@ function PhotoThumbnail({ item, index, selectionMode, selected, onSelect, onLong
           ? 'ring-2 ring-brand-500 ring-offset-1'
           : ''
         }`}
-      style={
-        item.blur_url
-          ? { backgroundImage: `url(${item.blur_url})`, backgroundSize: 'cover' }
-          : undefined
-      }
       onClick={handleClick}
       onContextMenu={coverSelectionMode ? undefined : handleContextMenu}
     >

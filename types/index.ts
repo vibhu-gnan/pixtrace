@@ -28,7 +28,7 @@ export interface Photo {
   event_id: string;
   filename: string;
   original_url: string;
-  thumbnail_url: string;
+  preview_url: string;
   file_size: number;
   width: number;
   height: number;

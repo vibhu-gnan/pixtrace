@@ -8,8 +8,7 @@ export interface FaceSearchResult {
   media_id: string;
   album_id: string;
   r2_key: string;
-  thumbnail_url: string;
-  full_url: string;
+  preview_url: string;
   original_url: string;
   width: number | null;
   height: number | null;

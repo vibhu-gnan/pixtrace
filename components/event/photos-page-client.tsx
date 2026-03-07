@@ -10,6 +10,7 @@ import { CreateAlbumCard } from './create-album-card';
 import { AlbumsEmptyState } from './albums-empty-state';
 import { CreateAlbumForm } from '@/components/dashboard/create-album-form';
 import { CoverBar } from './cover-bar';
+import { ImportTab } from './import-tab';
 import type { MediaItem } from '@/actions/media';
 import type { AlbumData } from '@/actions/albums';
 import type { EventData } from '@/actions/events';
@@ -30,7 +31,7 @@ const ACCEPTED_TYPES = [
 
 // ─── Types ───────────────────────────────────────────────────
 
-type ViewMode = 'albums' | 'photos';
+type ViewMode = 'albums' | 'photos' | 'import';
 
 // ─── Icons ───────────────────────────────────────────────────
 
@@ -63,6 +64,16 @@ function PlusIcon({ className }: { className?: string }) {
     <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function ImportIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   );
 }
@@ -128,7 +139,7 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
     const map = new Map<string, string>();
     for (const item of media) {
       if (item.media_type === 'image' && !map.has(item.album_id)) {
-        const coverUrl = item.full_url || item.thumbnail_url;
+        const coverUrl = item.preview_url || item.original_url;
         if (coverUrl) map.set(item.album_id, coverUrl);
       }
     }
@@ -460,6 +471,16 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
           >
             <GridIcon />
           </button>
+          <button
+            onClick={() => setViewMode('import')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'import'
+              ? 'text-brand-500 bg-brand-50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+            title="Import from Drive"
+          >
+            <ImportIcon />
+          </button>
 
           {/* Add Album button */}
           <button
@@ -484,7 +505,14 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
       )}
 
       {/* Content based on view mode */}
-      {viewMode === 'albums' ? (
+      {viewMode === 'import' ? (
+        // ─── Import View ────────────────────────────────────
+        <ImportTab
+          eventId={eventId}
+          albums={initialAlbums}
+          onImportComplete={() => { router.refresh(); setViewMode('photos'); }}
+        />
+      ) : viewMode === 'albums' ? (
         // ─── Albums View ─────────────────────────────────────
         initialAlbums.length === 0 ? (
           <AlbumsEmptyState onAddAlbum={() => setShowAlbumForm(true)} />

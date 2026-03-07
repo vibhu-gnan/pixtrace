@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { FACE_SEARCH } from '@/lib/face/constants';
 import { runRecallSearch } from '@/lib/face/recall-search';
-import { getThumbnailUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -112,8 +112,7 @@ export async function POST(request: NextRequest) {
         media_id: m.id,
         album_id: m.album_id,
         r2_key: m.r2_key,
-        thumbnail_url: await getThumbnailUrl(m.r2_key, 200, m.preview_r2_key),
-        full_url: await getPreviewUrl(m.r2_key, m.preview_r2_key),
+        preview_url: await getPreviewUrl(m.r2_key, m.preview_r2_key),
         original_url: await getOriginalUrl(m.r2_key),
         width: m.width,
         height: m.height,

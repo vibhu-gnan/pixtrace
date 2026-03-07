@@ -80,9 +80,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
         height: img.height,
         processing_status: 'completed',
         created_at: '',
-        thumbnail_url: img.thumbnail_url,
-        blur_url: img.blur_url,
-        full_url: img.full_url,
+        preview_url: img.preview_url,
         original_url: img.original_url,
     })), [images]);
 
@@ -184,14 +182,12 @@ function MasonryThumbnail({
     showFaceScores?: boolean;
 }) {
     const [loaded, setLoaded] = useState(false);
-    const [imgSrc, setImgSrc] = useState(item.full_url || item.thumbnail_url || item.original_url);
+    const [imgSrc, setImgSrc] = useState(item.preview_url || item.original_url);
     const refreshAttempted = useRef(false);
 
     const handleImageError = () => {
-        // Fallback chain: full_url → thumbnail_url → original_url → server refresh
-        if (imgSrc === item.full_url && item.thumbnail_url) {
-            setImgSrc(item.thumbnail_url);
-        } else if (imgSrc !== item.original_url) {
+        // Fallback chain: preview → original → server refresh
+        if (imgSrc !== item.original_url && item.original_url) {
             setImgSrc(item.original_url);
         } else if (!refreshAttempted.current && eventHash) {
             // All local variants failed — URLs likely expired. Refresh from server.
@@ -215,9 +211,6 @@ function MasonryThumbnail({
             className="relative overflow-hidden bg-gray-100 group cursor-pointer"
             style={{
                 aspectRatio: aspect,
-                ...(item.blur_url
-                    ? { backgroundImage: `url(${item.blur_url})`, backgroundSize: 'cover' }
-                    : {}),
             }}
             onClick={onClick}
         >

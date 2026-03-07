@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         }
 
         const fallbackImage = media.find((m) => m.media_type === 'image');
-        const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url;
+        const coverUrl = resolvedCoverUrl || fallbackImage?.preview_url || fallbackImage?.original_url;
 
         return {
             title: `${event.name} | PIXTRACE Gallery`,
@@ -85,7 +85,7 @@ export default async function GallerySlugPage({
 
         // Use resolved cover URL, or fall back to first image in media
         const fallbackImage = media.find((m) => m.media_type === 'image');
-        const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
+        const coverUrl = resolvedCoverUrl || fallbackImage?.preview_url || fallbackImage?.original_url || '';
         const firstSlideUrl = heroSlides[0]?.url || coverUrl;
         const hasSlideshow = heroSlides.length > 1;
 

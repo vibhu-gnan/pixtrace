@@ -1,7 +1,7 @@
 'use server';
 
 import { getPublicClient } from '@/lib/supabase/public';
-import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
 export interface HeroSlide {
     url: string;
@@ -44,9 +44,9 @@ export interface GalleryMediaItem {
     media_type: 'image' | 'video';
     width: number | null;
     height: number | null;
-    thumbnail_url: string;
-    blur_url: string;
-    full_url: string;
+    /** 1200×1200 preview WebP — used for grid + lightbox initial view */
+    preview_url: string;
+    /** Full-resolution original — loaded after intent detection in lightbox */
     original_url: string;
     created_at?: string;
     /** DEBUG: face search combined score — TEMPORARY, remove before production */
@@ -149,7 +149,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     if (event.cover_media_id) {
         const inPage = media.find(m => m.id === event.cover_media_id);
         if (inPage) {
-            coverUrl = inPage.full_url || inPage.original_url;
+            coverUrl = inPage.preview_url || inPage.original_url;
             coverR2Key = inPage.r2_key;
         } else {
             const { data: coverRow } = await (supabase
@@ -335,9 +335,7 @@ async function mapMediaRows(
         media_type: item.media_type,
         width: item.width,
         height: item.height,
-        thumbnail_url: item.media_type === 'image' ? await getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
-        blur_url: item.media_type === 'image' ? await getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
-        full_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
+        preview_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
         original_url: item.media_type === 'image' ? await getOriginalUrl(item.r2_key) : '',
         created_at: item.created_at || new Date().toISOString(), // Fallback for old items
     })));

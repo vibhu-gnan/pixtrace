@@ -1,9 +1,10 @@
 /**
  * Image URL utilities — Safe wrappers around presigned URL signing.
  *
- * Every function catches signing failures and returns '' instead of crashing.
- * This means one broken image URL never takes down the entire gallery page.
+ * Two files per image in R2: original + _preview.webp (1200×1200).
+ * Grid shows preview, lightbox shows preview then loads original.
  *
+ * Every function catches signing failures and returns '' instead of crashing.
  * All functions are async because URL signing uses HMAC (local, ~0.1ms per URL).
  * URLs expire after 4 hours by default.
  */
@@ -33,25 +34,8 @@ export async function getOriginalUrl(r2Key: string): Promise<string> {
 }
 
 /**
- * Get thumbnail URL (for grid display).
- * Uses the preview variant if available, falls back to original.
- * Returns '' if all signing attempts fail.
- */
-export async function getThumbnailUrl(
-  r2Key: string,
-  _size: number = 200,
-  previewR2Key?: string | null,
-): Promise<string> {
-  if (previewR2Key) {
-    const url = await safeSign(previewR2Key);
-    if (url) return url;
-  }
-  return safeSign(r2Key);
-}
-
-/**
- * Get preview URL (for lightbox view).
- * Uses pre-computed 1200×1200 WebP variant if available, falls back to original.
+ * Get preview URL (1200×1200 WebP) for grid display and lightbox initial view.
+ * Falls back to original if preview variant doesn't exist.
  * Returns '' if all signing attempts fail.
  */
 export async function getPreviewUrl(
@@ -63,16 +47,4 @@ export async function getPreviewUrl(
     if (url) return url;
   }
   return safeSign(r2Key);
-}
-
-/**
- * Get blur placeholder URL (for progressive loading).
- * Uses preview variant as placeholder.
- * Returns '' if all signing attempts fail.
- */
-export async function getBlurPlaceholderUrl(
-  r2Key: string,
-  previewR2Key?: string | null,
-): Promise<string> {
-  return getThumbnailUrl(r2Key, 200, previewR2Key);
 }

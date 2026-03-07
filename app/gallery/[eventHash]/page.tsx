@@ -115,7 +115,7 @@ export default async function GalleryEventPage({
 
     // Use resolved cover URL, or fall back to first image in media
     const fallbackImage = media.find((m) => m.media_type === 'image');
-    const coverUrl = resolvedCoverUrl || fallbackImage?.full_url || fallbackImage?.original_url || '';
+    const coverUrl = resolvedCoverUrl || fallbackImage?.preview_url || fallbackImage?.original_url || '';
     // Pick the first portrait mobile slide for story cards (9:16 format)
     const portraitSlide = mobileHeroSlides.find(s => s.width && s.height && s.height > s.width);
     const mobileCoverUrl = portraitSlide?.url || mobileHeroSlides[0]?.url || '';

@@ -17,11 +17,7 @@ export function canGenerateVariants(mimeType: string): boolean {
 
 export async function generateImageVariants(file: File): Promise<ImageVariants> {
   const img = await loadImage(file);
-
-  const [preview] = await Promise.all([
-    createContainFit(img, 1200, 1200, 0.80),
-  ]);
-
+  const preview = await createContainFit(img, 1200, 1200, 0.80);
   return { preview };
 }
 

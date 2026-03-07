@@ -122,9 +122,7 @@ export function GalleryPageClient({
             media_type: 'image' as const,
             width: r.width,
             height: r.height,
-            thumbnail_url: r.thumbnail_url,
-            blur_url: '',
-            full_url: r.full_url,
+            preview_url: r.preview_url,
             original_url: r.original_url,
             created_at: undefined,
             _debugScore: r.score, // DEBUG: temporary score overlay
@@ -617,7 +615,7 @@ export function GalleryPageClient({
                 <ShareSheet
                     isOpen={headerShareSheetOpen}
                     onClose={() => setHeaderShareSheetOpen(false)}
-                    photoUrl={mobileCoverUrl || coverUrl || media[0].full_url || media[0].original_url}
+                    photoUrl={mobileCoverUrl || coverUrl || media[0].preview_url || media[0].original_url}
                     photoR2Key={media[0]?.r2_key}
                     eventName={eventName}
                     logoUrl={logoUrl}

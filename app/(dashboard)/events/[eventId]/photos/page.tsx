@@ -24,11 +24,11 @@ export default async function PhotosPage({
   let savedCoverPreviewUrl: string | null = null;
   if (event.cover_media_id) {
     const found = media.find(m => m.id === event.cover_media_id);
-    savedCoverPreviewUrl = found?.thumbnail_url ?? null;
+    savedCoverPreviewUrl = found?.preview_url ?? null;
   }
   if (!savedCoverPreviewUrl && media.length > 0) {
     const firstImage = media.find(m => m.media_type === 'image');
-    savedCoverPreviewUrl = firstImage?.thumbnail_url ?? null;
+    savedCoverPreviewUrl = firstImage?.preview_url ?? null;
   }
 
   return (

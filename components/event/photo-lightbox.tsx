@@ -372,7 +372,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
 
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    if (isImageCached(currentPhoto.full_url)) {
+    if (isImageCached(currentPhoto.preview_url)) {
       setLoadingPhase('preview');
     } else {
       setLoadingPhase('thumbnail');
@@ -384,11 +384,11 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       return;
     }
 
-    if (!isImageCached(currentPhoto.full_url)) {
+    if (!isImageCached(currentPhoto.preview_url)) {
       const previewImg = new Image();
-      previewImg.src = currentPhoto.full_url;
+      previewImg.src = currentPhoto.preview_url;
       previewImg.onload = () => {
-        cacheImage(currentPhoto.full_url);
+        cacheImage(currentPhoto.preview_url);
         setLoadingPhase((current) => current === 'thumbnail' ? 'preview' : current);
       };
     }
@@ -418,8 +418,8 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     preloadAdjacent();
 
     function preloadAdjacent() {
-      if (currentIndex > 0) preloadImage(media[currentIndex - 1].full_url);
-      if (currentIndex < media.length - 1) preloadImage(media[currentIndex + 1].full_url);
+      if (currentIndex > 0) preloadImage(media[currentIndex - 1].preview_url);
+      if (currentIndex < media.length - 1) preloadImage(media[currentIndex + 1].preview_url);
     }
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -626,9 +626,9 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
   const displayImage = refreshedSrc
     ? refreshedSrc
     : loadingPhase === 'thumbnail'
-      ? currentPhoto.thumbnail_url
+      ? currentPhoto.preview_url
       : loadingPhase === 'preview' || loadingPhase === 'loading_original'
-        ? currentPhoto.full_url
+        ? currentPhoto.preview_url
         : currentPhoto.original_url;
 
   return (
@@ -736,7 +736,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
       <ShareSheet
         isOpen={shareSheetOpen}
         onClose={() => setShareSheetOpen(false)}
-        photoUrl={currentPhoto.full_url}
+        photoUrl={currentPhoto.preview_url}
         photoR2Key={currentPhoto.r2_key}
         eventName={eventName}
         logoUrl={logoUrl}

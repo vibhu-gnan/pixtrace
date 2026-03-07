@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
-import { getThumbnailUrl, getBlurPlaceholderUrl, getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 import { decrementStorageUsed } from '@/lib/plans/limits';
 
 export interface MediaItem {
@@ -20,9 +20,9 @@ export interface MediaItem {
   height: number | null;
   processing_status: string;
   created_at?: string;
-  thumbnail_url: string;
-  blur_url: string;
-  full_url: string;
+  /** 1200×1200 preview WebP — used for grid + lightbox initial view */
+  preview_url: string;
+  /** Full-resolution original — loaded after intent detection in lightbox */
   original_url: string;
 }
 
@@ -85,9 +85,7 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
     width: item.width,
     height: item.height,
     processing_status: item.processing_status,
-    thumbnail_url: item.media_type === 'image' ? await getThumbnailUrl(item.r2_key, 200, item.preview_r2_key) : '',
-    blur_url: item.media_type === 'image' ? await getBlurPlaceholderUrl(item.r2_key, item.preview_r2_key) : '',
-    full_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
+    preview_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
     original_url: item.media_type === 'image' ? await getOriginalUrl(item.r2_key) : '',
     created_at: item.created_at || new Date().toISOString(),
   })));

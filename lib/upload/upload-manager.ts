@@ -111,7 +111,7 @@ async function uploadSingleFile(
     try {
       updateItem(id, { status: 'uploading', progress: 0 });
 
-      // Step 1: Generate image variants (if applicable) while requesting presigned URLs
+      // Step 1: Generate preview variant (if applicable) while requesting presigned URLs
       let variantsPromise: Promise<{ preview: Blob } | null> | null = null;
       if (canGenerate) {
         variantsPromise = generateImageVariants(file).catch((err) => {
@@ -120,7 +120,7 @@ async function uploadSingleFile(
         });
       }
 
-      // Step 2: Get presigned URLs (original + variants if image)
+      // Step 2: Get presigned URLs (original + preview if image)
       const presignBody: any = {
         eventId,
         albumId,
@@ -157,7 +157,7 @@ async function uploadSingleFile(
 
       updateItem(id, { progress: 80 });
 
-      // Step 4: Upload variants (progress 80-90%)
+      // Step 4: Upload preview variant (progress 80-90%)
       let previewR2Key: string | undefined;
       let variantSizeBytes = 0;
 
@@ -166,18 +166,11 @@ async function uploadSingleFile(
         if (variants) {
           const previewVariant = presignData.variants.find((v: any) => v.suffix === '_preview.webp');
 
-          // Upload preview
-          const variantUploads: Promise<void>[] = [];
-
           if (previewVariant) {
             previewR2Key = previewVariant.r2Key;
             variantSizeBytes += variants.preview.size;
-            variantUploads.push(
-              uploadBlob(previewVariant.url, variants.preview, 'image/webp')
-            );
+            await uploadBlob(previewVariant.url, variants.preview, 'image/webp');
           }
-
-          await Promise.all(variantUploads);
         }
       }
 
