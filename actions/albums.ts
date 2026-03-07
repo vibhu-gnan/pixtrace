@@ -94,7 +94,7 @@ export async function getAlbums(eventId: string): Promise<AlbumData[]> {
     .from('albums')
     .select(`
       *,
-      media (id)
+      media(count)
     `)
     .eq('event_id', eventId)
     .order('sort_order', { ascending: true });
@@ -148,7 +148,7 @@ export async function getAlbums(eventId: string): Promise<AlbumData[]> {
 
   return (albums || []).map((album: any) => ({
     ...album,
-    media_count: album.media?.length || 0,
+    media_count: album.media?.[0]?.count ?? 0,
     cover_url: coverMap.get(album.id) || null,
     media: undefined,
   }));
