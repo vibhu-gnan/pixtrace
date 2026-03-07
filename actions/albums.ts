@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
+import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
 
 export interface AlbumData {
   id: string;
@@ -108,18 +109,16 @@ export async function getAlbums(eventId: string): Promise<AlbumData[]> {
   const coverMap = new Map<string, string>();
 
   if (albumIds.length > 0) {
+    // Primary: RPC with DISTINCT ON (1 row per album)
     const { data: coverMedia, error: coverErr } = await supabase
       .rpc('get_album_covers', { album_ids: albumIds });
 
+    let coverRows: Array<{ album_id: string; preview_r2_key: string | null; r2_key: string }> = [];
+
     if (coverMedia && !coverErr) {
-      for (const m of coverMedia) {
-        const key = m.preview_r2_key || m.r2_key;
-        if (key) {
-          coverMap.set(m.album_id, `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`);
-        }
-      }
+      coverRows = coverMedia;
     } else {
-      // Fallback: if RPC unavailable (e.g. migration not yet applied on prod), use client-side dedup
+      // Fallback: client-side dedup if RPC unavailable
       const { data: fallbackMedia } = await supabase
         .from('media')
         .select('album_id, preview_r2_key, r2_key')
@@ -128,16 +127,23 @@ export async function getAlbums(eventId: string): Promise<AlbumData[]> {
         .order('created_at', { ascending: true });
 
       if (fallbackMedia) {
+        const seen = new Set<string>();
         for (const m of fallbackMedia) {
-          if (!coverMap.has(m.album_id)) {
-            const key = m.preview_r2_key || m.r2_key;
-            if (key) {
-              coverMap.set(m.album_id, `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`);
-            }
+          if (!seen.has(m.album_id)) {
+            seen.add(m.album_id);
+            coverRows.push(m);
           }
         }
       }
     }
+
+    // Sign presigned URLs in parallel (R2 bucket is private)
+    await Promise.all(
+      coverRows.map(async (m) => {
+        const url = await getPreviewUrl(m.r2_key, m.preview_r2_key);
+        if (url) coverMap.set(m.album_id, url);
+      })
+    );
   }
 
   return (albums || []).map((album: any) => ({
