@@ -339,6 +339,28 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
 
   // ─── Infinite Scroll ────────────────────────────────────
   const MAX_FAILURES = 3;
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadMoreRef = useRef<(() => void) | null>(null);
+
+  // Check if sentinel is near viewport (matches rootMargin)
+  const isSentinelVisible = useCallback(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return false;
+    const rect = sentinel.getBoundingClientRect();
+    return rect.top < window.innerHeight + 600;
+  }, []);
+
+  // After load completes, retry if sentinel is still visible (fills viewport gaps)
+  const scheduleRetryIfNeeded = useCallback(() => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    if (!hasMoreRef.current) return;
+    retryTimerRef.current = setTimeout(() => {
+      retryTimerRef.current = null;
+      if (hasMoreRef.current && !loadingRef.current && isSentinelVisible()) {
+        loadMoreRef.current?.();
+      }
+    }, 300);
+  }, [isSentinelVisible]);
 
   const loadMore = useCallback(async () => {
     if (loadingRef.current || !hasMoreRef.current || failureCountRef.current >= MAX_FAILURES) return;
@@ -376,29 +398,34 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
     } finally {
       setScrollLoading(false);
       loadingRef.current = false;
+      scheduleRetryIfNeeded();
     }
-  }, [eventId]); // eventId read directly; everything else via refs
+  }, [eventId, scheduleRetryIfNeeded]);
 
-  const loadMoreRef = useRef(loadMore);
+  // Keep ref pointing at latest loadMore so observer never goes stale
   loadMoreRef.current = loadMore;
 
-  // Intersection observer — re-created on album change so sentinel re-triggers
+  // Intersection observer — created ONCE, uses refs for all state (no stale closures)
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && hasMoreRef.current && !loadingRef.current) {
-          loadMoreRef.current();
+        if (entries[0]?.isIntersecting) {
+          loadMoreRef.current?.();
         }
       },
-      { rootMargin: '400px' }
+      { rootMargin: '600px' }
     );
 
     observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [activeAlbumId]); // Re-observe after album switch resets content height
+    return () => {
+      observer.disconnect();
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — observer is stable, state accessed via refs
 
   const handleAlbumClick = useCallback(async (albumId: string) => {
     setActiveAlbumId(albumId);
@@ -697,12 +724,16 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
             coverSelectedIds={coverSelectedIds}
             onCoverPhotoClick={coverSelectionMode ? handleCoverPhotoClick : undefined}
           />
-          {/* Sentinel — always in DOM so observer can attach; hidden when no more */}
+          {/* Sentinel — always in DOM so observer stays attached */}
           <div
             ref={sentinelRef}
-            className={hasMore ? 'flex items-center justify-center py-8' : 'hidden'}
-          >
-            {scrollLoading && (
+            style={{ height: '1px' }}
+            className="pointer-events-none"
+            aria-hidden="true"
+          />
+          {/* Loading / error indicators */}
+          {hasMore && scrollLoading && (
+            <div className="flex items-center justify-center py-8">
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -710,16 +741,18 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
                 </svg>
                 Loading more photos...
               </div>
-            )}
-            {scrollError && (
+            </div>
+          )}
+          {scrollError && (
+            <div className="flex items-center justify-center py-8">
               <button
-                onClick={() => { failureCountRef.current = 0; setScrollError(null); loadMoreRef.current(); }}
+                onClick={() => { failureCountRef.current = 0; setScrollError(null); loadMoreRef.current?.(); }}
                 className="text-sm text-red-500 hover:text-red-600 underline"
               >
                 {scrollError} Tap to retry.
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>
