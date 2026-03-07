@@ -8,6 +8,14 @@ import type { MediaItem } from '@/actions/media';
 
 // ─── Gallery Grid (Masonry) ───────────────────────────────────
 
+// Skeleton aspect ratios per column — gives visual variety while loading
+const SKELETON_RATIOS = [
+    ['3/4', '4/3'],
+    ['4/3', '3/4'],
+    ['3/4', '1/1'],
+    ['4/5', '4/3'],
+];
+
 interface GalleryGridProps {
     media: GalleryMediaItem[];
     eventHash?: string;
@@ -146,6 +154,14 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
                                 eventHash={eventHash}
                                 onClick={() => openLightbox(item.id)}
                                 showFaceScores={showFaceScores}
+                            />
+                        ))}
+                        {/* Inline skeleton blocks — seamless continuation when loading */}
+                        {loading && SKELETON_RATIOS[colIdx % SKELETON_RATIOS.length].map((ratio, i) => (
+                            <div
+                                key={`skel-${i}`}
+                                className="skeleton-shimmer rounded-sm"
+                                style={{ aspectRatio: ratio }}
                             />
                         ))}
                     </div>

@@ -5,7 +5,6 @@ import { GalleryGrid } from './gallery-grid';
 import { getPublicGalleryPage } from '@/actions/gallery';
 import type { GalleryMediaItem } from '@/actions/gallery';
 
-import { GallerySkeleton } from './gallery-skeleton';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
 import { FaceSearchToggle } from './face-search-toggle';
@@ -570,12 +569,7 @@ export function GalleryPageClient({
                 )}
             </div>
 
-            {/* ── Loading / Error / End ──────────────────────────── */}
-            {loading && !faceSearchActive && (
-                <div className="w-full">
-                    <GallerySkeleton />
-                </div>
-            )}
+            {/* ── Error / End ──────────────────────────────────── */}
             {error && !faceSearchActive && (
                 <div className="py-8 text-center">
                     <p className="text-sm text-red-500 mb-2">{error}</p>
