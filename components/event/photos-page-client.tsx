@@ -405,7 +405,10 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
   // Keep ref pointing at latest loadMore so observer never goes stale
   loadMoreRef.current = loadMore;
 
-  // Intersection observer — created ONCE, uses refs for all state (no stale closures)
+  // Intersection observer — re-created when viewMode changes because sentinel
+  // is conditionally rendered (only in photos view). On mount in albums view,
+  // sentinelRef is null; when user switches to photos, sentinel appears and
+  // observer needs to attach. Uses refs for all other state (no stale closures).
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -425,7 +428,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — observer is stable, state accessed via refs
+  }, [viewMode]); // re-attach when sentinel appears/disappears with view switch
 
   const handleAlbumClick = useCallback(async (albumId: string) => {
     setActiveAlbumId(albumId);
@@ -433,6 +436,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
     setViewMode('photos');
     failureCountRef.current = 0;
     setScrollError(null);
+    loadingRef.current = true; // Block loadMore during album fetch
 
     // Guard: ignore stale responses from concurrent clicks
     const myRequestId = ++requestIdRef.current;
@@ -452,6 +456,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
     } finally {
       if (requestIdRef.current === myRequestId) {
         setScrollLoading(false);
+        loadingRef.current = false; // Unblock loadMore
       }
     }
   }, [eventId]);
