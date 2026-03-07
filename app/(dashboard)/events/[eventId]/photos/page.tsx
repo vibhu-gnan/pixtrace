@@ -1,4 +1,4 @@
-import { getMedia } from '@/actions/media';
+import { getMediaPage, getMediaCount } from '@/actions/media';
 import { getAlbums } from '@/actions/albums';
 import { getEvent } from '@/actions/events';
 import { PhotosPageClient } from '@/components/event/photos-page-client';
@@ -15,9 +15,10 @@ export default async function PhotosPage({
   const event = await getEvent(eventId);
   if (!event) notFound();
 
-  const [media, albums] = await Promise.all([
-    getMedia(eventId),
+  const [{ media, hasMore }, albums, counts] = await Promise.all([
+    getMediaPage(eventId),
     getAlbums(eventId),
+    getMediaCount(eventId),
   ]);
 
   // Compute cover preview URL server-side
@@ -39,6 +40,9 @@ export default async function PhotosPage({
       albums={albums}
       event={event}
       savedCoverPreviewUrl={savedCoverPreviewUrl}
+      initialHasMore={hasMore}
+      totalPhotos={counts.photos}
+      totalVideos={counts.videos}
     />
   );
 }

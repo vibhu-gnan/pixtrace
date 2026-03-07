@@ -11,6 +11,7 @@ import { AlbumsEmptyState } from './albums-empty-state';
 import { CreateAlbumForm } from '@/components/dashboard/create-album-form';
 import { CoverBar } from './cover-bar';
 import { ImportTab } from './import-tab';
+import { getMediaPage } from '@/actions/media';
 import type { MediaItem } from '@/actions/media';
 import type { AlbumData } from '@/actions/albums';
 import type { EventData } from '@/actions/events';
@@ -95,9 +96,12 @@ interface PhotosPageClientProps {
   albums: AlbumData[];
   event: EventData;
   savedCoverPreviewUrl: string | null;
+  initialHasMore?: boolean;
+  totalPhotos?: number;
+  totalVideos?: number;
 }
 
-function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, event, savedCoverPreviewUrl }: PhotosPageClientProps) {
+function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: initialAlbums, event, savedCoverPreviewUrl, initialHasMore = false, totalPhotos = 0, totalVideos = 0 }: PhotosPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const albumIdFromUrl = searchParams.get('album');
@@ -110,8 +114,21 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
   const [dragActive, setDragActive] = useState(false);
   const [showAlbumForm, setShowAlbumForm] = useState(false);
   const [albumRefreshKey, setAlbumRefreshKey] = useState(0);
+  // ─── Pagination State ────────────────────────────────────
+  const [media, setMedia] = useState<MediaItem[]>(initialMedia);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [scrollLoading, setScrollLoading] = useState(false);
+  const [scrollError, setScrollError] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(initialHasMore);
+  const mediaRef = useRef<MediaItem[]>(initialMedia);
+  const activeAlbumRef = useRef<string | null>(null);
+  const failureCountRef = useRef(0);
+  const requestIdRef = useRef(0); // Guards concurrent album switches
+
   // Default to 'photos' view if there are photos, otherwise show albums
-  const [viewMode, setViewMode] = useState<ViewMode>(media.length > 0 ? 'photos' : 'albums');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialMedia.length > 0 ? 'photos' : 'albums');
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(null);
 
   // ─── Cover Selection State ─────────────────────────────────
@@ -129,9 +146,23 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
     (event.theme as any)?.hero?.mode ?? 'single'
   );
 
+  // ─── Sync on server refresh (e.g. after upload completes) ──
+  useEffect(() => {
+    setMedia(initialMedia);
+    setHasMore(initialHasMore);
+    hasMoreRef.current = initialHasMore;
+    mediaRef.current = initialMedia;
+    failureCountRef.current = 0;
+    setScrollError(null);
+  }, [initialMedia, initialHasMore]);
+
+  // Keep refs in sync
+  useEffect(() => { mediaRef.current = media; }, [media]);
+  useEffect(() => { activeAlbumRef.current = activeAlbumId; }, [activeAlbumId]);
+
   // ─── Computed Values ─────────────────────────────────────
-  const photoCount = useMemo(() => media.filter((m) => m.media_type === 'image').length, [media]);
-  const videoCount = useMemo(() => media.filter((m) => m.media_type === 'video').length, [media]);
+  const photoCount = totalPhotos;
+  const videoCount = totalVideos;
   const albumCount = initialAlbums.length;
 
   // Build a map of albumId → first image preview URL for covers (fallback to thumbnail)
@@ -282,16 +313,119 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
     startUpload(eventId, selectedAlbum);
   };
 
-  const handleAlbumClick = useCallback((albumId: string) => {
+  // ─── Infinite Scroll ────────────────────────────────────
+  const MAX_FAILURES = 3;
+
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current || !hasMoreRef.current || failureCountRef.current >= MAX_FAILURES) return;
+    loadingRef.current = true;
+    setScrollLoading(true);
+    setScrollError(null);
+
+    try {
+      const currentMedia = mediaRef.current;
+      const lastItem = currentMedia[currentMedia.length - 1];
+      const cursor = lastItem?.created_at || null;
+      const { media: newMedia, hasMore: more } = await getMediaPage(
+        eventId,
+        cursor,
+        undefined,
+        activeAlbumRef.current,
+      );
+
+      setMedia((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id));
+        const unique = newMedia.filter((m) => !existingIds.has(m.id));
+        const next = [...prev, ...unique];
+        mediaRef.current = next;
+        return next;
+      });
+      hasMoreRef.current = more;
+      setHasMore(more);
+      failureCountRef.current = 0;
+    } catch (err) {
+      failureCountRef.current++;
+      console.error('Failed to load more photos:', err);
+      if (failureCountRef.current >= MAX_FAILURES) {
+        setScrollError('Failed to load more photos.');
+      }
+    } finally {
+      setScrollLoading(false);
+      loadingRef.current = false;
+    }
+  }, [eventId]); // eventId read directly; everything else via refs
+
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
+  // Intersection observer — re-created on album change so sentinel re-triggers
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasMoreRef.current && !loadingRef.current) {
+          loadMoreRef.current();
+        }
+      },
+      { rootMargin: '400px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeAlbumId]); // Re-observe after album switch resets content height
+
+  const handleAlbumClick = useCallback(async (albumId: string) => {
     setActiveAlbumId(albumId);
     setSelectedAlbum(albumId);
     setViewMode('photos');
-  }, []);
+    failureCountRef.current = 0;
+    setScrollError(null);
 
-  const handleBackToAlbums = useCallback(() => {
+    // Guard: ignore stale responses from concurrent clicks
+    const myRequestId = ++requestIdRef.current;
+
+    setScrollLoading(true);
+    try {
+      const { media: albumMedia, hasMore: more } = await getMediaPage(eventId, null, undefined, albumId);
+      if (requestIdRef.current !== myRequestId) return; // Superseded by newer click
+      setMedia(albumMedia);
+      mediaRef.current = albumMedia;
+      hasMoreRef.current = more;
+      setHasMore(more);
+    } catch {
+      if (requestIdRef.current === myRequestId) {
+        console.error('Failed to load album photos');
+      }
+    } finally {
+      if (requestIdRef.current === myRequestId) {
+        setScrollLoading(false);
+      }
+    }
+  }, [eventId]);
+
+  const handleBackToAlbums = useCallback(async () => {
     setViewMode('albums');
     setActiveAlbumId(null);
-  }, []);
+    failureCountRef.current = 0;
+    setScrollError(null);
+
+    const myRequestId = ++requestIdRef.current;
+
+    try {
+      const { media: allMedia, hasMore: more } = await getMediaPage(eventId);
+      if (requestIdRef.current !== myRequestId) return;
+      setMedia(allMedia);
+      mediaRef.current = allMedia;
+      hasMoreRef.current = more;
+      setHasMore(more);
+    } catch {
+      if (requestIdRef.current === myRequestId) {
+        console.error('Failed to reset media');
+      }
+    }
+  }, [eventId]);
 
   // ─── Cover Selection Handlers ──────────────────────────────
 
@@ -531,13 +665,38 @@ function PhotosPageContent({ eventId, eventName, media, albums: initialAlbums, e
         )
       ) : (
         // ─── Photos View ─────────────────────────────────────
-        <PhotoGrid
-          media={filteredMedia}
-          eventId={eventId}
-          coverSelectionMode={coverSelectionMode}
-          coverSelectedIds={coverSelectedIds}
-          onCoverPhotoClick={coverSelectionMode ? handleCoverPhotoClick : undefined}
-        />
+        <>
+          <PhotoGrid
+            media={filteredMedia}
+            eventId={eventId}
+            coverSelectionMode={coverSelectionMode}
+            coverSelectedIds={coverSelectedIds}
+            onCoverPhotoClick={coverSelectionMode ? handleCoverPhotoClick : undefined}
+          />
+          {/* Sentinel — always in DOM so observer can attach; hidden when no more */}
+          <div
+            ref={sentinelRef}
+            className={hasMore ? 'flex items-center justify-center py-8' : 'hidden'}
+          >
+            {scrollLoading && (
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Loading more photos...
+              </div>
+            )}
+            {scrollError && (
+              <button
+                onClick={() => { failureCountRef.current = 0; setScrollError(null); loadMoreRef.current(); }}
+                className="text-sm text-red-500 hover:text-red-600 underline"
+              >
+                {scrollError} Tap to retry.
+              </button>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

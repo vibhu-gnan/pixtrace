@@ -132,6 +132,63 @@ export async function getEvents(): Promise<EventData[]> {
   }));
 }
 
+const EVENTS_PAGE_SIZE = 50;
+
+export async function getEventsPage(
+  cursor?: string | null,
+  limit: number = EVENTS_PAGE_SIZE,
+): Promise<{ events: EventData[]; hasMore: boolean }> {
+  limit = Math.max(1, Math.min(limit, 200)); // Clamp to safe range
+
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { events: [], hasMore: false };
+
+  const supabase = createAdminClient();
+
+  let query = supabase
+    .from('events')
+    .select(`*, albums (id, name, sort_order)`)
+    .eq('organizer_id', organizer.id)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false }); // Deterministic tiebreaker
+
+  if (cursor) {
+    query = query.lt('created_at', cursor);
+  }
+
+  const { data: events, error } = await query.limit(limit + 1);
+
+  if (error) {
+    console.error('Error fetching events page:', error);
+    return { events: [], hasMore: false };
+  }
+
+  if (!events || events.length === 0) return { events: [], hasMore: false };
+
+  const hasMore = events.length > limit;
+  const pageEvents = hasMore ? events.slice(0, limit) : events;
+
+  // Fetch media counts for this page only
+  const mediaCounts = await Promise.all(
+    pageEvents.map((event: any) =>
+      supabase
+        .from('media')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', event.id)
+        .then(({ count }) => ({ id: event.id, count: count || 0 }))
+    )
+  );
+  const countMap = Object.fromEntries(mediaCounts.map(({ id, count }) => [id, count]));
+
+  return {
+    events: pageEvents.map((event: any) => ({
+      ...event,
+      media_count: countMap[event.id] ?? 0,
+    })),
+    hasMore,
+  };
+}
+
 export async function getEvent(eventId: string): Promise<EventData | null> {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return null;

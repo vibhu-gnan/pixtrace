@@ -1,6 +1,5 @@
-import { getEvents } from '@/actions/events';
-import { EventCard } from '@/components/dashboard/event-card';
-import { CreateEventCard } from '@/components/dashboard/create-event-card';
+import { getEventsPage } from '@/actions/events';
+import { DashboardEventsClient } from '@/components/dashboard/dashboard-events-client';
 import Link from 'next/link';
 
 // ─── Filter Tabs ─────────────────────────────────────────────
@@ -15,7 +14,7 @@ const filterTabs = [
 // ─── Page Component ──────────────────────────────────────────
 
 export default async function DashboardPage() {
-  const events = await getEvents();
+  const { events, hasMore } = await getEventsPage();
 
   return (
     <div>
@@ -74,49 +73,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-          <CreateEventCard />
-        </div>
-      )}
-
-      {/* Pagination (visual only) */}
-      {events.length > 0 && (
-        <div className="flex items-center justify-center gap-2 mt-8">
-          <button
-            disabled
-            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 cursor-not-allowed"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <button className="w-8 h-8 rounded-lg bg-brand-500 text-white text-sm font-medium flex items-center justify-center shadow-sm">
-            1
-          </button>
-          <button
-            disabled
-            className="w-8 h-8 rounded-lg border border-gray-200 text-gray-400 text-sm font-medium flex items-center justify-center cursor-not-allowed"
-          >
-            2
-          </button>
-          <button
-            disabled
-            className="w-8 h-8 rounded-lg border border-gray-200 text-gray-400 text-sm font-medium flex items-center justify-center cursor-not-allowed"
-          >
-            3
-          </button>
-          <button
-            disabled
-            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 cursor-not-allowed"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        </div>
+        <DashboardEventsClient initialEvents={events} initialHasMore={hasMore} />
       )}
     </div>
   );

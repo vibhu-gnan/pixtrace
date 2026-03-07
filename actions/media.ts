@@ -91,6 +91,91 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
   })));
 }
 
+const MEDIA_PAGE_SIZE = 50;
+
+export async function getMediaPage(
+  eventId: string,
+  cursor?: string | null,
+  limit: number = MEDIA_PAGE_SIZE,
+  albumId?: string | null,
+): Promise<{ media: MediaItem[]; hasMore: boolean }> {
+  limit = Math.max(1, Math.min(limit, 500)); // Clamp to safe range
+
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { media: [], hasMore: false };
+
+  const supabase = createAdminClient();
+
+  // Verify event belongs to organizer
+  const { data: event } = await supabase
+    .from('events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return { media: [], hasMore: false };
+
+  let query = supabase
+    .from('media')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true }); // Deterministic tiebreaker
+
+  if (cursor) {
+    query = query.gt('created_at', cursor);
+  }
+
+  if (albumId) {
+    query = query.eq('album_id', albumId);
+  }
+
+  const { data, error } = await query.limit(limit + 1);
+
+  if (error) {
+    console.error('Error fetching media page:', error);
+    return { media: [], hasMore: false };
+  }
+
+  const rows = data || [];
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+  const media = await Promise.all(pageRows.map(async (item: any) => ({
+    id: item.id,
+    album_id: item.album_id,
+    event_id: item.event_id,
+    r2_key: item.r2_key,
+    original_filename: item.original_filename,
+    media_type: item.media_type,
+    mime_type: item.mime_type,
+    file_size: item.file_size,
+    width: item.width,
+    height: item.height,
+    processing_status: item.processing_status,
+    preview_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
+    original_url: item.media_type === 'image' ? await getOriginalUrl(item.r2_key) : '',
+    created_at: item.created_at || new Date().toISOString(),
+  })));
+
+  return { media, hasMore };
+}
+
+export async function getMediaCount(eventId: string): Promise<{ photos: number; videos: number }> {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { photos: 0, videos: 0 };
+
+  const supabase = createAdminClient();
+
+  const [{ count: photos }, { count: videos }] = await Promise.all([
+    supabase.from('media').select('id', { count: 'exact', head: true }).eq('event_id', eventId).eq('media_type', 'image'),
+    supabase.from('media').select('id', { count: 'exact', head: true }).eq('event_id', eventId).eq('media_type', 'video'),
+  ]);
+
+  return { photos: photos || 0, videos: videos || 0 };
+}
+
 export async function deleteMedia(mediaId: string, eventId: string) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
