@@ -141,6 +141,16 @@ export function EventCard({ event }: EventCardProps) {
             background: `linear-gradient(135deg, ${from}, ${to})`,
           }}
         >
+          {/* Cover photo — overlays gradient */}
+          {event.cover_url && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={event.cover_url}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+            />
+          )}
           {/* Status badge — top left */}
           <div className="absolute top-3 left-3 z-10">
             {event.is_public ? (

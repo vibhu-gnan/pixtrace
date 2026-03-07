@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { getOrganizerPlanLimits, canCreateEvent } from '@/lib/plans/limits';
+import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
 
 export interface EventData {
   id: string;
@@ -17,6 +18,7 @@ export interface EventData {
   event_date: string | null;
   event_end_date: string | null;
   cover_media_id: string | null;
+  cover_url?: string | null;
   theme: Record<string, unknown>;
   is_public: boolean;
   view_count?: number;
@@ -29,6 +31,38 @@ export interface EventData {
   face_search_enabled?: boolean;
   show_face_scores?: boolean;
   photo_order?: 'oldest_first' | 'newest_first';
+}
+
+/**
+ * Batch-resolve cover image presigned URLs for a list of events.
+ * Only fetches media records for events that have a cover_media_id set.
+ */
+async function resolveCoverUrls(
+  events: any[],
+  supabase: ReturnType<typeof createAdminClient>,
+): Promise<Record<string, string>> {
+  const coverIds = events
+    .map((e) => e.cover_media_id)
+    .filter((id): id is string => !!id);
+
+  if (coverIds.length === 0) return {};
+
+  const { data: mediaRows } = await supabase
+    .from('media')
+    .select('id, r2_key, preview_r2_key')
+    .in('id', coverIds);
+
+  if (!mediaRows || mediaRows.length === 0) return {};
+
+  // Generate presigned URLs in parallel
+  const entries = await Promise.all(
+    mediaRows.map(async (m: any) => {
+      const url = await getPreviewUrl(m.r2_key, m.preview_r2_key);
+      return [m.id, url] as [string, string];
+    }),
+  );
+
+  return Object.fromEntries(entries.filter(([, url]) => !!url));
 }
 
 export async function createEvent(formData: FormData) {
@@ -114,21 +148,25 @@ export async function getEvents(): Promise<EventData[]> {
 
   if (!events || events.length === 0) return [];
 
-  // Fetch media counts for all events in parallel (avoids PostgREST 1000-row cap on nested relations)
-  const mediaCounts = await Promise.all(
-    events.map((event: any) =>
-      supabase
-        .from('media')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', event.id)
-        .then(({ count }) => ({ id: event.id, count: count || 0 }))
-    )
-  );
+  // Fetch media counts + cover URLs in parallel
+  const [mediaCounts, coverUrlMap] = await Promise.all([
+    Promise.all(
+      events.map((event: any) =>
+        supabase
+          .from('media')
+          .select('id', { count: 'exact', head: true })
+          .eq('event_id', event.id)
+          .then(({ count }) => ({ id: event.id, count: count || 0 }))
+      )
+    ),
+    resolveCoverUrls(events, supabase),
+  ]);
   const countMap = Object.fromEntries(mediaCounts.map(({ id, count }) => [id, count]));
 
   return events.map((event: any) => ({
     ...event,
     media_count: countMap[event.id] ?? 0,
+    cover_url: event.cover_media_id ? (coverUrlMap[event.cover_media_id] || null) : null,
   }));
 }
 
@@ -168,22 +206,26 @@ export async function getEventsPage(
   const hasMore = events.length > limit;
   const pageEvents = hasMore ? events.slice(0, limit) : events;
 
-  // Fetch media counts for this page only
-  const mediaCounts = await Promise.all(
-    pageEvents.map((event: any) =>
-      supabase
-        .from('media')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_id', event.id)
-        .then(({ count }) => ({ id: event.id, count: count || 0 }))
-    )
-  );
+  // Fetch media counts + cover URLs in parallel
+  const [mediaCounts, coverUrlMap] = await Promise.all([
+    Promise.all(
+      pageEvents.map((event: any) =>
+        supabase
+          .from('media')
+          .select('id', { count: 'exact', head: true })
+          .eq('event_id', event.id)
+          .then(({ count }) => ({ id: event.id, count: count || 0 }))
+      )
+    ),
+    resolveCoverUrls(pageEvents, supabase),
+  ]);
   const countMap = Object.fromEntries(mediaCounts.map(({ id, count }) => [id, count]));
 
   return {
     events: pageEvents.map((event: any) => ({
       ...event,
       media_count: countMap[event.id] ?? 0,
+      cover_url: event.cover_media_id ? (coverUrlMap[event.cover_media_id] || null) : null,
     })),
     hasMore,
   };
