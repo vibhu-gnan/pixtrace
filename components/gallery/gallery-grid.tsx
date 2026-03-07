@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PhotoLightbox } from '@/components/event/photo-lightbox';
 import { refreshMediaUrl } from '@/lib/gallery/url-refresh';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 import type { GalleryMediaItem } from '@/actions/gallery';
 import type { MediaItem } from '@/actions/media';
 
@@ -122,7 +123,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
         if (loading) {
             return (
                 <div className="flex items-center justify-center py-24">
-                    <div className="w-8 h-8 border-[3px] border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                    <LoadingSpinner size="lg" variant="ring" />
                 </div>
             );
         }

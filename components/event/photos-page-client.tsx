@@ -12,6 +12,7 @@ import { CreateAlbumForm } from '@/components/dashboard/create-album-form';
 import { CoverBar } from './cover-bar';
 import { ImportTab } from './import-tab';
 import { getMediaPage } from '@/actions/media';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 import type { MediaItem } from '@/actions/media';
 import type { AlbumData } from '@/actions/albums';
 import type { EventData } from '@/actions/events';
@@ -740,10 +741,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
           {hasMore && scrollLoading && (
             <div className="flex items-center justify-center py-8">
               <div className="flex items-center gap-2 text-sm text-gray-400">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <LoadingSpinner size="sm" className="text-gray-400" />
                 Loading more photos...
               </div>
             </div>
@@ -770,7 +768,7 @@ export function PhotosPageClient(props: PhotosPageClientProps) {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center py-16">
-        <div className="text-gray-500">Loading...</div>
+        <LoadingSpinner size="lg" variant="ring" />
       </div>
     }>
       <PhotosPageContent {...props} />

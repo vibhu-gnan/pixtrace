@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { LoadingSpinner } from '@/components/UI/LoadingStates';
 import type { LogoDisplay } from '@/actions/gallery-theme';
 
 interface GalleryLoadingScreenProps {
@@ -91,15 +92,10 @@ function LogoOrSpinnerLoader({ logoUrl, logoDisplay }: { logoUrl: string | null;
                         className={`h-20 sm:h-24 md:h-28 max-w-[60vw] object-contain transition-opacity duration-300 ${logoLoaded ? 'opacity-100 animate-[logoPulse_1.5s_ease-in-out_infinite]' : 'opacity-0'
                             }`}
                     />
-                    {logoLoaded && (
-                        <div className="w-6 h-6 border-[2.5px] border-gray-200 border-t-gray-500 rounded-full animate-spin" />
-                    )}
-                    {!logoLoaded && (
-                        <div className="w-8 h-8 border-[3px] border-gray-200 border-t-gray-600 rounded-full animate-spin" />
-                    )}
+                    <LoadingSpinner size={logoLoaded ? 'md' : 'lg'} variant="ring" />
                 </div>
             ) : (
-                <div className="w-8 h-8 border-[3px] border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                <LoadingSpinner size="lg" variant="ring" />
             )}
         </div>
     );
