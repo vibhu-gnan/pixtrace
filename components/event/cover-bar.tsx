@@ -91,6 +91,25 @@ export function CoverBar({
 
   const images = useMemo(() => media.filter(m => m.media_type === 'image'), [media]);
 
+  // ─── Dirty detection (compare current state vs saved) ─────
+  const savedMode = ((event.theme as any)?.hero?.mode as HeroMode) ?? 'single';
+  const savedSlideshowIds: string[] = (event.theme as any)?.hero?.slideshowMediaIds ?? [];
+  const savedMobileSlideshowIds: string[] = (event.theme as any)?.hero?.mobileSlideshowMediaIds ?? [];
+  const savedIntervalMs: number = (event.theme as any)?.hero?.intervalMs ?? 5000;
+
+  const hasChanges = useMemo(() => {
+    if (heroMode !== savedMode) return true;
+    if (heroMode === 'single' && coverSingleSelectedId !== (event.cover_media_id ?? null)) return true;
+    if (heroMode === 'slideshow') {
+      const currentDesktop = [...coverSlideshowSelectedIds];
+      if (currentDesktop.length !== savedSlideshowIds.length || currentDesktop.some((id, i) => id !== savedSlideshowIds[i])) return true;
+      const currentMobile = [...coverMobileSlideshowSelectedIds];
+      if (currentMobile.length !== savedMobileSlideshowIds.length || currentMobile.some((id, i) => id !== savedMobileSlideshowIds[i])) return true;
+    }
+    if (heroMode !== 'single' && intervalMs !== savedIntervalMs) return true;
+    return false;
+  }, [heroMode, savedMode, coverSingleSelectedId, event.cover_media_id, coverSlideshowSelectedIds, savedSlideshowIds, coverMobileSlideshowSelectedIds, savedMobileSlideshowIds, intervalMs, savedIntervalMs]);
+
   const currentPreviewUrl = useMemo(() => {
     if (heroMode === 'single' && coverSingleSelectedId) {
       const found = images.find(m => m.id === coverSingleSelectedId);
@@ -470,10 +489,13 @@ export function CoverBar({
         </button>
         <button
           onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          disabled={saving || !hasChanges}
+          className={`px-5 py-2 text-sm font-medium rounded-lg transition-all disabled:cursor-not-allowed ${hasChanges
+            ? 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60'
+            : 'bg-gray-200 text-gray-400'
+            }`}
         >
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>
       </div>
     </div>
