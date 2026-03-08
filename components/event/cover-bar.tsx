@@ -215,53 +215,41 @@ export function CoverBar({
   // ─── Expanded View ─────────────────────────────────────────
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 space-y-4">
+    <div className="bg-white border border-gray-200 rounded-xl mb-4 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">Gallery Cover</h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCollapse}
-            className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-1.5 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
+      <div className="px-5 pt-5 pb-3">
+        <h3 className="text-base font-semibold text-gray-900">Gallery Cover</h3>
+        <p className="text-xs text-gray-400 mt-0.5">Choose how the cover appears on your gallery page</p>
       </div>
 
       {/* Mode Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-        {([
-          { key: 'single' as HeroMode, label: 'Single Photo' },
-          { key: 'slideshow' as HeroMode, label: 'Slideshow' },
-          { key: 'auto' as HeroMode, label: 'Auto (first 5)' },
-        ]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => handleModeChange(tab.key)}
-            className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${heroMode === tab.key
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="px-5 pb-4">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          {([
+            { key: 'single' as HeroMode, label: 'Single Photo' },
+            { key: 'slideshow' as HeroMode, label: 'Slideshow' },
+            { key: 'auto' as HeroMode, label: 'Auto (first 5)' },
+          ]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => handleModeChange(tab.key)}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${heroMode === tab.key
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Mode-specific content */}
-      <div className="pt-2 border-t border-gray-100 space-y-3">
+      <div className="px-5 pb-4 space-y-3">
         {heroMode === 'single' && (
           <>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-9 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="w-14 h-10 rounded-md overflow-hidden bg-gray-200 flex-shrink-0 ring-1 ring-gray-200">
                 {coverSingleSelectedId ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -272,19 +260,19 @@ export function CoverBar({
                     />
                   </>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
                     <ImageIcon />
                   </div>
                 )}
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 {coverSelectionMode === 'single' ? (
                   <p className="text-sm text-amber-700 font-medium">
-                    Click a photo in the gallery below to select it as cover
+                    Tap a photo in the gallery below to set it as cover
                   </p>
                 ) : (
                   <p className="text-sm text-gray-500">
-                    {coverSingleSelectedId ? 'Photo selected. Click below to change.' : 'Select a photo or leave empty to use the first photo.'}
+                    {coverSingleSelectedId ? 'Cover photo selected' : 'No photo selected — first photo will be used'}
                   </p>
                 )}
               </div>
@@ -292,7 +280,7 @@ export function CoverBar({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onEnterSelectionMode(coverSelectionMode === 'single' ? null : 'single')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'single'
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${coverSelectionMode === 'single'
                   ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                   : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
@@ -302,9 +290,9 @@ export function CoverBar({
               {coverSingleSelectedId && (
                 <button
                   onClick={() => onCoverSingleSelectedChange(null)}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-3 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  Clear (use first photo)
+                  Clear
                 </button>
               )}
             </div>
@@ -317,7 +305,7 @@ export function CoverBar({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🖥 Desktop / Landscape</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Desktop / Landscape</span>
                   <span className="text-xs text-gray-400">({coverSlideshowSelectedIds.size} photos)</span>
                 </div>
                 <button
@@ -354,10 +342,10 @@ export function CoverBar({
             </div>
 
             {/* ── Mobile slideshow ──────────────────────────── */}
-            <div className="space-y-2 pt-2 border-t border-gray-100">
+            <div className="space-y-2 pt-3 border-t border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📱 Mobile / Portrait</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mobile / Portrait</span>
                   <span className="text-xs text-gray-400">
                     {coverMobileSlideshowSelectedIds.size > 0
                       ? `(${coverMobileSlideshowSelectedIds.size} photos)`
@@ -407,7 +395,7 @@ export function CoverBar({
             </div>
 
             {/* Interval selector */}
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
               <span className="text-sm text-gray-500">Change every:</span>
               <div className="flex gap-1">
                 {INTERVAL_OPTIONS.map(opt => (
@@ -428,47 +416,66 @@ export function CoverBar({
         )}
 
         {heroMode === 'auto' && (
-          <div className="flex items-center gap-3 py-2">
-            <div className="flex -space-x-2">
-              {images.slice(0, 5).map((img, i) => (
-                <div key={img.id} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white bg-gray-100" style={{ zIndex: 5 - i }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.preview_url} alt="" className="w-full h-full object-cover" />
-                </div>
-              ))}
+          <>
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="flex -space-x-2">
+                {images.slice(0, 5).map((img, i) => (
+                  <div key={img.id} className="w-8 h-8 rounded-full overflow-hidden border-2 border-white bg-gray-100" style={{ zIndex: 5 - i }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.preview_url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500">
+                Automatically cycles through the first 5 photos
+              </p>
             </div>
-            <p className="text-sm text-gray-500">
-              Will automatically cycle through the first 5 photos in your event
-            </p>
-          </div>
-        )}
 
-        {/* Interval selector for auto mode too */}
-        {heroMode === 'auto' && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Change every:</span>
-            <div className="flex gap-1">
-              {INTERVAL_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  onClick={() => setIntervalMs(opt.value)}
-                  className={`px-2.5 py-1 text-sm font-medium rounded-md transition-colors ${intervalMs === opt.value
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            {/* Interval selector for auto mode */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Change every:</span>
+              <div className="flex gap-1">
+                {INTERVAL_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setIntervalMs(opt.value)}
+                    className={`px-2.5 py-1 text-sm font-medium rounded-md transition-colors ${intervalMs === opt.value
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
       {/* Error message */}
       {errorMessage && (
-        <p className="text-sm text-red-600">{errorMessage}</p>
+        <div className="px-5 pb-3">
+          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{errorMessage}</p>
+        </div>
       )}
+
+      {/* Footer — Save & Cancel */}
+      <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50/50">
+        <button
+          onClick={handleCollapse}
+          className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        >
+          {saving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
     </div>
   );
 }
