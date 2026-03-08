@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { EventData } from '@/actions/events';
 import { PublishModal } from './publish-modal';
@@ -29,6 +30,7 @@ interface EventTopBarProps {
 }
 
 export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
+  const router = useRouter();
   const [showPublishModal, setShowPublishModal] = useState(false);
 
   const formattedDate = event.event_date
@@ -54,13 +56,13 @@ export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
             <MenuIcon className="text-gray-600" />
           </button>
 
-          <Link
-            href="/dashboard"
+          <button
+            onClick={() => router.back()}
             className="p-1 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
-            aria-label="Back to dashboard"
+            aria-label="Go back"
           >
             <BackIcon className="text-gray-500" />
-          </Link>
+          </button>
 
           <div className="min-w-0">
             <h1 className="text-base font-bold text-gray-900 truncate">{event.name}</h1>
