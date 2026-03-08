@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { EventData } from '@/actions/events';
 import { PublishModal } from './publish-modal';
 
@@ -24,13 +23,30 @@ function MenuIcon({ className }: { className?: string }) {
   );
 }
 
+/** Back arrow — only rendered when ?album= is present in the URL */
+function AlbumBackButton() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  if (!searchParams.has('album')) return null;
+
+  return (
+    <button
+      onClick={() => router.back()}
+      className="p-1 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
+      aria-label="Back to albums"
+    >
+      <BackIcon className="text-gray-500" />
+    </button>
+  );
+}
+
 interface EventTopBarProps {
   event: EventData;
   onMenuClick: () => void;
 }
 
 export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
-  const router = useRouter();
   const [showPublishModal, setShowPublishModal] = useState(false);
 
   const formattedDate = event.event_date
@@ -46,7 +62,7 @@ export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
   return (
     <>
       <header className="flex items-center justify-between gap-4 bg-white border-b border-gray-200 px-4 sm:px-6 h-14 flex-shrink-0">
-        {/* Left: hamburger (mobile) + back + event name */}
+        {/* Left: hamburger (mobile) + back (album only) + event name */}
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={onMenuClick}
@@ -56,13 +72,10 @@ export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
             <MenuIcon className="text-gray-600" />
           </button>
 
-          <button
-            onClick={() => router.back()}
-            className="p-1 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
-            aria-label="Go back"
-          >
-            <BackIcon className="text-gray-500" />
-          </button>
+          {/* Back arrow — only when inside an album */}
+          <Suspense>
+            <AlbumBackButton />
+          </Suspense>
 
           <div className="min-w-0">
             <h1 className="text-base font-bold text-gray-900 truncate">{event.name}</h1>
