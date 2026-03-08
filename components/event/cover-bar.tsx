@@ -341,12 +341,12 @@ export function CoverBar({
                 <p className="text-xs text-amber-700">Click photos below to add/remove</p>
               )}
               {slideshowOrderedIds.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2.5 overflow-x-auto pb-1">
                   {slideshowOrderedIds.map((id, index) => {
                     const item = images.find(m => m.id === id);
                     if (!item) return null;
                     return (
-                      <div key={id} className="relative flex-shrink-0 w-16 h-12 rounded-md overflow-hidden bg-gray-100 group">
+                      <div key={id} className="relative flex-shrink-0 w-24 h-16 rounded-lg overflow-hidden bg-gray-100 group">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={item.preview_url} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
                         <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">{index + 1}</span>
@@ -385,12 +385,12 @@ export function CoverBar({
                 <p className="text-xs text-blue-700">Click photos below to add/remove (portrait photos work best)</p>
               )}
               {mobileOrderedIds.length > 0 ? (
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2.5 overflow-x-auto pb-1">
                   {mobileOrderedIds.map((id, index) => {
                     const item = images.find(m => m.id === id);
                     if (!item) return null;
                     return (
-                      <div key={id} className="relative flex-shrink-0 w-10 h-14 rounded-md overflow-hidden bg-gray-100 group">
+                      <div key={id} className="relative flex-shrink-0 w-14 h-20 rounded-lg overflow-hidden bg-gray-100 group">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={item.preview_url} alt={`Mobile slide ${index + 1}`} className="w-full h-full object-cover" />
                         <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[10px] font-bold px-1 rounded">{index + 1}</span>
@@ -402,7 +402,7 @@ export function CoverBar({
                   })}
                   <button
                     onClick={() => { onCoverMobileSlideshowSelectedChange(new Set()); }}
-                    className="flex-shrink-0 w-10 h-14 rounded-md border border-dashed border-gray-300 flex items-center justify-center text-xs text-gray-400 hover:bg-gray-50"
+                    className="flex-shrink-0 w-14 h-20 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-xs text-gray-400 hover:bg-gray-50"
                     title="Clear mobile slideshow (will use desktop)"
                   >
                     <XIcon />
