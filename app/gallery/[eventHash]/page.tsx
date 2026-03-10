@@ -11,7 +11,7 @@ export const revalidate = 3600;
 
 type Props = {
   params: Promise<{ eventHash: string }>;
-  searchParams: Promise<{ photo?: string; album?: string }>;
+  searchParams: Promise<{ photo?: string; album?: string; only?: string }>;
 };
 
 // Deduplicate calls within the same request
@@ -75,7 +75,8 @@ export default async function GalleryEventPage({
 }: Props) {
   try {
     const { eventHash } = await params;
-    const { photo: initialPhotoId, album: initialAlbumId } = await searchParams;
+    const { photo: initialPhotoId, album: initialAlbumId, only } = await searchParams;
+    const albumOnly = only === '1' && !!initialAlbumId;
     const { isOwnerPreview, ...result } = await getCachedGalleryWithFallback(eventHash);
 
     const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = result;
@@ -208,6 +209,7 @@ export default async function GalleryEventPage({
             faceSearchEnabled={event.face_search_enabled ?? false}
             showFaceScores={event.show_face_scores ?? false}
             isOwnerPreview={isOwnerPreview}
+            albumOnly={albumOnly}
           />
         </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { deleteAlbum, updateAlbum } from '@/actions/albums';
 import type { AlbumData } from '@/actions/albums';
@@ -220,19 +221,128 @@ function EditIcon({ className }: { className?: string }) {
 
 // ─── Album Card Component ────────────────────────────────────
 
+// ─── Link Icon ──────────────────────────────────────────────
+function LinkIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 interface AlbumCardProps {
   album: AlbumData;
   coverUrl: string | null;
+  eventHash: string;
   onClick: () => void;
 }
 
-export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
+export function AlbumCard({ album, coverUrl, eventHash, onClick }: AlbumCardProps) {
   const router = useRouter();
   const [from, to] = getGradient(album.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [copied, setCopied] = useState<'album' | 'event' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const shareButtonRef = useRef<HTMLSpanElement>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
+  // Position the portal dropdown relative to the share button
+  const openShareMenu = useCallback(() => {
+    if (shareButtonRef.current) {
+      const rect = shareButtonRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: Math.max(8, rect.right - 224), // 224 = w-56 (14rem)
+      });
+    }
+    setShowShareMenu(prev => !prev);
+  }, []);
+
+  // Close share menu on outside click or scroll
+  useEffect(() => {
+    if (!showShareMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node) &&
+        shareButtonRef.current && !shareButtonRef.current.contains(e.target as Node)
+      ) {
+        setShowShareMenu(false);
+      }
+    };
+    const handleScroll = () => setShowShareMenu(false);
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [showShareMenu]);
+
+  const getAlbumOnlyUrl = useCallback(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/gallery/${encodeURIComponent(eventHash)}?album=${encodeURIComponent(album.id)}&only=1`;
+  }, [eventHash, album.id]);
+
+  const getEventUrl = useCallback(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/gallery/${encodeURIComponent(eventHash)}`;
+  }, [eventHash]);
+
+  const shareOrCopy = useCallback(async (url: string, title: string, type: 'album' | 'event') => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch { /* user cancelled */ }
+    } else {
+      try { await navigator.clipboard.writeText(url); }
+      catch {
+        // Fallback for older browsers / insecure contexts
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(type);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopied(null), 2000);
+    }
+    setShowShareMenu(false);
+  }, []);
 
   const handleDelete = async () => {
     setLoading(true);
@@ -307,6 +417,11 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
               <EditIcon />
             </span>
             <span
+              ref={shareButtonRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                openShareMenu();
+              }}
               className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm cursor-pointer"
               aria-label="Share"
             >
@@ -372,6 +487,52 @@ export function AlbumCard({ album, coverUrl, onClick }: AlbumCardProps) {
           loading={loading}
           error={error}
         />
+      )}
+
+      {/* Share dropdown — portal to escape overflow-hidden parents */}
+      {showShareMenu && menuPos && createPortal(
+        <div
+          ref={shareMenuRef}
+          className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[9999] animate-in fade-in slide-in-from-top-1"
+          style={{ top: menuPos.top, left: menuPos.left }}
+        >
+          <button
+            onClick={() => shareOrCopy(getAlbumOnlyUrl(), album.name, 'album')}
+            className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-start gap-2.5"
+          >
+            <LinkIcon className="mt-0.5 flex-shrink-0 text-gray-400" />
+            <div>
+              <div className="font-medium">Share This Album</div>
+              <div className="text-[11px] text-gray-400 mt-0.5">Only &quot;{album.name}&quot; will be visible</div>
+            </div>
+          </button>
+          <button
+            onClick={() => shareOrCopy(getEventUrl(), album.name, 'event')}
+            className="w-full text-left px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-start gap-2.5"
+          >
+            <GlobeIcon className="mt-0.5 flex-shrink-0 text-gray-400" />
+            <div>
+              <div className="font-medium">Share Entire Event</div>
+              <div className="text-[11px] text-gray-400 mt-0.5">All albums &amp; photos</div>
+            </div>
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {/* Copied toast — portal, positioned from share button */}
+      {copied && shareButtonRef.current && createPortal(
+        <div
+          className="fixed px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md shadow-lg z-[9999] whitespace-nowrap flex items-center gap-1.5 animate-in fade-in"
+          style={{
+            top: shareButtonRef.current.getBoundingClientRect().bottom + 4,
+            left: Math.max(8, shareButtonRef.current.getBoundingClientRect().right - 160),
+          }}
+        >
+          <CheckIcon className="text-green-400" />
+          {copied === 'album' ? 'Album link copied!' : 'Event link copied!'}
+        </div>,
+        document.body
       )}
     </>
   );

@@ -29,6 +29,7 @@ interface GalleryPageClientProps {
     faceSearchEnabled?: boolean;
     showFaceScores?: boolean;
     isOwnerPreview?: boolean;
+    albumOnly?: boolean;
 }
 
 export function GalleryPageClient({
@@ -48,6 +49,7 @@ export function GalleryPageClient({
     faceSearchEnabled = false,
     showFaceScores = false,
     isOwnerPreview = false,
+    albumOnly = false,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -102,7 +104,7 @@ export function GalleryPageClient({
             setFaceSearchResults(allResults);
             setFaceSearchActive(true);
             faceSearchActiveRef.current = true;
-            setActiveAlbum(null);
+            if (!albumOnly) setActiveAlbum(null);
             setTimeout(() => {
                 document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
@@ -141,7 +143,7 @@ export function GalleryPageClient({
         setFaceSearchActive(true);
         faceSearchActiveRef.current = true;
         setFaceSearchOpen(false);
-        setActiveAlbum(null);
+        if (!albumOnly) setActiveAlbum(null);
         setTimeout(() => {
             document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -150,9 +152,10 @@ export function GalleryPageClient({
     const handleDismissFaceSearch = useCallback(() => {
         setFaceSearchActive(false);
         faceSearchActiveRef.current = false;
-        setActiveAlbum(null);
+        // In albumOnly mode, keep the locked album; otherwise reset to show all
+        if (!albumOnly) setActiveAlbum(null);
         // Keep faceSearchResults cached so toggling back doesn't re-trigger modal
-    }, []);
+    }, [albumOnly]);
 
     // Toggle handler for ALL/Mine pill
     const handleFaceToggle = useCallback(() => {
@@ -163,7 +166,7 @@ export function GalleryPageClient({
             // We have cached results — switch to Mine without re-searching
             setFaceSearchActive(true);
             faceSearchActiveRef.current = true;
-            setActiveAlbum(null);
+            if (!albumOnly) setActiveAlbum(null);
             setTimeout(() => {
                 document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
@@ -171,7 +174,7 @@ export function GalleryPageClient({
             // Open selfie modal directly — no auth required
             setFaceSearchOpen(true);
         }
-    }, [faceSearchActive, faceSearchResults, handleDismissFaceSearch]);
+    }, [faceSearchActive, faceSearchResults, handleDismissFaceSearch, albumOnly]);
 
     // Re-scan handler: retake selfie to update stored profile
     const handleRescan = useCallback(() => {
@@ -214,13 +217,16 @@ export function GalleryPageClient({
             document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         // Sync URL with album selection (replaceState to avoid polluting history)
-        const url = new URL(window.location.href);
-        if (activeAlbum) {
-            url.searchParams.set('album', activeAlbum);
-        } else {
-            url.searchParams.delete('album');
+        // In albumOnly mode, never remove the album or only params — they define the shared link
+        if (!albumOnly) {
+            const url = new URL(window.location.href);
+            if (activeAlbum) {
+                url.searchParams.set('album', activeAlbum);
+            } else {
+                url.searchParams.delete('album');
+            }
+            window.history.replaceState({}, '', url.toString());
         }
-        window.history.replaceState({}, '', url.toString());
         // Cancel any pending retry from the previous album
         if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
         if (activeAlbum === null) {
@@ -384,12 +390,13 @@ export function GalleryPageClient({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [shareMenuOpen]);
 
-    // Build gallery URL (without album param)
+    // Build gallery URL (clean — no album/photo/face/only params)
     const getGalleryUrl = useCallback(() => {
         const url = new URL(window.location.href);
         url.searchParams.delete('album');
         url.searchParams.delete('photo');
         url.searchParams.delete('face');
+        url.searchParams.delete('only');
         return url.toString();
     }, []);
 
@@ -482,8 +489,8 @@ export function GalleryPageClient({
                                 )}
                             </div>
 
-                            {/* Album tabs */}
-                            {albums.length > 1 && (
+                            {/* Album tabs — hidden in album-only mode */}
+                            {albums.length > 1 && !albumOnly && (
                                 <div className="relative group flex-shrink-0">
                                     <nav className="flex items-center gap-2 pr-12">
                                         <button
@@ -528,24 +535,36 @@ export function GalleryPageClient({
                                     <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                                 </svg>
                             </button>
-                            {/* Share dropdown — only when album is selected */}
+                            {/* Share dropdown */}
                             {shareMenuOpen && (
                                 <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40 animate-in fade-in slide-in-from-top-1">
-                                    <button
-                                        onClick={() => shareOrCopy(getGalleryUrl(), eventName)}
-                                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="font-medium">{activeAlbum ? 'Share Entire Gallery' : 'Copy Link'}</div>
-                                        <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbum ? 'All albums & photos' : 'Share gallery URL'}</div>
-                                    </button>
-                                    {activeAlbum && (
+                                    {albumOnly ? (
                                         <button
-                                            onClick={() => shareOrCopy(getAlbumUrl(), `${eventName} — ${activeAlbumName}`)}
+                                            onClick={() => shareOrCopy(window.location.href, `${eventName} — ${activeAlbumName}`)}
                                             className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                         >
-                                            <div className="font-medium">Share This Album</div>
-                                            <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbumName}</div>
+                                            <div className="font-medium">Copy Link</div>
+                                            <div className="text-[11px] text-gray-400 mt-0.5">Share this album</div>
                                         </button>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => shareOrCopy(getGalleryUrl(), eventName)}
+                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <div className="font-medium">{activeAlbum ? 'Share Entire Gallery' : 'Copy Link'}</div>
+                                                <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbum ? 'All albums & photos' : 'Share gallery URL'}</div>
+                                            </button>
+                                            {activeAlbum && (
+                                                <button
+                                                    onClick={() => shareOrCopy(getAlbumUrl(), `${eventName} — ${activeAlbumName}`)}
+                                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                                >
+                                                    <div className="font-medium">Share This Album</div>
+                                                    <div className="text-[11px] text-gray-400 mt-0.5">{activeAlbumName}</div>
+                                                </button>
+                                            )}
+                                        </>
                                     )}
                                     <div className="border-t border-gray-100 my-1" />
                                     <button

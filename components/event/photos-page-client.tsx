@@ -716,6 +716,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
                 key={album.id}
                 album={album}
                 coverUrl={album.cover_url || null}
+                eventHash={event.event_hash}
                 onClick={() => handleAlbumClick(album.id)}
               />
             ))}
