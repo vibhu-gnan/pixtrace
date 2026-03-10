@@ -97,12 +97,13 @@ interface PhotosPageClientProps {
   albums: AlbumData[];
   event: EventData;
   savedCoverPreviewUrl: string | null;
+  logoUrl?: string | null;
   initialHasMore?: boolean;
   totalPhotos?: number;
   totalVideos?: number;
 }
 
-function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: initialAlbums, event, savedCoverPreviewUrl, initialHasMore = false, totalPhotos = 0, totalVideos = 0 }: PhotosPageClientProps) {
+function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: initialAlbums, event, savedCoverPreviewUrl, logoUrl, initialHasMore = false, totalPhotos = 0, totalVideos = 0 }: PhotosPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -552,6 +553,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
         onCoverMobileSlideshowSelectedChange={setCoverMobileSlideshowSelectedIds}
         heroMode={heroMode}
         onHeroModeChange={setHeroMode}
+        logoUrl={logoUrl}
       />
 
       {/* Upload Banner — shows during/after uploads */}

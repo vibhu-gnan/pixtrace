@@ -3,6 +3,7 @@ import { getAlbums } from '@/actions/albums';
 import { getEvent } from '@/actions/events';
 import { PhotosPageClient } from '@/components/event/photos-page-client';
 import { notFound } from 'next/navigation';
+import { getSignedR2Url } from '@/lib/storage/r2-client';
 
 
 export default async function PhotosPage({
@@ -20,6 +21,12 @@ export default async function PhotosPage({
     getAlbums(eventId),
     getMediaCount(eventId),
   ]);
+
+  // Resolve logo URL server-side (R2 key → signed URL)
+  const logoRaw = (event.theme as any)?.logoUrl as string | undefined;
+  const resolvedLogoUrl = logoRaw
+    ? (logoRaw.startsWith('http://') || logoRaw.startsWith('https://') ? logoRaw : await getSignedR2Url(logoRaw))
+    : null;
 
   // Compute cover preview URL server-side
   let savedCoverPreviewUrl: string | null = null;
@@ -40,6 +47,7 @@ export default async function PhotosPage({
       albums={albums}
       event={event}
       savedCoverPreviewUrl={savedCoverPreviewUrl}
+      logoUrl={resolvedLogoUrl}
       initialHasMore={hasMore}
       totalPhotos={counts.photos}
       totalVideos={counts.videos}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { updateEventHero } from '@/actions/events';
 import type { EventData } from '@/actions/events';
 import type { MediaItem } from '@/actions/media';
+import { CoverPreviewModal } from './cover-preview-modal';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ interface CoverBarProps {
   onCoverMobileSlideshowSelectedChange: (ids: Set<string>) => void;
   heroMode: HeroMode;
   onHeroModeChange: (mode: HeroMode) => void;
+  logoUrl?: string | null;
 }
 
 // ─── Component ───────────────────────────────────────────────
@@ -80,6 +82,7 @@ export function CoverBar({
   onCoverMobileSlideshowSelectedChange,
   heroMode,
   onHeroModeChange,
+  logoUrl,
 }: CoverBarProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
@@ -121,6 +124,40 @@ export function CoverBar({
   // Ordered arrays for desktop and mobile slideshow
   const slideshowOrderedIds = useMemo(() => [...coverSlideshowSelectedIds], [coverSlideshowSelectedIds]);
   const mobileOrderedIds = useMemo(() => [...coverMobileSlideshowSelectedIds], [coverMobileSlideshowSelectedIds]);
+
+  // ─── Preview state & slide arrays ───────────────────────────
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const previewSlideshowPhotos = useMemo(() => {
+    return [...coverSlideshowSelectedIds]
+      .map(id => {
+        const item = images.find(m => m.id === id);
+        return item ? { url: item.preview_url, mediaId: item.id } : null;
+      })
+      .filter((s): s is { url: string; mediaId: string } => s !== null);
+  }, [coverSlideshowSelectedIds, images]);
+
+  const previewMobileSlideshowPhotos = useMemo(() => {
+    return [...coverMobileSlideshowSelectedIds]
+      .map(id => {
+        const item = images.find(m => m.id === id);
+        return item ? { url: item.preview_url, mediaId: item.id } : null;
+      })
+      .filter((s): s is { url: string; mediaId: string } => s !== null);
+  }, [coverMobileSlideshowSelectedIds, images]);
+
+  const previewAutoPhotos = useMemo(() => {
+    return images.slice(0, 5).map(img => ({ url: img.preview_url, mediaId: img.id }));
+  }, [images]);
+
+  const previewSinglePhotoUrl = useMemo(() => {
+    if (coverSingleSelectedId) {
+      const found = images.find(m => m.id === coverSingleSelectedId);
+      return found?.preview_url ?? null;
+    }
+    // Fallback to first image
+    return images[0]?.preview_url ?? null;
+  }, [coverSingleSelectedId, images]);
 
   // Collapsed label
   const coverLabel = useMemo(() => {
@@ -479,13 +516,19 @@ export function CoverBar({
         </div>
       )}
 
-      {/* Footer — Save & Cancel */}
+      {/* Footer — Preview, Save & Cancel */}
       <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50/50">
         <button
           onClick={handleCollapse}
           className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
         >
           Cancel
+        </button>
+        <button
+          onClick={() => setPreviewOpen(true)}
+          className="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+        >
+          Preview
         </button>
         <button
           onClick={handleSave}
@@ -498,6 +541,21 @@ export function CoverBar({
           {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>
       </div>
+
+      {/* Cover Preview Modal */}
+      <CoverPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        heroMode={heroMode}
+        singlePhotoUrl={previewSinglePhotoUrl}
+        slideshowPhotos={previewSlideshowPhotos}
+        mobileSlideshowPhotos={previewMobileSlideshowPhotos}
+        autoPhotos={previewAutoPhotos}
+        intervalMs={intervalMs}
+        eventName={event.name}
+        eventDate={event.event_date ?? null}
+        logoUrl={logoUrl ?? null}
+      />
     </div>
   );
 }
