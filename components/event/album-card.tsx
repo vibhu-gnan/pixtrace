@@ -316,8 +316,8 @@ export function AlbumCard({ album, coverUrl, eventHash, onClick }: AlbumCardProp
 
   const getEventUrl = useCallback(() => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/gallery/${encodeURIComponent(eventHash)}`;
-  }, [eventHash]);
+    return `${origin}/gallery/${encodeURIComponent(eventHash)}?album=${encodeURIComponent(album.id)}`;
+  }, [eventHash, album.id]);
 
   const shareOrCopy = useCallback(async (url: string, title: string, type: 'album' | 'event') => {
     if (navigator.share) {
@@ -512,8 +512,8 @@ export function AlbumCard({ album, coverUrl, eventHash, onClick }: AlbumCardProp
           >
             <GlobeIcon className="mt-0.5 flex-shrink-0 text-gray-400" />
             <div>
-              <div className="font-medium">Share Entire Event</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">All albums &amp; photos</div>
+              <div className="font-medium">Share with Event</div>
+              <div className="text-[11px] text-gray-400 mt-0.5">Opens this album, all albums accessible</div>
             </div>
           </button>
         </div>,
