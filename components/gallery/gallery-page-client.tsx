@@ -243,7 +243,7 @@ export function GalleryPageClient({
                 .catch(() => setError('Failed to load photos'))
                 .finally(() => setLoading(false));
         }
-    }, [activeAlbum, faceSearchActive, eventHash, initialMedia, totalCount, photoOrder]);
+    }, [activeAlbum, faceSearchActive, eventHash, initialMedia, totalCount, photoOrder, isOwnerPreview]);
 
     // Keep refs in sync with state (read latest values without stale closures)
     useEffect(() => { mediaRef.current = media; }, [media]);
@@ -310,7 +310,7 @@ export function GalleryPageClient({
             // After load + render, check if we need to keep loading
             scheduleRetryIfNeeded();
         }
-    }, [eventHash, photoOrder, scheduleRetryIfNeeded]);
+    }, [eventHash, photoOrder, scheduleRetryIfNeeded, isOwnerPreview]);
 
     // Keep loadMoreRef pointing at the latest loadMore so the observer never goes stale
     loadMoreRef.current = loadMore;

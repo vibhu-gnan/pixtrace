@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import type { EventData } from '@/actions/events';
 import { PublishModal } from './publish-modal';
 
@@ -23,12 +24,12 @@ function MenuIcon({ className }: { className?: string }) {
   );
 }
 
-function ExternalLinkIcon() {
+function DevicePreviewIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   );
 }
@@ -97,15 +98,13 @@ export function EventTopBar({ event, onMenuClick }: EventTopBarProps) {
 
         {/* Right: Preview + Publish */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          <a
-            href={`/gallery/${event.event_hash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:inline-flex items-center gap-1"
+          <Link
+            href={`/preview/${event.id}`}
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:inline-flex items-center gap-1.5"
           >
+            <DevicePreviewIcon />
             Preview
-            <ExternalLinkIcon />
-          </a>
+          </Link>
 
           {isPublished ? (
             <button
