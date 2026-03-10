@@ -113,7 +113,7 @@ function IframeErrorState({ onRetry }: { onRetry: () => void }) {
 
 function LaptopFrame({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex flex-col items-center w-[90%] max-w-[900px]">
+        <div className="flex flex-col items-center w-[94%] max-w-[1100px]">
             {/* Screen bezel */}
             <div className="relative w-full bg-[#1a1a1a] rounded-t-xl pt-6 pb-4 px-5">
                 {/* Webcam dot */}
@@ -138,7 +138,7 @@ function LaptopFrame({ children }: { children: React.ReactNode }) {
 
 function PhoneFrame({ children }: { children: React.ReactNode }) {
     return (
-        <div className="relative bg-[#1a1a1a] rounded-[40px] p-3 w-[260px] sm:w-[280px] shadow-[inset_0_0_0_2px_#2a2a2a,0_0_0_1px_rgba(255,255,255,0.05)]">
+        <div className="relative bg-[#1a1a1a] rounded-[44px] p-3 w-[300px] sm:w-[340px] shadow-[inset_0_0_0_2px_#2a2a2a,0_0_0_1px_rgba(255,255,255,0.05)]">
             {/* Dynamic island */}
             <div className="absolute top-[14px] left-1/2 -translate-x-1/2 w-[76px] h-[22px] bg-[#1a1a1a] rounded-full z-10" />
 
