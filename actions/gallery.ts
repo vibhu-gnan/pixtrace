@@ -1,6 +1,8 @@
 'use server';
 
 import { getPublicClient } from '@/lib/supabase/public';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getUser } from '@/lib/auth';
 import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
 export interface HeroSlide {
@@ -61,10 +63,45 @@ function resolvePhotoOrder(theme: unknown): 'oldest_first' | 'newest_first' {
 }
 
 /**
+ * Check if the current logged-in user owns the event with the given hash.
+ * Returns the organizer's auth_id if they own it, null otherwise.
+ * Uses admin client to bypass RLS.
+ */
+export async function checkEventOwnership(eventHash: string): Promise<boolean> {
+    try {
+        const user = await getUser();
+        if (!user) return false;
+
+        const admin = createAdminClient();
+
+        // Get the event's organizer_id
+        const { data: event } = await admin
+            .from('events')
+            .select('organizer_id')
+            .eq('event_hash', eventHash)
+            .single();
+        if (!event) return false;
+
+        // Get the organizer profile for this user
+        const { data: organizer } = await admin
+            .from('organizers')
+            .select('id')
+            .eq('auth_id', user.id)
+            .single();
+        if (!organizer) return false;
+
+        return event.organizer_id === organizer.id;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Fetch a public event and its first page of media by event_hash.
  * No auth required — RLS policies enforce is_public=true.
+ * When ownerBypass is true, uses admin client and skips the is_public check.
  */
-export async function getPublicGallery(identifier: string): Promise<{
+export async function getPublicGallery(identifier: string, ownerBypass = false): Promise<{
     event: GalleryEvent | null;
     media: GalleryMediaItem[];
     albums: { id: string; name: string }[];
@@ -77,7 +114,7 @@ export async function getPublicGallery(identifier: string): Promise<{
     heroIntervalMs: number;
     photoOrder: 'oldest_first' | 'newest_first';
 }> {
-    const supabase = getPublicClient();
+    const supabase = ownerBypass ? createAdminClient() : getPublicClient();
 
     // ── Local row types (supabase-js without a DB generic returns `never`
     //    for untyped queries; explicit casts here keep the file type-safe) ──
@@ -92,12 +129,9 @@ export async function getPublicGallery(identifier: string): Promise<{
     type SlideRow = { id: string; r2_key: string; preview_r2_key: string | null };
 
     // 1. Fetch Event Details by hash
-    const { data: event, error: eventError } = await (supabase
-        .from('events')
-        .select('*')
-        .eq('event_hash', identifier)
-        .eq('is_public', true)
-        .single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
+    let query = supabase.from('events').select('*').eq('event_hash', identifier);
+    if (!ownerBypass) query = query.eq('is_public', true);
+    const { data: event, error: eventError } = await (query.single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
 
     if (eventError || !event) {
         return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first' };
@@ -257,11 +291,20 @@ export async function getPublicGalleryPage(
     albumId?: string | null,
     albumNames?: Record<string, string>,
     photoOrder?: 'oldest_first' | 'newest_first',
+    ownerBypass = false,
 ): Promise<{
     media: GalleryMediaItem[];
     hasMore: boolean;
 }> {
-    const supabase = getPublicClient();
+    // When ownerBypass is requested, verify the caller actually owns the event
+    if (ownerBypass) {
+        const isOwner = await checkEventOwnership(eventHash);
+        if (!isOwner) {
+            return { media: [], hasMore: false };
+        }
+    }
+
+    const supabase = ownerBypass ? createAdminClient() : getPublicClient();
 
     type EventIdRow = { id: string };
     type MediaRow = {
@@ -270,13 +313,10 @@ export async function getPublicGalleryPage(
         thumbnail_r2_key: string | null; preview_r2_key: string | null; created_at: string;
     };
 
-    // Verify event is still public
-    const { data: event } = await (supabase
-        .from('events')
-        .select('id')
-        .eq('event_hash', eventHash)
-        .eq('is_public', true)
-        .single() as unknown as Promise<{ data: EventIdRow | null; error: unknown }>);
+    // Fetch event — bypass RLS check for owner preview
+    let eventQuery = supabase.from('events').select('id').eq('event_hash', eventHash);
+    if (!ownerBypass) eventQuery = eventQuery.eq('is_public', true);
+    const { data: event } = await (eventQuery.single() as unknown as Promise<{ data: EventIdRow | null; error: unknown }>);
 
     if (!event) {
         return { media: [], hasMore: false };

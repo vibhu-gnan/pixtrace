@@ -28,6 +28,7 @@ interface GalleryPageClientProps {
     mobileCoverUrl?: string;
     faceSearchEnabled?: boolean;
     showFaceScores?: boolean;
+    isOwnerPreview?: boolean;
 }
 
 export function GalleryPageClient({
@@ -46,6 +47,7 @@ export function GalleryPageClient({
     mobileCoverUrl,
     faceSearchEnabled = false,
     showFaceScores = false,
+    isOwnerPreview = false,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -233,7 +235,7 @@ export function GalleryPageClient({
             hasMoreRef.current = true;
             setHasMore(true);
             setLoading(true);
-            getPublicGalleryPage(eventHash, null, activeAlbum, albumNamesRef.current, photoOrder)
+            getPublicGalleryPage(eventHash, null, activeAlbum, albumNamesRef.current, photoOrder, isOwnerPreview)
                 .then(({ media: newMedia, hasMore: more }) => {
                     setMedia(newMedia);
                     setHasMore(more);
@@ -288,6 +290,7 @@ export function GalleryPageClient({
                 activeAlbumRef.current,
                 albumNamesRef.current,
                 photoOrder,
+                isOwnerPreview,
             );
             setMedia((prev) => {
                 const existingIds = new Set(prev.map((m) => m.id));
@@ -337,8 +340,11 @@ export function GalleryPageClient({
     }, []); // intentionally empty — observer is stable, state accessed via refs
 
     // Heartbeat: check ~every 5min if gallery is still public
+    // Skip for owner preview — the owner can always see their own draft
     // Random jitter (±1 min) prevents all 2K clients from hitting at the same instant
     useEffect(() => {
+        if (isOwnerPreview) return; // owners don't need heartbeat checks
+
         let timeout: ReturnType<typeof setTimeout>;
         let stopped = false;
 
@@ -360,7 +366,7 @@ export function GalleryPageClient({
         const initialDelay = 240_000 + Math.random() * 120_000;
         timeout = setTimeout(check, initialDelay);
         return () => { stopped = true; clearTimeout(timeout); };
-    }, [eventHash]);
+    }, [eventHash, isOwnerPreview]);
 
     const [shareMenuOpen, setShareMenuOpen] = useState(false);
     const [headerShareSheetOpen, setHeaderShareSheetOpen] = useState(false);
@@ -449,6 +455,20 @@ export function GalleryPageClient({
 
     return (
         <>
+            {/* ── Draft Preview Banner ──────────────────────────── */}
+            {isOwnerPreview && (
+                <div className="bg-amber-50 border-b border-amber-200">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-center gap-2 text-sm text-amber-800">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <span className="font-medium">Draft Preview</span>
+                        <span className="hidden sm:inline text-amber-600">— Only you can see this. Publish your event to make it public.</span>
+                    </div>
+                </div>
+            )}
+
             {/* ── Sticky Info Bar ───────────────────────────────── */}
             <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

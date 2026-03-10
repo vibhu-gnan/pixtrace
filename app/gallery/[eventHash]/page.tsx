@@ -1,7 +1,7 @@
 import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import { getPublicGallery } from '@/actions/gallery';
+import { getPublicGallery, checkEventOwnership } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 import { HeroSlideshow } from '@/components/gallery/hero-slideshow';
 import { getSignedR2Url } from '@/lib/storage/r2-client';
@@ -14,14 +14,25 @@ type Props = {
   searchParams: Promise<{ photo?: string; album?: string }>;
 };
 
-// Deduplicate getPublicGallery calls within the same request
+// Deduplicate calls within the same request
 // (generateMetadata + page component share one result)
-const getCachedGallery = cache((eventHash: string) => getPublicGallery(eventHash));
+/** Try public first, then owner fallback. Cached per-request. */
+const getCachedGalleryWithFallback = cache(async (eventHash: string) => {
+  const result = await getPublicGallery(eventHash);
+  if (result.event) return { ...result, isOwnerPreview: false };
+
+  const isOwner = await checkEventOwnership(eventHash);
+  if (isOwner) {
+    const ownerResult = await getPublicGallery(eventHash, true);
+    return { ...ownerResult, isOwnerPreview: true };
+  }
+  return { ...result, isOwnerPreview: false };
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { eventHash } = await params;
-    const { event, media, coverR2Key } = await getCachedGallery(eventHash);
+    const { event, media, coverR2Key } = await getCachedGalleryWithFallback(eventHash);
 
     if (!event) {
       return {
@@ -65,7 +76,9 @@ export default async function GalleryEventPage({
   try {
     const { eventHash } = await params;
     const { photo: initialPhotoId, album: initialAlbumId } = await searchParams;
-    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = await getCachedGallery(eventHash);
+    const { isOwnerPreview, ...result } = await getCachedGalleryWithFallback(eventHash);
+
+    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = result;
 
     if (!event) {
       notFound();
@@ -194,6 +207,7 @@ export default async function GalleryEventPage({
             mobileCoverUrl={mobileCoverUrl}
             faceSearchEnabled={event.face_search_enabled ?? false}
             showFaceScores={event.show_face_scores ?? false}
+            isOwnerPreview={isOwnerPreview}
           />
         </div>
 
