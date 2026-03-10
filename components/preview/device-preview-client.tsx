@@ -74,13 +74,90 @@ function DevicePreviewIcon() {
     );
 }
 
-// ─── Loading Spinner ────────────────────────────────────────
+// ─── Shimmer keyframes (injected once) ──────────────────────
 
-function LoadingSpinner() {
+const shimmerCSS = `
+@keyframes preview-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.preview-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 60%, transparent 100%);
+  background-size: 400px 100%;
+  animation: preview-shimmer 1.8s ease-in-out infinite;
+}
+`;
+
+// ─── Desktop Skeleton ───────────────────────────────────────
+
+function DesktopSkeleton() {
     return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 gap-3">
-            <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin" />
-            <p className="text-xs text-white/50">Loading gallery...</p>
+        <div className="absolute inset-0 z-20 bg-gray-950 flex flex-col">
+            <style dangerouslySetInnerHTML={{ __html: shimmerCSS }} />
+            {/* Hero area — full width image placeholder */}
+            <div className="relative w-full h-[55%] bg-gray-800">
+                <div className="absolute inset-0 preview-shimmer" />
+                {/* Overlay text skeleton */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                    <div className="w-32 h-3 bg-white/10 rounded preview-shimmer" />
+                    <div className="w-56 h-6 bg-white/15 rounded preview-shimmer" />
+                    <div className="w-24 h-2.5 bg-white/8 rounded preview-shimmer mt-1" />
+                    <div className="w-28 h-8 border border-white/20 rounded mt-3 preview-shimmer" />
+                </div>
+            </div>
+            {/* Gallery grid skeleton — 4 columns */}
+            <div className="flex-1 bg-gray-950 p-3">
+                {/* Sticky bar */}
+                <div className="flex items-center justify-between mb-3 px-1">
+                    <div className="w-28 h-3 bg-white/8 rounded preview-shimmer" />
+                    <div className="flex gap-1.5">
+                        <div className="w-12 h-5 bg-white/6 rounded-full preview-shimmer" />
+                        <div className="w-14 h-5 bg-white/6 rounded-full preview-shimmer" />
+                        <div className="w-10 h-5 bg-white/6 rounded-full preview-shimmer" />
+                    </div>
+                </div>
+                {/* Photo grid — 4 columns */}
+                <div className="grid grid-cols-4 gap-1.5">
+                    {[72, 56, 64, 80, 60, 72, 48, 64, 56, 72, 64, 52].map((h, i) => (
+                        <div key={i} className="bg-white/[0.04] rounded preview-shimmer" style={{ paddingBottom: `${h}%` }} />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Mobile Skeleton ────────────────────────────────────────
+
+function MobileSkeleton() {
+    return (
+        <div className="absolute inset-0 z-20 bg-gray-950 flex flex-col">
+            <style dangerouslySetInnerHTML={{ __html: shimmerCSS }} />
+            {/* Hero area — taller on mobile */}
+            <div className="relative w-full h-[45%] bg-gray-800">
+                <div className="absolute inset-0 preview-shimmer" />
+                {/* Overlay text skeleton */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <div className="w-20 h-2.5 bg-white/10 rounded preview-shimmer" />
+                    <div className="w-36 h-5 bg-white/15 rounded preview-shimmer" />
+                    <div className="w-16 h-2 bg-white/8 rounded preview-shimmer mt-0.5" />
+                    <div className="w-24 h-7 border border-white/20 rounded mt-2.5 preview-shimmer" />
+                </div>
+            </div>
+            {/* Gallery grid skeleton — 2 columns */}
+            <div className="flex-1 bg-gray-950 p-2">
+                {/* Sticky bar */}
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                    <div className="w-20 h-2.5 bg-white/8 rounded preview-shimmer" />
+                    <div className="w-5 h-5 bg-white/6 rounded preview-shimmer" />
+                </div>
+                {/* Photo grid — 2 columns */}
+                <div className="grid grid-cols-2 gap-1">
+                    {[80, 64, 72, 56, 64, 80, 56, 72].map((h, i) => (
+                        <div key={i} className="bg-white/[0.04] rounded-sm preview-shimmer" style={{ paddingBottom: `${h}%` }} />
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
@@ -226,16 +303,28 @@ export function DevicePreviewClient({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // ── Iframe element (shared between both frames) ─────────
-    const iframeElement = (
+    // ── Reset loading state when switching device modes ────────
+    const prevModeRef = useRef(deviceMode);
+    useEffect(() => {
+        if (prevModeRef.current !== deviceMode) {
+            prevModeRef.current = deviceMode;
+            setIframeLoaded(false);
+            setIframeError(false);
+        }
+    }, [deviceMode]);
+
+    // ── Iframe element builder (device-specific skeleton) ────
+    const buildIframeContent = (mode: DeviceMode) => (
         <>
-            {!iframeLoaded && !iframeError && <LoadingSpinner />}
+            {!iframeLoaded && !iframeError && (
+                mode === 'desktop' ? <DesktopSkeleton /> : <MobileSkeleton />
+            )}
             {iframeError && <IframeErrorState onRetry={handleRetry} />}
             <iframe
-                key={iframeKey}
+                key={`${iframeKey}-${mode}`}
                 src={galleryUrl}
                 title={`Preview: ${eventName}`}
-                className={`absolute inset-0 w-full h-full border-0 transition-opacity duration-300 ${
+                className={`absolute inset-0 w-full h-full border-0 transition-opacity duration-500 ${
                     iframeLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
                 onLoad={handleIframeLoad}
@@ -314,9 +403,9 @@ export function DevicePreviewClient({
                     deviceMode === 'desktop' ? 'w-full flex justify-center' : ''
                 }`}>
                     {deviceMode === 'desktop' ? (
-                        <LaptopFrame>{iframeElement}</LaptopFrame>
+                        <LaptopFrame>{buildIframeContent('desktop')}</LaptopFrame>
                     ) : (
-                        <PhoneFrame>{iframeElement}</PhoneFrame>
+                        <PhoneFrame>{buildIframeContent('mobile')}</PhoneFrame>
                     )}
                 </div>
 
