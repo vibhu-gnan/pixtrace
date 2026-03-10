@@ -555,6 +555,7 @@ export function CoverBar({
         eventName={event.name}
         eventDate={event.event_date ?? null}
         logoUrl={logoUrl ?? null}
+        showLogoOnCover={((event.theme as any)?.logoDisplay ?? 'cover_and_loading') === 'cover_and_loading'}
       />
     </div>
   );

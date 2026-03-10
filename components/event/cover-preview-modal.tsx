@@ -19,6 +19,7 @@ interface CoverPreviewModalProps {
   eventName: string;
   eventDate: string | null;
   logoUrl: string | null;
+  showLogoOnCover: boolean;
 }
 
 // ─── Icons ──────────────────────────────────────────────────
@@ -65,6 +66,7 @@ export function CoverPreviewModal({
   eventName,
   eventDate,
   logoUrl,
+  showLogoOnCover,
 }: CoverPreviewModalProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('desktop');
 
@@ -230,7 +232,7 @@ export function CoverPreviewModal({
             {/* Event info overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20 px-4">
               {/* Logo */}
-              {logoUrl && (
+              {logoUrl && showLogoOnCover && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={logoUrl}
