@@ -309,8 +309,10 @@ export function DevicePreviewClient({
 
             {/* ── Preview Area ───────────────────────────────── */}
             <div className="flex-1 flex flex-col items-center justify-center overflow-hidden p-4 sm:p-8">
-                {/* Device frame */}
-                <div className="transition-all duration-300 ease-in-out">
+                {/* Device frame — w-full needed so LaptopFrame's w-[90%] resolves correctly */}
+                <div className={`transition-all duration-300 ease-in-out ${
+                    deviceMode === 'desktop' ? 'w-full flex justify-center' : ''
+                }`}>
                     {deviceMode === 'desktop' ? (
                         <LaptopFrame>{iframeElement}</LaptopFrame>
                     ) : (
