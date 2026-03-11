@@ -273,15 +273,24 @@ export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onTog
     <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-200 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] overflow-hidden">
       {/* Header: Logo + collapse toggle */}
       <div className={`flex items-center h-16 flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
-        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-          <span className={`font-bold text-brand-600 tracking-tight whitespace-nowrap transition-all duration-300 ${collapsed ? 'text-lg' : 'text-xl'}`}>
-            {collapsed ? 'P' : 'PIXTRACE'}
-          </span>
-        </Link>
+        {collapsed ? (
+          <button
+            onClick={onToggleCollapse}
+            className="flex items-center gap-2 min-w-0 cursor-pointer"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <span className="text-lg font-bold text-brand-600 tracking-tight">P</span>
+          </button>
+        ) : (
+          <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+            <span className="text-xl font-bold text-brand-600 tracking-tight">PIXTRACE</span>
+          </Link>
+        )}
         {!collapsed && (
           <button
             onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
