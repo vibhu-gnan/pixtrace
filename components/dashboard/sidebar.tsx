@@ -182,7 +182,13 @@ export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onTog
           <p className="text-[11px] text-gray-400 mt-2">
             {usedDisplay} of {limitDisplay} used
           </p>
-          {!isUnlimitedStorage && storagePercent >= 80 && (
+          {planLimits.isOverLimit && planLimits.storageGraceDeadline ? (
+            <div className="mt-2 text-[11px] font-medium px-2 py-1 rounded bg-red-50 text-red-600">
+              Over limit! {planLimits.graceDaysRemaining != null && planLimits.graceDaysRemaining > 0
+                ? `${planLimits.graceDaysRemaining} day${planLimits.graceDaysRemaining !== 1 ? 's' : ''} left`
+                : 'Grace period expired'}
+            </div>
+          ) : !isUnlimitedStorage && storagePercent >= 80 && (
             <div className={`mt-2 text-[11px] font-medium px-2 py-1 rounded ${
               storagePercent >= 95
                 ? 'bg-red-50 text-red-600'

@@ -23,6 +23,9 @@ CREATE TABLE organizers (
   plan_id VARCHAR(50) NOT NULL DEFAULT 'free',
   razorpay_customer_id VARCHAR(255),
   storage_used_bytes BIGINT NOT NULL DEFAULT 0,
+  storage_grace_deadline TIMESTAMPTZ,
+  storage_grace_notified_at TIMESTAMPTZ,
+  storage_deletion_warned_at TIMESTAMPTZ,
   created_at TIMESTAMP DEFAULT now() NOT NULL,
   updated_at TIMESTAMP DEFAULT now() NOT NULL
 );

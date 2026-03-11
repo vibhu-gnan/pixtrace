@@ -10,6 +10,8 @@ const PUBLIC_PREFIXES = [
   '/api/webhooks',
   '/api/proxy-image',
   '/api/face',
+  '/api/import/cleanup',
+  '/api/cron/storage-cleanup',
   '/sign-in',
   '/sign-up',
   '/pricing',

@@ -45,9 +45,10 @@ export default async function BillingPage() {
 
   const { plan, subscription, payments } = details;
 
-  const storagePercent = planLimits.storageLimitBytes > 0
-    ? Math.min(100, Math.round((planLimits.storageUsedBytes / planLimits.storageLimitBytes) * 100))
+  const storagePercentRaw = planLimits.storageLimitBytes > 0
+    ? Math.round((planLimits.storageUsedBytes / planLimits.storageLimitBytes) * 100)
     : 0;
+  const storagePercent = Math.min(100, storagePercentRaw);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -127,11 +128,16 @@ export default async function BillingPage() {
       )}
 
       {/* Storage Usage */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div className={`bg-white rounded-xl border p-6 shadow-sm ${
+        planLimits.isOverLimit ? 'border-red-200' : 'border-gray-200'
+      }`}>
         <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">Storage Usage</h3>
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">{formatBytes(planLimits.storageUsedBytes)} used</span>
+            <span className={planLimits.isOverLimit ? 'text-red-600 font-medium' : 'text-gray-600'}>
+              {formatBytes(planLimits.storageUsedBytes)} used
+              {planLimits.isOverLimit && ` (${storagePercentRaw}%)`}
+            </span>
             <span className="text-gray-500">
               {planLimits.storageLimitBytes > 0 ? `${formatBytes(planLimits.storageLimitBytes)} total` : 'Unlimited'}
             </span>
@@ -139,10 +145,18 @@ export default async function BillingPage() {
           {planLimits.storageLimitBytes > 0 && (
             <div className="w-full bg-gray-100 rounded-full h-2.5">
               <div
-                className={`h-2.5 rounded-full transition-all ${storagePercent >= 90 ? 'bg-red-500' : 'bg-brand-500'}`}
+                className={`h-2.5 rounded-full transition-all ${storagePercent >= 90 || planLimits.isOverLimit ? 'bg-red-500' : 'bg-brand-500'}`}
                 style={{ width: `${storagePercent}%` }}
               />
             </div>
+          )}
+          {planLimits.isOverLimit && planLimits.storageLimitBytes > 0 && (
+            <p className="text-xs font-medium text-red-600">
+              Over by {formatBytes(planLimits.storageUsedBytes - planLimits.storageLimitBytes)}
+              {planLimits.storageGraceDeadline && (
+                <> &middot; Grace period expires {formatDate(planLimits.storageGraceDeadline)}</>
+              )}
+            </p>
           )}
           <p className="text-xs text-gray-400">
             {planLimits.maxEvents === 0

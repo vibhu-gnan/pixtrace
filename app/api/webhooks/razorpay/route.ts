@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { checkAndSetGracePeriod } from '@/lib/plans/grace-period';
 import crypto from 'crypto';
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -194,6 +195,11 @@ async function handleSubscriptionCharged(supabase: SupabaseClient, payload: any)
     .update({ plan_id: sub.plan_id, updated_at: now.toISOString() })
     .eq('id', sub.organizer_id);
 
+  // Await grace period check so deadline is cleared before cron can see it
+  await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
+    console.error('[Razorpay Webhook] Grace period check failed (charged):', err);
+  });
+
   const payment = payload.payment?.entity;
   if (payment) {
     await supabase.from('payment_history').upsert({
@@ -241,6 +247,11 @@ async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any)
         .from('organizers')
         .update({ plan_id: plan.id, updated_at: new Date().toISOString() })
         .eq('id', sub.organizer_id);
+
+      // Await grace period check so deadline is cleared before cron can see it
+      await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
+        console.error('[Razorpay Webhook] Grace period check failed (updated):', err);
+      });
 
       console.log(`[Razorpay Webhook] Plan updated: organizer ${sub.organizer_id} → ${plan.id}`);
     }
@@ -308,6 +319,11 @@ async function handleSubscriptionCancelled(supabase: SupabaseClient, payload: an
       .from('organizers')
       .update({ plan_id: 'free', updated_at: new Date().toISOString() })
       .eq('id', sub.organizer_id);
+
+    // Downgraded to free — likely creates storage overage
+    await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
+      console.error('[Razorpay Webhook] Grace period check failed (cancelled):', err);
+    });
   }
 }
 
@@ -337,6 +353,11 @@ async function handleSubscriptionCompleted(supabase: SupabaseClient, payload: an
     .from('organizers')
     .update({ plan_id: 'free', updated_at: new Date().toISOString() })
     .eq('id', sub.organizer_id);
+
+  // Downgraded to free — likely creates storage overage
+  await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
+    console.error('[Razorpay Webhook] Grace period check failed (completed):', err);
+  });
 }
 
 // ── Generic subscription status update ────────────────────────────────────────

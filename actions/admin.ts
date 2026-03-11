@@ -327,6 +327,15 @@ export async function changeUserPlan(userId: string, newPlanId: string) {
     return { error: 'Failed to update plan' };
   }
 
+  // Await grace period check so the deadline is cleared BEFORE we return.
+  // This prevents a race where the cron could still see a stale deadline.
+  try {
+    const { checkAndSetGracePeriod } = await import('@/lib/plans/grace-period');
+    await checkAndSetGracePeriod(userId);
+  } catch (err) {
+    console.error('Grace period check failed after admin plan change:', err);
+  }
+
   revalidatePath('/admin/users');
   revalidatePath(`/admin/users/${userId}`);
   return { success: true };

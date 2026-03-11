@@ -13,6 +13,9 @@ export interface PlanLimits {
     events: boolean;
     features: boolean;
   };
+  isOverLimit: boolean;
+  storageGraceDeadline: string | null;
+  graceDaysRemaining: number | null;
 }
 
 export async function getOrganizerPlanLimits(organizerId: string): Promise<PlanLimits> {
@@ -21,7 +24,7 @@ export async function getOrganizerPlanLimits(organizerId: string): Promise<PlanL
   // Fetch organizer first (needed for plan_id)
   const { data: organizer } = await supabase
     .from('organizers')
-    .select('plan_id, storage_used_bytes, custom_storage_limit_bytes, custom_max_events, custom_feature_flags')
+    .select('plan_id, storage_used_bytes, custom_storage_limit_bytes, custom_max_events, custom_feature_flags, storage_grace_deadline')
     .eq('id', organizerId)
     .single();
 
@@ -51,12 +54,26 @@ export async function getOrganizerPlanLimits(organizerId: string): Promise<PlanL
     ? { ...planFeatureFlags, ...customFeatureFlags }
     : planFeatureFlags;
 
+  const effectiveStorageLimit = hasCustomStorage
+    ? (organizer!.custom_storage_limit_bytes as number)
+    : (plan?.storage_limit_bytes ?? 1073741824);
+  const isUnlimited = effectiveStorageLimit === 0;
+  const isOverLimit = !isUnlimited && storageUsedBytes > effectiveStorageLimit;
+
+  const storageGraceDeadline = organizer?.storage_grace_deadline
+    ? String(organizer.storage_grace_deadline)
+    : null;
+
+  let graceDaysRemaining: number | null = null;
+  if (storageGraceDeadline) {
+    const msRemaining = new Date(storageGraceDeadline).getTime() - Date.now();
+    graceDaysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+  }
+
   return {
     planId,
     planName: plan?.name || 'Free',
-    storageLimitBytes: hasCustomStorage
-      ? (organizer!.custom_storage_limit_bytes as number)
-      : (plan?.storage_limit_bytes ?? 1073741824),
+    storageLimitBytes: effectiveStorageLimit,
     maxEvents: hasCustomEvents
       ? (organizer!.custom_max_events as number)
       : (plan?.max_events ?? 1),
@@ -68,6 +85,9 @@ export async function getOrganizerPlanLimits(organizerId: string): Promise<PlanL
       events: hasCustomEvents,
       features: hasCustomFeatures,
     },
+    isOverLimit,
+    storageGraceDeadline,
+    graceDaysRemaining,
   };
 }
 

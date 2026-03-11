@@ -6,6 +6,7 @@ import type { PlanLimits } from '@/lib/plans/limits';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { Footer } from './footer';
+import { StorageOverageBanner } from './storage-overage-banner';
 
 const COLLAPSED_KEY = 'pixtrace-sidebar-collapsed';
 
@@ -75,6 +76,7 @@ export function DashboardShell({ organizer, planLimits, children }: DashboardShe
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <StorageOverageBanner planLimits={planLimits} />
           {children}
         </main>
 

@@ -12,7 +12,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
  */
 export function deleteR2WithTracking(
   r2Keys: string[],
-  source: 'event_delete' | 'album_delete' | 'media_delete' | 'multi_media_delete',
+  source: 'event_delete' | 'album_delete' | 'media_delete' | 'multi_media_delete' | 'storage_cleanup',
 ): void {
   if (r2Keys.length === 0) return;
 

@@ -84,6 +84,15 @@ export async function POST(request: NextRequest) {
       console.error('Error updating organizer plan:', orgUpdateErr);
     }
 
+    // Await grace period check so the deadline is cleared BEFORE we return.
+    // This prevents a race where the cron could still see a stale deadline.
+    try {
+      const { checkAndSetGracePeriod } = await import('@/lib/plans/grace-period');
+      await checkAndSetGracePeriod(organizer.id);
+    } catch (err) {
+      console.error('Grace period check failed after subscription verify:', err);
+    }
+
     // Record initial verification payment (amount populated by webhook on actual charge)
     await supabase.from('payment_history').upsert({
       organizer_id: organizer.id,
