@@ -6,7 +6,7 @@ import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
-import { getOrganizerPlanLimits, canCreateEvent, hasFeature } from '@/lib/plans/limits';
+import { getOrganizerPlanLimits, canCreateEvent, hasFeature, decrementStorageUsed } from '@/lib/plans/limits';
 import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
 
 export interface EventData {
@@ -470,10 +470,10 @@ export async function deleteEvent(eventId: string) {
     return { error: 'Event not found' };
   }
 
-  // 2. Fetch all R2 keys BEFORE deleting from DB (cascade will remove media rows)
+  // 2. Fetch all R2 keys + sizes BEFORE deleting from DB (cascade will remove media rows)
   const { data: mediaRows } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key, preview_r2_key')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size, variant_size_bytes')
     .eq('event_id', eventId);
 
   // 3. Delete event from DB (cascades to albums → media)
@@ -488,7 +488,20 @@ export async function deleteEvent(eventId: string) {
     return { error: 'Failed to delete event' };
   }
 
-  // 4. Delete files from R2 storage (non-blocking — DB is source of truth)
+  // 4. Decrement storage usage (original + variants for all media in this event)
+  if (mediaRows && mediaRows.length > 0) {
+    const totalBytes = mediaRows.reduce(
+      (sum, row) => sum + (row.file_size || 0) + (row.variant_size_bytes || 0),
+      0,
+    );
+    if (totalBytes > 0) {
+      decrementStorageUsed(organizer.id, totalBytes).catch((err) => {
+        console.error('Error decrementing storage for event delete:', err);
+      });
+    }
+  }
+
+  // 5. Delete files from R2 storage (non-blocking — DB is source of truth)
   if (mediaRows && mediaRows.length > 0) {
     const r2Keys: string[] = [];
     for (const row of mediaRows) {

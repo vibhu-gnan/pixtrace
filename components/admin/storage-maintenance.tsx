@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { scanOrphanedR2, cleanOrphanedR2, type ScanResult } from '@/actions/admin';
+import { scanOrphanedR2, cleanOrphanedR2, adminRecalculateStorage, type ScanResult } from '@/actions/admin';
 
 interface StorageMaintenanceSectionProps {
   initialTrackedOrphanCount: number;
@@ -66,11 +66,111 @@ export function StorageMaintenanceSection({ initialTrackedOrphanCount }: Storage
     });
   };
 
+  // Recalculate storage state
+  const [recalcResult, setRecalcResult] = useState<{
+    updated: number;
+    details: Array<{ id: string; name: string; oldBytes: number; newBytes: number; diff: number }>;
+  } | null>(null);
+  const [recalcError, setRecalcError] = useState<string | null>(null);
+  const [isRecalculating, startRecalcTransition] = useTransition();
+
+  const handleRecalculate = () => {
+    setRecalcResult(null);
+    setRecalcError(null);
+    startRecalcTransition(async () => {
+      try {
+        const result = await adminRecalculateStorage();
+        if (result.success) {
+          setRecalcResult({ updated: result.updated, details: result.details });
+        } else {
+          setRecalcError(result.error || 'Recalculation failed');
+        }
+      } catch (err: any) {
+        setRecalcError(err?.message || 'Recalculation failed unexpectedly');
+      }
+    });
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(1024));
+    return `${(bytes / (1024 ** i)).toFixed(1)} ${units[i]}`;
+  };
+
   const totalOrphansFound = scanResult
     ? scanResult.untrackedOrphanCount + scanResult.trackedOrphanCount
     : 0;
 
   return (
+    <div className="space-y-6">
+    {/* Recalculate Storage Section */}
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+          Storage Counter Reconciliation
+        </h3>
+        <button
+          onClick={handleRecalculate}
+          disabled={isRecalculating}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          {isRecalculating ? 'Recalculating...' : 'Recalculate All'}
+        </button>
+      </div>
+      <div className="p-6 space-y-4">
+        {isRecalculating && (
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+            Summing media sizes for all organizers...
+          </div>
+        )}
+
+        {recalcError && (
+          <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+            {recalcError}
+          </div>
+        )}
+
+        {recalcResult && (
+          <div className={`rounded-lg border p-4 text-sm ${recalcResult.updated > 0 ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+            <p className={`font-medium ${recalcResult.updated > 0 ? 'text-blue-700' : 'text-green-700'}`}>
+              {recalcResult.updated > 0
+                ? `Fixed ${recalcResult.updated} organizer(s)`
+                : 'All storage counters are accurate'}
+            </p>
+            {recalcResult.details.length > 0 && (
+              <ul className="mt-2 space-y-1 text-gray-600">
+                {recalcResult.details.map((d) => (
+                  <li key={d.id} className="flex items-center gap-2">
+                    <span className="font-medium">{d.name}</span>
+                    <span className="text-gray-400">{formatBytes(d.oldBytes)}</span>
+                    <span className="text-gray-400">&rarr;</span>
+                    <span className="font-medium">{formatBytes(d.newBytes)}</span>
+                    <span className={`text-xs ${d.diff > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                      ({d.diff > 0 ? '+' : ''}{formatBytes(d.diff)})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {!isRecalculating && !recalcResult && !recalcError && (
+          <p className="text-sm text-gray-400">
+            Recalculates storage_used_bytes from actual media records. Fixes drift from bugs or missing decrements.
+          </p>
+        )}
+      </div>
+    </div>
+
+    {/* Orphan Scan Section */}
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -234,6 +334,7 @@ export function StorageMaintenanceSection({ initialTrackedOrphanCount }: Storage
           </p>
         )}
       </div>
+    </div>
     </div>
   );
 }

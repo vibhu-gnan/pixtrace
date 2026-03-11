@@ -47,6 +47,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    // Track storage usage (original + variant sizes like thumbnail/preview)
+    // Cap variantSizeBytes to a reasonable max (2x original) to prevent billing manipulation
+    const rawVariantSize = typeof body.variantSizeBytes === 'number' ? body.variantSizeBytes : 0;
+    const variantSizeBytes = Math.max(0, Math.min(rawVariantSize, fileSize * 2));
+
     // Create media record
     const { data: media, error } = await supabase
       .from('media')
@@ -58,6 +63,7 @@ export async function POST(request: NextRequest) {
         media_type: mediaType,
         mime_type: mimeType,
         file_size: fileSize,
+        variant_size_bytes: variantSizeBytes,
         width: width || null,
         height: height || null,
         preview_r2_key: previewR2Key || null,
@@ -74,10 +80,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Track storage usage (original + variant sizes like thumbnail/preview)
-    // Cap variantSizeBytes to a reasonable max (2x original) to prevent billing manipulation
-    const rawVariantSize = typeof body.variantSizeBytes === 'number' ? body.variantSizeBytes : 0;
-    const variantSizeBytes = Math.max(0, Math.min(rawVariantSize, fileSize * 2));
+    // Increment storage counter (original + variants)
     const totalBytes = fileSize + variantSizeBytes;
     if (totalBytes > 0) {
       try {

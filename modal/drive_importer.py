@@ -449,7 +449,8 @@ class DriveImporter:
                     upload_to_r2(self.s3, self.bucket, thumb_key, thumb, "image/webp")
                     upload_to_r2(self.s3, self.bucket, preview_key, preview, "image/webp")
 
-                    file_total = len(original) + len(thumb) + len(preview)
+                    variant_bytes = len(thumb) + len(preview)
+                    file_total = len(original) + variant_bytes
                     total_bytes += file_total
 
                     # Accumulate media record
@@ -461,6 +462,7 @@ class DriveImporter:
                         "media_type": "image",
                         "mime_type": file_info["mime_type"],
                         "file_size": len(original),
+                        "variant_size_bytes": variant_bytes,
                         "width": w,
                         "height": h,
                         "thumbnail_r2_key": thumb_key,

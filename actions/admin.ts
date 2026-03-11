@@ -838,6 +838,109 @@ export async function retryFailedFaceJobs(jobIds: string[]) {
 }
 
 // ============================================================================
+// STORAGE RECALCULATION
+// ============================================================================
+
+/**
+ * Recalculate storage_used_bytes for one or all organizers from actual media data.
+ * Fixes any drift between the counter and reality (e.g. from past bugs).
+ */
+export async function adminRecalculateStorage(organizerId?: string): Promise<{
+  success: boolean;
+  updated: number;
+  details: Array<{ id: string; name: string; oldBytes: number; newBytes: number; diff: number }>;
+  error?: string;
+}> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  // Fetch organizers to recalculate
+  let organizers: Array<{ id: string; name: string; storage_used_bytes: number }>;
+
+  if (organizerId) {
+    const { data, error } = await supabase
+      .from('organizers')
+      .select('id, name, storage_used_bytes')
+      .eq('id', organizerId);
+    if (error || !data?.length) {
+      return { success: false, updated: 0, details: [], error: 'Organizer not found' };
+    }
+    organizers = data;
+  } else {
+    // All organizers with any storage used or any media
+    const { data, error } = await supabase
+      .from('organizers')
+      .select('id, name, storage_used_bytes');
+    if (error) {
+      return { success: false, updated: 0, details: [], error: 'Failed to fetch organizers' };
+    }
+    organizers = data || [];
+  }
+
+  const details: Array<{ id: string; name: string; oldBytes: number; newBytes: number; diff: number }> = [];
+  let updated = 0;
+
+  for (const org of organizers) {
+    // Sum file_size + variant_size_bytes for all media owned by this organizer
+    // Media → Event → Organizer (media has event_id, event has organizer_id)
+    const { data: events } = await supabase
+      .from('events')
+      .select('id')
+      .eq('organizer_id', org.id);
+
+    if (!events || events.length === 0) {
+      // No events — storage should be 0
+      if (org.storage_used_bytes !== 0) {
+        await supabase
+          .from('organizers')
+          .update({ storage_used_bytes: 0, updated_at: new Date().toISOString() })
+          .eq('id', org.id);
+        details.push({ id: org.id, name: org.name, oldBytes: org.storage_used_bytes, newBytes: 0, diff: -org.storage_used_bytes });
+        updated++;
+      }
+      continue;
+    }
+
+    const eventIds = events.map((e) => e.id);
+
+    // Paginated sum — Supabase caps rows at ~1000
+    let actualBytes = 0;
+    const PAGE_SIZE = 1000;
+    let offset = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data: mediaPage } = await supabase
+        .from('media')
+        .select('file_size, variant_size_bytes')
+        .in('event_id', eventIds)
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (!mediaPage || mediaPage.length === 0) break;
+
+      for (const row of mediaPage) {
+        actualBytes += (row.file_size || 0) + (row.variant_size_bytes || 0);
+      }
+
+      offset += mediaPage.length;
+      if (mediaPage.length < PAGE_SIZE) break;
+    }
+
+    const diff = actualBytes - org.storage_used_bytes;
+    if (diff !== 0) {
+      await supabase
+        .from('organizers')
+        .update({ storage_used_bytes: actualBytes, updated_at: new Date().toISOString() })
+        .eq('id', org.id);
+      details.push({ id: org.id, name: org.name, oldBytes: org.storage_used_bytes, newBytes: actualBytes, diff });
+      updated++;
+    }
+  }
+
+  return { success: true, updated, details };
+}
+
+// ============================================================================
 // STORAGE MAINTENANCE
 // ============================================================================
 

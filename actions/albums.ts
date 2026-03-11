@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
+import { decrementStorageUsed } from '@/lib/plans/limits';
 import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
 
 export interface AlbumData {
@@ -213,13 +214,13 @@ export async function deleteAlbum(albumId: string, eventId: string) {
 
   if (!event) return { error: 'Event not found' };
 
-  // Fetch R2 keys BEFORE deleting (cascade will remove media rows)
+  // Fetch R2 keys + sizes BEFORE deleting (cascade will remove media rows)
   // Wrapped in try-catch so fetch failure doesn't block album deletion
-  let mediaRows: { r2_key: string | null; thumbnail_r2_key: string | null; preview_r2_key: string | null }[] | null = null;
+  let mediaRows: { r2_key: string | null; thumbnail_r2_key: string | null; preview_r2_key: string | null; file_size: number | null; variant_size_bytes: number | null }[] | null = null;
   try {
     const { data } = await supabase
       .from('media')
-      .select('r2_key, thumbnail_r2_key, preview_r2_key')
+      .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size, variant_size_bytes')
       .eq('album_id', albumId)
       .eq('event_id', eventId);
     mediaRows = data;
@@ -236,6 +237,19 @@ export async function deleteAlbum(albumId: string, eventId: string) {
   if (error) {
     console.error('Error deleting album:', error);
     return { error: 'Failed to delete album' };
+  }
+
+  // Decrement storage usage (original + variants for all media in this album)
+  if (mediaRows && mediaRows.length > 0) {
+    const totalBytes = mediaRows.reduce(
+      (sum, row) => sum + (row.file_size || 0) + (row.variant_size_bytes || 0),
+      0,
+    );
+    if (totalBytes > 0) {
+      decrementStorageUsed(organizer.id, totalBytes).catch((err) => {
+        console.error('Error decrementing storage for album delete:', err);
+      });
+    }
   }
 
   // Clean up R2 files (fire-and-forget with orphan tracking)

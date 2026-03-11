@@ -71,6 +71,7 @@ CREATE TABLE media (
   duration INTEGER,
   thumbnail_r2_key TEXT,
   preview_r2_key TEXT,
+  variant_size_bytes BIGINT NOT NULL DEFAULT 0,
   processing_status processing_status DEFAULT 'pending' NOT NULL,
   processing_error TEXT,
   face_count INTEGER DEFAULT NULL,

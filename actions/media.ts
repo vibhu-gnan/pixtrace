@@ -202,7 +202,7 @@ export async function deleteMedia(mediaId: string, eventId: string) {
   // Fetch R2 keys and file size before deleting
   const { data: mediaRow } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size, variant_size_bytes')
     .eq('id', mediaId)
     .eq('event_id', eventId)
     .single();
@@ -221,9 +221,10 @@ export async function deleteMedia(mediaId: string, eventId: string) {
     return { error: 'Failed to delete media' };
   }
 
-  // Decrement storage usage
-  if (mediaRow.file_size) {
-    decrementStorageUsed(organizer.id, mediaRow.file_size).catch((err) => {
+  // Decrement storage usage (original + variants)
+  const totalBytes = (mediaRow.file_size || 0) + (mediaRow.variant_size_bytes || 0);
+  if (totalBytes > 0) {
+    decrementStorageUsed(organizer.id, totalBytes).catch((err) => {
       console.error('Error decrementing storage:', err);
     });
   }
@@ -268,7 +269,7 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
   // Fetch R2 keys and file sizes before deleting
   const { data: mediaRows } = await supabase
     .from('media')
-    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size')
+    .select('r2_key, thumbnail_r2_key, preview_r2_key, file_size, variant_size_bytes')
     .eq('event_id', eventId)
     .in('id', mediaIds);
 
@@ -284,9 +285,12 @@ export async function deleteMultipleMedia(mediaIds: string[], eventId: string) {
     return { error: 'Failed to delete media' };
   }
 
-  // Decrement storage usage
+  // Decrement storage usage (original + variants)
   if (mediaRows && mediaRows.length > 0) {
-    const totalBytes = mediaRows.reduce((sum, row) => sum + (row.file_size || 0), 0);
+    const totalBytes = mediaRows.reduce(
+      (sum, row) => sum + (row.file_size || 0) + (row.variant_size_bytes || 0),
+      0,
+    );
     if (totalBytes > 0) {
       decrementStorageUsed(organizer.id, totalBytes).catch((err) => {
         console.error('Error decrementing storage:', err);
