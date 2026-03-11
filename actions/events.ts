@@ -183,6 +183,31 @@ export async function getEvents(): Promise<EventData[]> {
 
 const EVENTS_PAGE_SIZE = 50;
 
+export async function getDashboardStats(organizerId: string): Promise<{
+  totalPhotos: number;
+  totalViews: number;
+}> {
+  const supabase = createAdminClient();
+
+  // Single query: sum media_count and view_count across all organizer events
+  const { data } = await supabase
+    .from('events')
+    .select('media_count:media(count), view_count')
+    .eq('organizer_id', organizerId);
+
+  if (!data || data.length === 0) return { totalPhotos: 0, totalViews: 0 };
+
+  let totalPhotos = 0;
+  let totalViews = 0;
+  for (const row of data) {
+    totalViews += (row as any).view_count || 0;
+    const mc = (row as any).media_count;
+    totalPhotos += Array.isArray(mc) && mc[0] ? mc[0].count : 0;
+  }
+
+  return { totalPhotos, totalViews };
+}
+
 export async function getEventsPage(
   cursor?: string | null,
   limit: number = EVENTS_PAGE_SIZE,

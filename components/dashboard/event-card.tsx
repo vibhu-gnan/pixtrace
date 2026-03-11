@@ -18,6 +18,24 @@ function CalendarIcon({ className }: { className?: string }) {
   );
 }
 
+function CameraIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 function ShareIcon({ className }: { className?: string }) {
   return (
     <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -54,16 +72,16 @@ function TrashIcon({ className }: { className?: string }) {
 // ─── Gradient Generator ──────────────────────────────────────
 
 const gradientPairs = [
-  ['#6366f1', '#8b5cf6'],  // indigo → violet
-  ['#3b82f6', '#6366f1'],  // blue → indigo
-  ['#ec4899', '#f43f5e'],  // pink → rose
-  ['#f59e0b', '#ef4444'],  // amber → red
-  ['#10b981', '#3b82f6'],  // emerald → blue
-  ['#8b5cf6', '#ec4899'],  // violet → pink
-  ['#06b6d4', '#6366f1'],  // cyan → indigo
-  ['#f97316', '#f59e0b'],  // orange → amber
-  ['#14b8a6', '#10b981'],  // teal → emerald
-  ['#a855f7', '#6366f1'],  // purple → indigo
+  ['#6366f1', '#8b5cf6'],
+  ['#3b82f6', '#6366f1'],
+  ['#ec4899', '#f43f5e'],
+  ['#f59e0b', '#ef4444'],
+  ['#10b981', '#3b82f6'],
+  ['#8b5cf6', '#ec4899'],
+  ['#06b6d4', '#6366f1'],
+  ['#f97316', '#f59e0b'],
+  ['#14b8a6', '#10b981'],
+  ['#a855f7', '#6366f1'],
 ];
 
 function hashString(str: string): number {
@@ -103,7 +121,6 @@ export function EventCard({ event }: EventCardProps) {
       const startDay = startDate.getDate();
       const endDay = endDate.getDate();
       const year = startDate.getFullYear();
-
       if (startMonth === endMonth) {
         formattedDate = `${startMonth} ${startDay} - ${endDay}, ${year}`;
       } else {
@@ -111,9 +128,7 @@ export function EventCard({ event }: EventCardProps) {
       }
     } else {
       formattedDate = startDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: '2-digit',
-        year: 'numeric',
+        month: 'short', day: '2-digit', year: 'numeric',
       });
     }
   }
@@ -132,26 +147,24 @@ export function EventCard({ event }: EventCardProps) {
     <>
       <Link
         href={`/events/${event.id}`}
-        className="block rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-lg border border-gray-100 transition-all duration-200 group"
+        className="block rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-xl border border-gray-100 transition-all duration-300 group hover:-translate-y-0.5"
       >
         {/* Cover image area */}
         <div
-          className="relative h-48 overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${from}, ${to})`,
-          }}
+          className="relative h-52 overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
         >
-          {/* Cover photo — overlays gradient */}
           {event.cover_url && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={event.cover_url}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               loading="lazy"
             />
           )}
-          {/* Status badge — top left */}
+
+          {/* Status badge */}
           <div className="absolute top-3 left-3 z-10">
             {event.is_public ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/90 text-green-700 backdrop-blur-sm shadow-sm">
@@ -166,75 +179,49 @@ export function EventCard({ event }: EventCardProps) {
             )}
           </div>
 
-          {/* Action icons — top right */}
+          {/* Action icons */}
           <div
             className="absolute top-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => e.preventDefault()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={(e) => e.preventDefault()}
-              className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
-              aria-label="Share"
-            >
-              <ShareIcon />
-            </button>
-            <button
-              onClick={(e) => e.preventDefault()}
-              className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm"
-              aria-label="More options"
-            >
-              <DotsIcon />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowDeleteConfirm(true);
-              }}
-              className="p-1.5 rounded-full bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 backdrop-blur-sm transition-colors shadow-sm"
-              aria-label="Delete event"
-            >
-              <TrashIcon />
-            </button>
+            <button onClick={(e) => e.preventDefault()} className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm" aria-label="Share"><ShareIcon /></button>
+            <button onClick={(e) => e.preventDefault()} className="p-1.5 rounded-full bg-white/80 text-gray-600 hover:bg-white backdrop-blur-sm transition-colors shadow-sm" aria-label="More options"><DotsIcon /></button>
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDeleteConfirm(true); }} className="p-1.5 rounded-full bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 backdrop-blur-sm transition-colors shadow-sm" aria-label="Delete event"><TrashIcon /></button>
           </div>
 
-          {/* Name overlay — bottom */}
-          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-12 bg-gradient-to-t from-black/60 to-transparent">
-            <h3 className="text-white font-bold text-lg leading-tight truncate">
+          {/* Name overlay with stronger gradient */}
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-16 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
+            <h3 className="text-white font-bold text-lg leading-tight truncate drop-shadow-sm">
               {event.name}
             </h3>
             {event.description && (
-              <p className="text-white/70 text-xs mt-0.5 truncate">
-                {event.description}
-              </p>
+              <p className="text-white/80 text-xs mt-0.5 truncate">{event.description}</p>
             )}
           </div>
         </div>
 
         {/* Card body */}
-        <div className="p-4">
-          {/* Date row */}
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+        <div className="px-4 py-3.5">
+          {/* Date */}
+          <div className="flex items-center gap-2 text-sm text-gray-500 mb-2.5">
             <CalendarIcon className="text-gray-400 flex-shrink-0" />
             <span>{formattedDate || 'No date set'}</span>
           </div>
 
-          {/* Stats row */}
-          <div className="flex items-center gap-8">
-            <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Photos</p>
-              <p className="text-base font-bold text-gray-900">
-                {formatCount(event.media_count || 0)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Views</p>
-              <p className="text-base font-bold text-gray-900">
-                {formatCount(event.view_count || 0)}
-              </p>
-            </div>
+          {/* Stats row — inline with icons */}
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <span className="inline-flex items-center gap-1.5">
+              <CameraIcon className="text-gray-400" />
+              <span className="font-semibold text-gray-700">{formatCount(event.media_count || 0)}</span>
+              <span className="text-gray-400">photos</span>
+            </span>
+            <span className="text-gray-200">|</span>
+            <span className="inline-flex items-center gap-1.5">
+              <EyeIcon className="text-gray-400" />
+              <span className="font-semibold text-gray-700">{formatCount(event.view_count || 0)}</span>
+              <span className="text-gray-400">views</span>
+            </span>
           </div>
         </div>
       </Link>
@@ -247,22 +234,8 @@ export function EventCard({ event }: EventCardProps) {
               Delete &quot;{event.name}&quot;? This will remove the event and all its photos. This cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleteLoading}
-                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-500 disabled:opacity-50"
-              >
-                {deleteLoading ? 'Deleting...' : 'Yes, Delete'}
-              </button>
+              <button type="button" onClick={() => setShowDeleteConfirm(false)} disabled={deleteLoading} className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={handleDelete} disabled={deleteLoading} className="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-500 disabled:opacity-50">{deleteLoading ? 'Deleting...' : 'Yes, Delete'}</button>
             </div>
           </div>
         </div>
@@ -271,11 +244,7 @@ export function EventCard({ event }: EventCardProps) {
   );
 }
 
-// ─── Helpers ─────────────────────────────────────────────────
-
 function formatCount(n: number): string {
-  if (n >= 1000) {
-    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  }
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   return String(n);
 }
