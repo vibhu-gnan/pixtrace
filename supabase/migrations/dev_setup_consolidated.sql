@@ -52,6 +52,7 @@ CREATE TABLE albums (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   sort_order INTEGER DEFAULT 0 NOT NULL,
+  view_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT now() NOT NULL,
   updated_at TIMESTAMP DEFAULT now() NOT NULL
 );
@@ -344,6 +345,37 @@ CREATE POLICY "Users can update own face profiles" ON face_search_profiles FOR U
 -- ============================================================
 -- RPC FUNCTIONS
 -- ============================================================
+
+-- Event view count: atomic increment by N
+CREATE OR REPLACE FUNCTION increment_view_count(event_hash_input text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE events SET view_count = view_count + 1
+  WHERE event_hash = event_hash_input AND is_public = true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION increment_view_count_by(event_hash_input text, amount integer DEFAULT 1)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF amount < 1 THEN amount := 1; END IF;
+  IF amount > 10000 THEN amount := 10000; END IF;
+  UPDATE events SET view_count = view_count + amount
+  WHERE event_hash = event_hash_input AND is_public = true;
+END;
+$$;
+
+-- Album view count: atomic increment by N
+CREATE OR REPLACE FUNCTION increment_album_view_count(album_id_input uuid, amount integer DEFAULT 1)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF amount < 1 THEN amount := 1; END IF;
+  IF amount > 10000 THEN amount := 10000; END IF;
+  UPDATE albums a SET view_count = a.view_count + amount
+  FROM events e
+  WHERE a.id = album_id_input AND a.event_id = e.id AND e.is_public = true;
+END;
+$$;
 
 -- Storage increment
 CREATE OR REPLACE FUNCTION increment_storage_used(org_id UUID, bytes_to_add BIGINT)

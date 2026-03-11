@@ -12,6 +12,7 @@ export interface AlbumData {
   name: string;
   description: string | null;
   sort_order: number;
+  view_count: number;
   created_at: string;
   updated_at: string;
   media_count?: number;

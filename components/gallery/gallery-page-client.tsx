@@ -239,11 +239,28 @@ export function GalleryPageClient({
     useEffect(() => {
         if (viewTrackedRef.current) return;
         viewTrackedRef.current = true;
-        fetch(`/api/gallery/view?hash=${eventHash}`, {
+        // Include initial album in the event view call (if landing directly on one)
+        const params = new URLSearchParams({ hash: eventHash });
+        if (validInitialAlbum) params.set('album', validInitialAlbum);
+        fetch(`/api/gallery/view?${params}`, {
             method: 'POST',
             keepalive: true,
         }).catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventHash]);
+
+    // Track album views — fires once per unique album per session
+    // Uses a Set to prevent counting the same album twice (e.g. user switches back and forth)
+    const trackedAlbumsRef = useRef(new Set<string>(validInitialAlbum ? [validInitialAlbum] : []));
+    useEffect(() => {
+        if (!activeAlbum) return;
+        if (trackedAlbumsRef.current.has(activeAlbum)) return;
+        trackedAlbumsRef.current.add(activeAlbum);
+        fetch(`/api/gallery/view?hash=${eventHash}&album=${activeAlbum}`, {
+            method: 'POST',
+            keepalive: true,
+        }).catch(() => { });
+    }, [activeAlbum, eventHash]);
 
     // Track whether this is the initial mount (skip scroll on first render)
     const isInitialMount = useRef(true);

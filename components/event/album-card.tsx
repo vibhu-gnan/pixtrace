@@ -462,7 +462,9 @@ export function AlbumCard({ album, coverUrl, eventHash, onClick }: AlbumCardProp
           </div>
           <div>
             <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Views</p>
-            <p className="text-base font-bold text-gray-900">&mdash;</p>
+            <p className="text-base font-bold text-gray-900">
+              {formatCount(album.view_count || 0)}
+            </p>
           </div>
         </button>
       </div>
