@@ -11,6 +11,7 @@ type ImportState =
   | 'preview'
   | 'importing'
   | 'complete'
+  | 'cancelled'
   | 'error';
 
 type ImportMode = 'flat' | 'folder_to_album';
@@ -29,6 +30,7 @@ interface ScanResult {
   totalSkipped: number;
   estimatedSize: number;
   rootFileCount: number;
+  truncated?: boolean;
   folders: FolderInfo[];
 }
 
@@ -50,7 +52,7 @@ interface ImportTabProps {
 // ── Helpers ──────────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes <= 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -70,13 +72,70 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollCountRef = useRef(0);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
+  }, []);
+
+  // ── Poll with adaptive interval ─────────────────────────────
+
+  // Max polls: 5 fast (1s) + 355 slow (5s) = ~30 minutes total
+  const MAX_POLL_COUNT = 360;
+
+  const schedulePoll = useCallback((id: string) => {
+    const count = pollCountRef.current;
+
+    // Give up after 30 minutes of polling
+    if (count >= MAX_POLL_COUNT) {
+      setError('Import is taking too long. Check back later or try again.');
+      setState('error');
+      return;
+    }
+
+    // Fast initial polls (1s for first 5), then slow down to 5s
+    const interval = count < 5 ? 1000 : 5000;
+
+    pollRef.current = setTimeout(async () => {
+      try {
+        const statusRes = await fetch(`/api/import/status?jobId=${id}`);
+        const statusData = await statusRes.json();
+
+        if (!statusRes.ok) {
+          pollCountRef.current++;
+          schedulePoll(id);
+          return;
+        }
+
+        setProgress(statusData);
+
+        if (statusData.status === 'completed') {
+          setState('complete');
+          return;
+        }
+        if (statusData.status === 'cancelled') {
+          setState('cancelled');
+          return;
+        }
+        if (statusData.status === 'failed') {
+          setError(statusData.error_message || 'Import failed');
+          setState('error');
+          return;
+        }
+
+        // Still in progress — schedule next poll
+        pollCountRef.current++;
+        schedulePoll(id);
+      } catch {
+        // Network error — retry
+        pollCountRef.current++;
+        schedulePoll(id);
+      }
+    }, interval);
   }, []);
 
   // ── Scan folder ────────────────────────────────────────────
@@ -105,7 +164,7 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
       setScanResult(data);
       setNewAlbumName(data.folderName);
       setState('preview');
-    } catch (err) {
+    } catch {
       setError('Network error while scanning folder');
       setState('error');
     }
@@ -118,6 +177,7 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
 
     setState('importing');
     setError(null);
+    pollCountRef.current = 0;
 
     try {
       const body: Record<string, unknown> = {
@@ -125,6 +185,7 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
         driveUrl,
         eventId,
         importMode,
+        totalFiles: scanResult.totalImages, // Pass from scan — no double listing
       };
 
       if (importMode === 'flat') {
@@ -150,34 +211,12 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
       }
 
       setJobId(data.jobId);
-
-      // Start polling
-      pollRef.current = setInterval(async () => {
-        try {
-          const statusRes = await fetch(`/api/import/status?jobId=${data.jobId}`);
-          const statusData = await statusRes.json();
-
-          if (!statusRes.ok) return;
-
-          setProgress(statusData);
-
-          if (['completed', 'failed', 'cancelled'].includes(statusData.status)) {
-            if (pollRef.current) clearInterval(pollRef.current);
-            pollRef.current = null;
-            setState(statusData.status === 'completed' ? 'complete' : 'error');
-            if (statusData.status === 'failed') {
-              setError(statusData.error_message || 'Import failed');
-            }
-          }
-        } catch {
-          // Polling error — ignore, will retry
-        }
-      }, 5000);
-    } catch (err) {
+      schedulePoll(data.jobId);
+    } catch {
       setError('Network error while starting import');
       setState('error');
     }
-  }, [scanResult, driveUrl, eventId, importMode, useNewAlbum, newAlbumName, selectedAlbumId]);
+  }, [scanResult, driveUrl, eventId, importMode, useNewAlbum, newAlbumName, selectedAlbumId, schedulePoll]);
 
   // ── Cancel import ──────────────────────────────────────────
 
@@ -208,8 +247,9 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
     setJobId(null);
     setProgress(null);
     setError(null);
+    pollCountRef.current = 0;
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   }, []);
@@ -287,6 +327,11 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
                 <> ({scanResult.rootFileCount} in root)</>
               )}
             </p>
+            {scanResult.truncated && (
+              <p className="text-xs text-amber-600 mt-1">
+                This folder has more than 10,000 photos. Only the first 10,000 will be imported.
+              </p>
+            )}
             {scanResult.totalSkipped > 0 && (
               <p className="text-xs text-gray-400 mt-0.5">
                 {scanResult.totalSkipped} non-image file{scanResult.totalSkipped !== 1 ? 's' : ''} will be skipped
@@ -460,9 +505,14 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
 
           <div className="flex justify-between text-xs text-gray-500 mb-4">
             <span>{pct}% complete</span>
-            {progress && progress.failed > 0 && (
-              <span className="text-amber-600">{progress.failed} failed</span>
-            )}
+            <div className="flex gap-3">
+              {progress && progress.skipped > 0 && (
+                <span className="text-gray-400">{progress.skipped} skipped</span>
+              )}
+              {progress && progress.failed > 0 && (
+                <span className="text-amber-600">{progress.failed} failed</span>
+              )}
+            </div>
           </div>
 
           <button
@@ -509,12 +559,60 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
             >
               Import More
             </button>
+            {onImportComplete && (
+              <button
+                onClick={onImportComplete}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors"
+              >
+                View Photos
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Cancelled state (separate from error)
+  if (state === 'cancelled') {
+    return (
+      <div className="max-w-xl mx-auto mt-8">
+        <div className="bg-white border border-amber-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <CancelIcon />
+            <h3 className="text-lg font-semibold text-amber-800">Import Cancelled</h3>
+          </div>
+
+          <div className="space-y-1 text-sm text-gray-600 mb-5">
+            {progress && (
+              <>
+                <p>
+                  <span className="font-medium text-gray-900">{progress.completed.toLocaleString()}</span> photos were imported before cancellation
+                </p>
+                {progress.failed > 0 && (
+                  <p>
+                    <span className="font-medium text-amber-600">{progress.failed}</span> failed
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-3">
             <button
-              onClick={onImportComplete}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors"
+              onClick={handleReset}
+              className="flex-1 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              View Photos
+              Start Over
             </button>
+            {onImportComplete && progress && progress.completed > 0 && (
+              <button
+                onClick={onImportComplete}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors"
+              >
+                View Photos
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -528,6 +626,12 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
         <div className="bg-white border border-red-200 rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-red-800 mb-2">Import Failed</h3>
           <p className="text-sm text-red-600 mb-4">{error || 'An unknown error occurred'}</p>
+
+          {progress && progress.completed > 0 && (
+            <p className="text-xs text-gray-500 mb-4">
+              {progress.completed} photos were imported before the error.
+            </p>
+          )}
 
           <button
             onClick={handleReset}
@@ -560,6 +664,15 @@ function CheckIcon() {
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="flex-shrink-0">
       <circle cx="10" cy="10" r="10" fill="#16A34A" />
       <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CancelIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="flex-shrink-0">
+      <circle cx="10" cy="10" r="10" fill="#D97706" />
+      <path d="M7 7L13 13M13 7L7 13" stroke="white" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }

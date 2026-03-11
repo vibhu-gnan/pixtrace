@@ -94,3 +94,6 @@ export const IMPORTABLE_IMAGE_MIMES = new Set([
 
 /** Max file size for import (50 MB) */
 export const MAX_IMPORT_FILE_SIZE = 50 * 1024 * 1024;
+
+/** Max number of files per import job */
+export const MAX_IMPORT_FILE_COUNT = 10_000;

@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import {
   parseDriveFolderUrl,
   IMPORTABLE_IMAGE_MIMES,
+  MAX_IMPORT_FILE_COUNT,
 } from '@/lib/import/drive-utils';
 
 export const maxDuration = 60; // Listing large folders may take time
@@ -36,14 +37,29 @@ interface ScannedFile {
   folderPath: string;
 }
 
+// ── Constants ────────────────────────────────────────────────
+
+const MAX_DEPTH = 10; // Max folder nesting depth
+const SCAN_RATE_LIMIT_MS = 10_000; // Min 10s between scans per organizer
+const MAX_RATE_LIMIT_ENTRIES = 1000; // Prevent unbounded growth
+const scanTimestamps = new Map<string, number>(); // In-memory rate limit (per instance)
+
 // ── Drive API helpers ────────────────────────────────────────
 
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 
-async function driveApiFetch<T>(path: string, apiKey: string): Promise<T> {
+async function driveApiFetch<T>(
+  path: string,
+  apiKey: string,
+  resourceKey?: string,
+): Promise<T> {
   const sep = path.includes('?') ? '&' : '?';
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (resourceKey) {
+    headers['X-Goog-Drive-Resource-Keys'] = resourceKey;
+  }
   const res = await fetch(`${DRIVE_API_BASE}${path}${sep}key=${apiKey}`, {
-    headers: { Accept: 'application/json' },
+    headers,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -58,52 +74,79 @@ async function driveApiFetch<T>(path: string, apiKey: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function getFolderName(folderId: string, apiKey: string): Promise<string> {
+async function getFolderName(
+  folderId: string,
+  apiKey: string,
+  resourceKey?: string,
+): Promise<string> {
   const data = await driveApiFetch<{ name: string }>(
     `/files/${folderId}?fields=name`,
     apiKey,
+    resourceKey,
   );
   return data.name;
 }
 
+/** Mutable counter shared across recursion levels to enforce the global file cap. */
+interface FileCounter {
+  count: number;
+}
+
 /**
  * Recursively list all files in a Drive folder.
- * Returns image files with their folder path.
+ * Memory-bounded: stops at MAX_IMPORT_FILE_COUNT files (shared across all levels)
+ * and MAX_DEPTH nesting levels.
  */
 async function listFolderRecursive(
   folderId: string,
   apiKey: string,
   path: string = '',
   resourceKey?: string,
-): Promise<{ files: ScannedFile[]; folders: FolderInfo[]; skippedCount: number }> {
+  depth: number = 0,
+  counter?: FileCounter,
+): Promise<{ files: ScannedFile[]; folders: FolderInfo[]; skippedCount: number; truncated: boolean }> {
+  if (depth > MAX_DEPTH) {
+    return { files: [], folders: [], skippedCount: 0, truncated: true };
+  }
+
+  // Shared counter across all recursion levels
+  const fileCounter = counter ?? { count: 0 };
+
   const allFiles: ScannedFile[] = [];
   const allFolders: FolderInfo[] = [];
   let skippedCount = 0;
+  let truncated = false;
   let pageToken: string | undefined;
 
   // List all items in this folder (paginated)
   do {
+    if (fileCounter.count >= MAX_IMPORT_FILE_COUNT) {
+      truncated = true;
+      break;
+    }
+
     const query = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
     const fields = encodeURIComponent('files(id,name,mimeType,size),nextPageToken');
     let url = `/files?q=${query}&fields=${fields}&pageSize=1000`;
     if (pageToken) url += `&pageToken=${pageToken}`;
-    if (resourceKey) {
-      // Resource key header not supported via query param, but API key access
-      // to public folders generally works without it
-    }
 
-    const data = await driveApiFetch<DriveListResponse>(url, apiKey);
+    const data = await driveApiFetch<DriveListResponse>(url, apiKey, resourceKey);
     const files = data.files || [];
 
     for (const file of files) {
+      // Check shared file count cap
+      if (fileCounter.count >= MAX_IMPORT_FILE_COUNT) {
+        truncated = true;
+        break;
+      }
+
       if (file.mimeType === 'application/vnd.google-apps.folder') {
-        // Recurse into subfolder
         const subPath = path ? `${path}/${file.name}` : file.name;
-        const sub = await listFolderRecursive(file.id, apiKey, subPath);
+        const sub = await listFolderRecursive(file.id, apiKey, subPath, resourceKey, depth + 1, fileCounter);
         allFiles.push(...sub.files);
         skippedCount += sub.skippedCount;
+        if (sub.truncated) truncated = true;
 
-        // Record this folder if it has files
         if (sub.files.length > 0) {
           allFolders.push({
             name: file.name,
@@ -111,7 +154,6 @@ async function listFolderRecursive(
             fileCount: sub.files.length,
           });
         }
-        // Merge sub-folders
         allFolders.push(...sub.folders);
       } else if (IMPORTABLE_IMAGE_MIMES.has(file.mimeType)) {
         allFiles.push({
@@ -121,16 +163,17 @@ async function listFolderRecursive(
           size: parseInt(file.size || '0', 10),
           folderPath: path,
         });
+        fileCounter.count++;
       } else {
-        // Non-image file — skip
         skippedCount++;
       }
     }
 
+    if (truncated) break;
     pageToken = data.nextPageToken;
   } while (pageToken);
 
-  return { files: allFiles, folders: allFolders, skippedCount };
+  return { files: allFiles, folders: allFolders, skippedCount, truncated };
 }
 
 // ── Route handler ────────────────────────────────────────────
@@ -174,6 +217,23 @@ async function handleList(
     return NextResponse.json({ error: 'Missing driveUrl or eventId' }, { status: 400 });
   }
 
+  // Rate limit: 1 scan per organizer per 10s
+  const now = Date.now();
+  const lastScan = scanTimestamps.get(organizer.id);
+  if (lastScan && now - lastScan < SCAN_RATE_LIMIT_MS) {
+    return NextResponse.json(
+      { error: 'Please wait a few seconds before scanning again' },
+      { status: 429 },
+    );
+  }
+  scanTimestamps.set(organizer.id, now);
+  // Evict stale entries to prevent unbounded growth
+  if (scanTimestamps.size > MAX_RATE_LIMIT_ENTRIES) {
+    for (const [id, ts] of scanTimestamps) {
+      if (now - ts > SCAN_RATE_LIMIT_MS * 6) scanTimestamps.delete(id);
+    }
+  }
+
   const parsed = parseDriveFolderUrl(driveUrl);
   if (!parsed) {
     return NextResponse.json(
@@ -197,17 +257,15 @@ async function handleList(
   }
 
   try {
-    const folderName = await getFolderName(parsed.folderId, apiKey);
-    const { files, folders, skippedCount } = await listFolderRecursive(
+    const folderName = await getFolderName(parsed.folderId, apiKey, parsed.resourceKey);
+    const { files, folders, skippedCount, truncated } = await listFolderRecursive(
       parsed.folderId,
       apiKey,
       '',
       parsed.resourceKey,
     );
 
-    // Count root-level files
     const rootFileCount = files.filter((f) => f.folderPath === '').length;
-
     const estimatedSize = files.reduce((sum, f) => sum + f.size, 0);
 
     return NextResponse.json({
@@ -218,6 +276,7 @@ async function handleList(
       totalSkipped: skippedCount,
       estimatedSize,
       rootFileCount,
+      truncated,
       folders: folders.map((f) => ({
         name: f.name,
         path: f.path,
@@ -254,7 +313,8 @@ async function handleStart(
   body: {
     driveUrl: string;
     eventId: string;
-    importMode: 'flat' | 'folder_to_album';
+    importMode: string;
+    totalFiles?: number;
     albumId?: string;
     newAlbumName?: string;
   },
@@ -265,6 +325,11 @@ async function handleStart(
 
   if (!driveUrl || !eventId || !importMode) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  // Validate importMode
+  if (importMode !== 'flat' && importMode !== 'folder_to_album') {
+    return NextResponse.json({ error: 'Invalid import mode' }, { status: 400 });
   }
 
   const parsed = parseDriveFolderUrl(driveUrl);
@@ -307,7 +372,6 @@ async function handleStart(
 
   if (importMode === 'flat') {
     if (albumId) {
-      // Verify album belongs to this event
       const { data: album } = await supabase
         .from('albums')
         .select('id')
@@ -320,7 +384,7 @@ async function handleStart(
       }
       targetAlbumId = albumId;
     } else if (newAlbumName) {
-      // Create new album
+      // Use COALESCE to safely get next sort_order in one query
       const { data: lastAlbum } = await supabase
         .from('albums')
         .select('sort_order')
@@ -352,21 +416,11 @@ async function handleStart(
       );
     }
   }
-  // folder_to_album mode: targetAlbumId stays null, Modal creates albums
 
-  // Quick file count (re-list just to get count — Modal will do the full listing)
-  let totalFiles = 0;
-  try {
-    const { files } = await listFolderRecursive(
-      parsed.folderId,
-      apiKey,
-      '',
-      parsed.resourceKey,
-    );
-    totalFiles = files.length;
-  } catch {
-    // Non-fatal — Modal will get the real count
-  }
+  // Use totalFiles from scan result instead of re-listing
+  const totalFiles = typeof body.totalFiles === 'number' && body.totalFiles > 0
+    ? body.totalFiles
+    : 0;
 
   // Create import job
   const { data: job, error: jobErr } = await supabase
@@ -390,25 +444,27 @@ async function handleStart(
     return NextResponse.json({ error: 'Failed to create import job' }, { status: 500 });
   }
 
-  // Fire-and-forget: trigger Modal import
+  // Trigger Modal import with retry (2 attempts)
   const modalUrl = process.env.MODAL_DRIVE_IMPORT_URL;
   if (modalUrl) {
-    fetch(modalUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        job_id: job.id,
-        event_id: eventId,
-        organizer_id: organizer.id,
-        album_id: targetAlbumId,
-        folder_id: parsed.folderId,
-        resource_key: parsed.resourceKey || null,
-        import_mode: importMode,
-        secret: process.env.FACE_PROCESSING_SECRET,
-      }),
-    }).catch((err) => console.error('Modal import trigger error:', err));
+    const modalPayload = {
+      job_id: job.id,
+      event_id: eventId,
+      organizer_id: organizer.id,
+      album_id: targetAlbumId,
+      folder_id: parsed.folderId,
+      resource_key: parsed.resourceKey || null,
+      import_mode: importMode,
+      secret: process.env.FACE_PROCESSING_SECRET,
+    };
+
+    triggerModal(modalUrl, modalPayload, job.id, supabase).catch(() => {});
   } else {
     console.error('MODAL_DRIVE_IMPORT_URL not configured');
+    await supabase
+      .from('import_jobs')
+      .update({ status: 'failed', error_message: 'Import service not configured' })
+      .eq('id', job.id);
   }
 
   return NextResponse.json({
@@ -417,4 +473,39 @@ async function handleStart(
     totalFiles,
     status: 'pending',
   });
+}
+
+/** Trigger Modal with retry. Mark job as failed if all retries fail. */
+async function triggerModal(
+  modalUrl: string,
+  payload: Record<string, unknown>,
+  jobId: string,
+  supabase: ReturnType<typeof createAdminClient>,
+) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(modalUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15_000), // 15s timeout
+      });
+      if (res.ok || res.status < 500) return; // Success or client error (don't retry)
+      console.error(`Modal trigger attempt ${attempt + 1} failed: ${res.status}`);
+    } catch (err) {
+      console.error(`Modal trigger attempt ${attempt + 1} error:`, err);
+    }
+    // Wait before retry
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  // All retries failed — mark job as failed
+  await supabase
+    .from('import_jobs')
+    .update({
+      status: 'failed',
+      error_message: 'Failed to reach import service. Please try again.',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', jobId);
 }
