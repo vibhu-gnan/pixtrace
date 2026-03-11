@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import * as Progress from '@radix-ui/react-progress';
 import { useUploadStore } from '@/lib/upload/upload-manager';
 
@@ -164,7 +165,7 @@ export function UploadBanner({ eventName }: UploadBannerProps) {
                 </svg>
                 <span>
                   <strong>Storage limit reached</strong> &mdash; {storageErrors} file{storageErrors > 1 ? 's' : ''} blocked.{' '}
-                  <a href="/pricing" className="underline font-semibold hover:text-red-900">Upgrade your plan</a>
+                  <Link href="/pricing" className="underline font-semibold hover:text-red-900">Upgrade your plan</Link>
                 </span>
               </div>
             )}
