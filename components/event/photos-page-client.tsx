@@ -6,9 +6,8 @@ import { useUploadStore } from '@/lib/upload/upload-manager';
 import { UploadBanner } from './upload-banner';
 import { StorageLimitModal } from './storage-limit-modal';
 import { PhotoGrid } from './photo-grid';
-import { AlbumCard } from './album-card';
-import { CreateAlbumCard } from './create-album-card';
 import { AlbumsEmptyState } from './albums-empty-state';
+import { SortableAlbumList } from './sortable-album-list';
 import { CreateAlbumForm } from '@/components/dashboard/create-album-form';
 import { CoverBar } from './cover-bar';
 import { ImportTab } from './import-tab';
@@ -35,6 +34,7 @@ const ACCEPTED_TYPES = [
 // ─── Types ───────────────────────────────────────────────────
 
 type ViewMode = 'albums' | 'photos' | 'import';
+type AlbumLayout = 'grid' | 'list';
 
 // ─── Icons ───────────────────────────────────────────────────
 
@@ -134,6 +134,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
   // Default to albums (grid) view; respect ?album= URL param for deep links
   const [viewMode, setViewMode] = useState<ViewMode>(albumIdFromUrl ? 'photos' : 'albums');
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(albumIdFromUrl || null);
+  const [albumLayout, setAlbumLayout] = useState<AlbumLayout>('grid');
 
   // ─── URL Sync ─────────────────────────────────────────────
   // Keep URL in sync with view state (shallow — no server re-fetch)
@@ -486,6 +487,34 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
     }
   }, [eventId]);
 
+  const handleAllPhotosClick = useCallback(async () => {
+    setActiveAlbumId(null);
+    setViewMode('photos');
+    failureCountRef.current = 0;
+    setScrollError(null);
+    loadingRef.current = true;
+
+    const myRequestId = ++requestIdRef.current;
+    setScrollLoading(true);
+    try {
+      const { media: allMedia, hasMore: more } = await getMediaPage(eventId);
+      if (requestIdRef.current !== myRequestId) return;
+      setMedia(allMedia);
+      mediaRef.current = allMedia;
+      hasMoreRef.current = more;
+      setHasMore(more);
+    } catch {
+      if (requestIdRef.current === myRequestId) {
+        console.error('Failed to load all photos');
+      }
+    } finally {
+      if (requestIdRef.current === myRequestId) {
+        setScrollLoading(false);
+        loadingRef.current = false;
+      }
+    }
+  }, [eventId]);
+
   // ─── Cover Selection Handlers ──────────────────────────────
 
   const handleCoverPhotoClick = useCallback(
@@ -652,24 +681,32 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
         )}
 
         <div className="flex items-center gap-3">
-          {/* View toggle icons */}
+          {/* Layout toggle icons */}
           <button
-            onClick={handleBackToAlbums}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === 'albums'
-              ? 'text-brand-500 bg-brand-50'
-              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-              }`}
-            title="Albums view"
+            onClick={() => {
+              if (viewMode !== 'albums') handleBackToAlbums();
+              setAlbumLayout('list');
+            }}
+            className={`p-1.5 rounded-md transition-colors ${
+              viewMode === 'albums' && albumLayout === 'list'
+                ? 'text-brand-500 bg-brand-50'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+            title="List view"
           >
             <ListIcon />
           </button>
           <button
-            onClick={() => setViewMode('photos')}
-            className={`p-1.5 rounded-md transition-colors ${viewMode === 'photos'
-              ? 'text-brand-500 bg-brand-50'
-              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-              }`}
-            title="Photos view"
+            onClick={() => {
+              if (viewMode !== 'albums') handleBackToAlbums();
+              setAlbumLayout('grid');
+            }}
+            className={`p-1.5 rounded-md transition-colors ${
+              viewMode === 'albums' && albumLayout === 'grid'
+                ? 'text-brand-500 bg-brand-50'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Grid view"
           >
             <GridIcon />
           </button>
@@ -719,18 +756,16 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
         initialAlbums.length === 0 ? (
           <AlbumsEmptyState onAddAlbum={() => setShowAlbumForm(true)} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {initialAlbums.map((album) => (
-              <AlbumCard
-                key={album.id}
-                album={album}
-                coverUrl={album.cover_url || null}
-                eventHash={event.event_hash}
-                onClick={() => handleAlbumClick(album.id)}
-              />
-            ))}
-            <CreateAlbumCard onCreateAlbum={() => setShowAlbumForm(true)} />
-          </div>
+          <SortableAlbumList
+            albums={initialAlbums}
+            layout={albumLayout}
+            eventId={eventId}
+            eventHash={event.event_hash}
+            totalPhotoCount={photoCount + videoCount}
+            onAlbumClick={handleAlbumClick}
+            onAllPhotosClick={handleAllPhotosClick}
+            onCreateAlbum={() => setShowAlbumForm(true)}
+          />
         )
       ) : (
         // ─── Photos View ─────────────────────────────────────

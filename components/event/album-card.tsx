@@ -249,14 +249,28 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
+function GripVerticalIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="5" r="1.5" />
+      <circle cx="15" cy="5" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="19" r="1.5" />
+      <circle cx="15" cy="19" r="1.5" />
+    </svg>
+  );
+}
+
 interface AlbumCardProps {
   album: AlbumData;
   coverUrl: string | null;
   eventHash: string;
   onClick: () => void;
+  dragHandleProps?: Record<string, unknown>;
 }
 
-export function AlbumCard({ album, coverUrl, eventHash, onClick }: AlbumCardProps) {
+export function AlbumCard({ album, coverUrl, eventHash, onClick, dragHandleProps }: AlbumCardProps) {
   const router = useRouter();
   const [from, to] = getGradient(album.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -393,8 +407,21 @@ export function AlbumCard({ album, coverUrl, eventHash, onClick }: AlbumCardProp
             />
           )}
 
-          {/* ACTIVE badge — top left */}
-          <div className="absolute top-3 left-3 z-10">
+          {/* Drag handle — top left, shows on hover */}
+          {dragHandleProps && (
+            <div
+              className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+              {...dragHandleProps}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="p-1.5 rounded-full bg-white/80 text-gray-500 hover:text-gray-700 backdrop-blur-sm shadow-sm cursor-grab inline-flex touch-none">
+                <GripVerticalIcon />
+              </span>
+            </div>
+          )}
+
+          {/* ACTIVE badge — top left (shifts right when drag handle visible) */}
+          <div className={`absolute top-3 z-10 ${dragHandleProps ? 'left-12' : 'left-3'}`}>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/90 text-green-700 backdrop-blur-sm shadow-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
               ACTIVE

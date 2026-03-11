@@ -268,3 +268,42 @@ export async function deleteAlbum(albumId: string, eventId: string) {
   revalidatePath(`/events/${eventId}`);
   return { success: true };
 }
+
+export async function reorderAlbums(eventId: string, orderedAlbumIds: string[]) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  if (!orderedAlbumIds.length) return { error: 'No albums to reorder' };
+
+  const supabase = createAdminClient();
+
+  // Verify event belongs to organizer
+  const { data: event } = await supabase
+    .from('events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return { error: 'Event not found' };
+
+  // Batch update sort_order for all albums in parallel
+  const results = await Promise.all(
+    orderedAlbumIds.map((albumId, index) =>
+      supabase
+        .from('albums')
+        .update({ sort_order: index, updated_at: new Date().toISOString() })
+        .eq('id', albumId)
+        .eq('event_id', eventId)
+    )
+  );
+
+  const failed = results.find(r => r.error);
+  if (failed?.error) {
+    console.error('Error reordering albums:', failed.error);
+    return { error: 'Failed to reorder albums' };
+  }
+
+  revalidatePath(`/events/${eventId}`);
+  return { success: true };
+}
