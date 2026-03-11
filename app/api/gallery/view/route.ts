@@ -11,8 +11,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * state between requests. Each cold start gets fresh Maps, and timers
  * can be frozen before they fire. Direct writes are simple and reliable.
  *
- * Performance: Each RPC is a single atomic UPDATE (no SELECT), taking
- * ~5-10ms. We fire-and-forget without awaiting, so response is instant.
+ * Performance: Each RPC is a single atomic UPDATE (no SELECT), ~5-10ms.
+ * Both event + album writes run in parallel, awaited before responding.
+ * Client uses keepalive:true and doesn't read the response body, so
+ * the ~10ms server-side latency is invisible to the user.
  *
  * Safety:
  * - Input validation rejects malformed hashes/UUIDs before any DB call
@@ -27,7 +29,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 const HASH_RE = /^[a-zA-Z0-9_-]{6,32}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// ─── DB write (fire-and-forget) ─────────────────────────────────
+// ─── DB writes (awaited, parallel) ──────────────────────────────
 
 async function recordEventView(hash: string) {
     try {
@@ -74,12 +76,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false }, { status: 400 });
     }
 
-    // Fire-and-forget: don't await so response is instant.
-    // Vercel keeps the function alive briefly after response to finish promises.
-    recordEventView(hash);
-    if (albumId) {
-        recordAlbumView(albumId);
-    }
+    // Await DB writes before responding — Vercel serverless kills the
+    // process after the response, so unawaited promises get dropped.
+    // Both writes run in parallel (~10ms total). Client doesn't await
+    // the fetch response, so this latency is invisible to users.
+    await Promise.allSettled([
+        recordEventView(hash),
+        ...(albumId ? [recordAlbumView(albumId)] : []),
+    ]);
 
     return NextResponse.json({ ok: true });
 }
