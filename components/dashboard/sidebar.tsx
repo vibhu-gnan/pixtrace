@@ -56,14 +56,6 @@ function MenuIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronLeftIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-
 // ─── Nav Config ──────────────────────────────────────────────
 
 const navItems = [
@@ -80,11 +72,9 @@ interface SidebarProps {
   planLimits: PlanLimits;
   open: boolean;
   onClose: () => void;
-  collapsed: boolean;
-  onToggleCollapse: () => void;
 }
 
-export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   const isUnlimitedStorage = planLimits.storageLimitBytes === 0;
@@ -94,187 +84,13 @@ export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onTog
   const usedDisplay = formatBytes(planLimits.storageUsedBytes);
   const limitDisplay = isUnlimitedStorage ? 'Unlimited' : formatBytes(planLimits.storageLimitBytes);
 
-  // ─── Desktop sidebar content ──────────────────────────────
-  const desktopContent = (
-    <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-200 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)]">
-      {/* Logo + collapse toggle */}
-      <div className={`flex items-center h-14 flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
-        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-          {collapsed ? (
-            <span className="text-lg font-bold text-brand-600">P</span>
-          ) : (
-            <span className="text-xl font-bold text-brand-600 tracking-tight">PIXTRACE</span>
-          )}
-        </Link>
-        <button
-          onClick={onToggleCollapse}
-          className={`p-1.5 rounded-lg hover:bg-gray-100 transition-colors ${collapsed ? 'hidden' : ''}`}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <ChevronLeftIcon className="text-gray-400" />
-        </button>
-      </div>
-
-      {/* Navigation */}
-      <nav className={`flex-1 py-4 space-y-1 ${collapsed ? 'px-2' : 'px-3'}`}>
-        {navItems.map((item) => {
-          const isActive = item.enabled && (pathname === item.href || pathname.startsWith(item.href + '/'));
-          const Icon = item.icon;
-
-          if (!item.enabled) {
-            return (
-              <div
-                key={item.label}
-                title={collapsed ? item.label : undefined}
-                className={`flex items-center rounded-lg text-sm text-gray-400 cursor-not-allowed select-none ${
-                  collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
-                }`}
-              >
-                <Icon className="text-gray-300 flex-shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
-                collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
-              } ${isActive
-                ? 'bg-brand-500 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              }`}
-            >
-              <Icon className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
-
-        {/* Expand button — visible only when collapsed, placed after nav items */}
-        {collapsed && (
-          <button
-            onClick={onToggleCollapse}
-            title="Expand sidebar"
-            className="flex items-center justify-center w-full py-2.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors mt-2"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        )}
-      </nav>
-
-      {/* Storage Card — expanded only */}
-      {collapsed ? (
-        /* Minimal storage indicator when collapsed */
-        <div className="px-3 pb-3" title={`${usedDisplay} of ${limitDisplay} used`}>
-          <div className="bg-gray-100 rounded-full h-1.5 overflow-hidden">
-            <div
-              className={`h-full rounded-full ${storagePercent >= 90 ? 'bg-red-500' : 'bg-brand-500'}`}
-              style={{ width: `${storagePercent}%` }}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="px-4 pb-4">
-          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Storage</span>
-              {!isUnlimitedStorage && (
-                <span className={`text-xs font-bold ${storagePercent >= 90 ? 'text-red-500' : 'text-brand-500'}`}>
-                  {storagePercent}%
-                </span>
-              )}
-            </div>
-            {!isUnlimitedStorage && (
-              <Progress.Root
-                className="relative overflow-hidden bg-gray-100 rounded-full w-full h-2"
-                value={storagePercent}
-              >
-                <Progress.Indicator
-                  className={`h-full rounded-full transition-transform duration-500 ${storagePercent >= 90 ? 'bg-red-500' : 'bg-brand-500'}`}
-                  style={{ width: `${storagePercent}%` }}
-                />
-              </Progress.Root>
-            )}
-            <p className="text-[11px] text-gray-400 mt-2">
-              {usedDisplay} of {limitDisplay} used
-            </p>
-            {!isUnlimitedStorage && storagePercent >= 80 && (
-              <div className={`mt-2 text-[11px] font-medium px-2 py-1 rounded ${
-                storagePercent >= 95
-                  ? 'bg-red-50 text-red-600'
-                  : 'bg-amber-50 text-amber-600'
-              }`}>
-                {storagePercent >= 95
-                  ? 'Storage almost full! Upgrade now.'
-                  : 'Running low on storage.'}
-              </div>
-            )}
-            {planLimits.planId !== 'enterprise' && (
-              <Link
-                href="/pricing"
-                className={`block w-full mt-3 text-xs font-medium text-center rounded-lg py-2 transition-colors ${
-                  !isUnlimitedStorage && storagePercent >= 90
-                    ? 'bg-blue-600 text-white hover:bg-blue-500'
-                    : 'text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                {planLimits.planId === 'free' ? 'Upgrade Plan' : 'Change Plan'}
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* User Profile */}
-      <div className={`border-t border-gray-100 py-4 flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'}`}>
-        {organizer.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={organizer.avatar_url}
-            alt=""
-            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-            title={collapsed ? (organizer.name || organizer.email || '') : undefined}
-          />
-        ) : (
-          <div
-            className="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0"
-            title={collapsed ? (organizer.name || organizer.email || '') : undefined}
-          >
-            <span className="text-sm font-semibold text-white">
-              {(organizer.name || organizer.email)?.[0]?.toUpperCase() || '?'}
-            </span>
-          </div>
-        )}
-        {!collapsed && (
-          <>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {organizer.name || organizer.email?.split('@')[0]}
-              </p>
-              <p className="text-[11px] text-gray-400">{planLimits.planName} Plan</p>
-            </div>
-            <SignOutButton />
-          </>
-        )}
-      </div>
-    </div>
-  );
-
-  // ─── Mobile sidebar content (always expanded) ─────────────
-  const mobileContent = (
-    <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-200">
+  const sidebarContent = (
+    <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-100">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-14 flex-shrink-0">
+      <div className="flex items-center gap-3 px-5 h-16 flex-shrink-0">
         <button
           onClick={onClose}
-          className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+          className="lg:hidden p-1 rounded-md hover:bg-gray-100 transition-colors"
           aria-label="Close sidebar"
         >
           <MenuIcon className="text-gray-600" />
@@ -344,11 +160,25 @@ export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onTog
           <p className="text-[11px] text-gray-400 mt-2">
             {usedDisplay} of {limitDisplay} used
           </p>
+          {!isUnlimitedStorage && storagePercent >= 80 && (
+            <div className={`mt-2 text-[11px] font-medium px-2 py-1 rounded ${
+              storagePercent >= 95
+                ? 'bg-red-50 text-red-600'
+                : 'bg-amber-50 text-amber-600'
+            }`}>
+              {storagePercent >= 95
+                ? 'Storage almost full! Upgrade now.'
+                : 'Running low on storage.'}
+            </div>
+          )}
           {planLimits.planId !== 'enterprise' && (
             <Link
               href="/pricing"
-              onClick={onClose}
-              className="block w-full mt-3 text-xs font-medium text-center rounded-lg py-2 transition-colors text-gray-600 border border-gray-200 hover:bg-gray-50"
+              className={`block w-full mt-3 text-xs font-medium text-center rounded-lg py-2 transition-colors ${
+                !isUnlimitedStorage && storagePercent >= 90
+                  ? 'bg-blue-600 text-white hover:bg-blue-500'
+                  : 'text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
             >
               {planLimits.planId === 'free' ? 'Upgrade Plan' : 'Change Plan'}
             </Link>
@@ -385,13 +215,9 @@ export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onTog
 
   return (
     <>
-      {/* Desktop sidebar — always visible, animated width */}
-      <aside
-        className={`hidden lg:flex flex-shrink-0 h-full transition-all duration-300 ease-in-out ${
-          collapsed ? 'w-[72px]' : 'w-64'
-        }`}
-      >
-        {desktopContent}
+      {/* Desktop sidebar — always visible */}
+      <aside className="hidden lg:flex lg:w-64 lg:flex-shrink-0 h-full">
+        {sidebarContent}
       </aside>
 
       {/* Mobile overlay */}
@@ -402,7 +228,7 @@ export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onTog
             onClick={onClose}
           />
           <aside className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden">
-            {mobileContent}
+            {sidebarContent}
           </aside>
         </>
       )}

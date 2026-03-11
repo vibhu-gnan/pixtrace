@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import type { PlanLimits } from '@/lib/plans/limits';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { Footer } from './footer';
-
-const COLLAPSED_KEY = 'sidebar-collapsed';
 
 interface DashboardShellProps {
   organizer: OrganizerProfile;
@@ -17,25 +15,6 @@ interface DashboardShellProps {
 
 export function DashboardShell({ organizer, planLimits, children }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Default to expanded; hydrate from localStorage after mount
-  const [collapsed, setCollapsed] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(COLLAPSED_KEY);
-      if (stored === 'true') setCollapsed(true);
-    } catch { /* SSR / private browsing */ }
-    setHydrated(true);
-  }, []);
-
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
-      return next;
-    });
-  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -45,8 +24,6 @@ export function DashboardShell({ organizer, planLimits, children }: DashboardShe
         planLimits={planLimits}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        collapsed={hydrated ? collapsed : false}
-        onToggleCollapse={toggleCollapsed}
       />
 
       {/* Main content area */}
