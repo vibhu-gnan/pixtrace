@@ -56,6 +56,22 @@ function MenuIcon({ className }: { className?: string }) {
   );
 }
 
+function ChevronLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
 // ─── Nav Config ──────────────────────────────────────────────
 
 const navItems = [
@@ -65,6 +81,20 @@ const navItems = [
   { label: 'Settings', href: '#', icon: CogIcon, enabled: false },
 ];
 
+// ─── Tooltip wrapper for collapsed state ─────────────────────
+
+function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative group/tooltip">
+      {children}
+      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity duration-150 z-50">
+        {label}
+        <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
+      </div>
+    </div>
+  );
+}
+
 // ─── Sidebar Component ──────────────────────────────────────
 
 interface SidebarProps {
@@ -72,9 +102,11 @@ interface SidebarProps {
   planLimits: PlanLimits;
   open: boolean;
   onClose: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) {
+export function Sidebar({ organizer, planLimits, open, onClose, collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
 
   const isUnlimitedStorage = planLimits.storageLimitBytes === 0;
@@ -84,58 +116,48 @@ export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) 
   const usedDisplay = formatBytes(planLimits.storageUsedBytes);
   const limitDisplay = isUnlimitedStorage ? 'Unlimited' : formatBytes(planLimits.storageLimitBytes);
 
-  const sidebarContent = (
-    <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-100">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-5 h-16 flex-shrink-0">
-        <button
-          onClick={onClose}
-          className="lg:hidden p-1 rounded-md hover:bg-gray-100 transition-colors"
-          aria-label="Close sidebar"
+  // ─── Shared nav item renderer ─────────────────────────────
+  function renderNavItem(item: typeof navItems[number], isCollapsed: boolean, closeMobile?: () => void) {
+    const isActive = item.enabled && (pathname === item.href || pathname.startsWith(item.href + '/'));
+    const Icon = item.icon;
+
+    if (!item.enabled) {
+      const content = (
+        <div
+          key={item.label}
+          className={`flex items-center rounded-lg text-sm text-gray-400 cursor-not-allowed select-none ${
+            isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
+          }`}
         >
-          <MenuIcon className="text-gray-600" />
-        </button>
-        <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
-          <span className="text-xl font-bold text-brand-600 tracking-tight">PIXTRACE</span>
-        </Link>
-      </div>
+          <Icon className="text-gray-300 flex-shrink-0" />
+          {!isCollapsed && <span>{item.label}</span>}
+        </div>
+      );
+      return isCollapsed ? <Tooltip key={item.label} label={item.label}>{content}</Tooltip> : content;
+    }
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = item.enabled && (pathname === item.href || pathname.startsWith(item.href + '/'));
-          const Icon = item.icon;
+    const link = (
+      <Link
+        key={item.label}
+        href={item.href}
+        onClick={closeMobile}
+        className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
+          isCollapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
+        } ${isActive
+          ? 'bg-brand-500 text-white shadow-sm'
+          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        }`}
+      >
+        <Icon className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+        {!isCollapsed && <span>{item.label}</span>}
+      </Link>
+    );
+    return isCollapsed ? <Tooltip key={item.label} label={item.label}>{link}</Tooltip> : link;
+  }
 
-          if (!item.enabled) {
-            return (
-              <div
-                key={item.label}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 cursor-not-allowed select-none"
-              >
-                <Icon className="text-gray-300" />
-                <span>{item.label}</span>
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
-                  ? 'bg-brand-500 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-            >
-              <Icon className={isActive ? 'text-white' : 'text-gray-400'} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Storage Card */}
+  // ─── Storage card (full) ──────────────────────────────────
+  function renderStorageCard(closeMobile?: () => void) {
+    return (
       <div className="px-4 pb-4">
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -174,6 +196,7 @@ export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) 
           {planLimits.planId !== 'enterprise' && (
             <Link
               href="/pricing"
+              onClick={closeMobile}
               className={`block w-full mt-3 text-xs font-medium text-center rounded-lg py-2 transition-colors ${
                 !isUnlimitedStorage && storagePercent >= 90
                   ? 'bg-blue-600 text-white hover:bg-blue-500'
@@ -185,23 +208,55 @@ export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) 
           )}
         </div>
       </div>
+    );
+  }
 
-      {/* User Profile */}
-      <div className="border-t border-gray-100 px-4 py-4 flex items-center gap-3">
-        {organizer.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={organizer.avatar_url}
-            alt=""
-            className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-sm font-semibold text-white">
-              {(organizer.name || organizer.email)?.[0]?.toUpperCase() || '?'}
-            </span>
+  // ─── Storage bar (collapsed — minimal) ────────────────────
+  function renderStorageBar() {
+    return (
+      <Tooltip label={`${usedDisplay} of ${limitDisplay} used`}>
+        <div className="px-3 pb-3">
+          <div className="bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${storagePercent >= 90 ? 'bg-red-500' : 'bg-brand-500'}`}
+              style={{ width: `${Math.max(storagePercent, 3)}%` }}
+            />
           </div>
-        )}
+        </div>
+      </Tooltip>
+    );
+  }
+
+  // ─── User profile (full) ──────────────────────────────────
+  function renderUserProfile(isCollapsed: boolean) {
+    const avatar = organizer.avatar_url ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={organizer.avatar_url}
+        alt=""
+        className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+      />
+    ) : (
+      <div className="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0">
+        <span className="text-sm font-semibold text-white">
+          {(organizer.name || organizer.email)?.[0]?.toUpperCase() || '?'}
+        </span>
+      </div>
+    );
+
+    if (isCollapsed) {
+      return (
+        <div className="border-t border-gray-100 py-4 flex justify-center px-2">
+          <Tooltip label={organizer.name || organizer.email || 'Account'}>
+            {avatar}
+          </Tooltip>
+        </div>
+      );
+    }
+
+    return (
+      <div className="border-t border-gray-100 px-4 py-4 flex items-center gap-3">
+        {avatar}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate">
             {organizer.name || organizer.email?.split('@')[0]}
@@ -210,14 +265,96 @@ export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) 
         </div>
         <SignOutButton />
       </div>
+    );
+  }
+
+  // ─── Desktop sidebar (collapsible) ────────────────────────
+  const desktopContent = (
+    <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-200 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] overflow-hidden">
+      {/* Header: Logo + collapse toggle */}
+      <div className={`flex items-center h-16 flex-shrink-0 ${collapsed ? 'justify-center px-2' : 'justify-between px-5'}`}>
+        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <span className={`font-bold text-brand-600 tracking-tight whitespace-nowrap transition-all duration-300 ${collapsed ? 'text-lg' : 'text-xl'}`}>
+            {collapsed ? 'P' : 'PIXTRACE'}
+          </span>
+        </Link>
+        {!collapsed && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <ChevronLeftIcon />
+          </button>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <nav className={`flex-1 py-4 space-y-1 ${collapsed ? 'px-2' : 'px-3'}`}>
+        {navItems.map((item) => renderNavItem(item, collapsed))}
+
+        {/* Expand button (only when collapsed) */}
+        {collapsed && (
+          <Tooltip label="Expand sidebar">
+            <button
+              onClick={onToggleCollapse}
+              className="flex items-center justify-center w-full py-2.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors mt-2"
+              aria-label="Expand sidebar"
+            >
+              <ChevronRightIcon />
+            </button>
+          </Tooltip>
+        )}
+      </nav>
+
+      {/* Storage */}
+      {collapsed ? renderStorageBar() : renderStorageCard()}
+
+      {/* User */}
+      {renderUserProfile(collapsed)}
+    </div>
+  );
+
+  // ─── Mobile sidebar (always expanded, never collapsible) ──
+  const mobileContent = (
+    <div className="flex flex-col h-full bg-gradient-to-b from-white to-brand-50/40 border-r border-gray-100">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 h-16 flex-shrink-0">
+        <button
+          onClick={onClose}
+          className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+          aria-label="Close sidebar"
+        >
+          <MenuIcon className="text-gray-600" />
+        </button>
+        <Link href="/dashboard" className="flex items-center gap-2" onClick={onClose}>
+          <span className="text-xl font-bold text-brand-600 tracking-tight">PIXTRACE</span>
+        </Link>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {navItems.map((item) => renderNavItem(item, false, onClose))}
+      </nav>
+
+      {/* Storage */}
+      {renderStorageCard(onClose)}
+
+      {/* User */}
+      {renderUserProfile(false)}
     </div>
   );
 
   return (
     <>
-      {/* Desktop sidebar — always visible */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-shrink-0 h-full">
-        {sidebarContent}
+      {/* Desktop sidebar — always visible, animated width */}
+      <aside
+        className={`hidden lg:flex flex-shrink-0 h-full transition-[width] duration-300 ease-in-out ${
+          collapsed ? 'w-[72px]' : 'w-64'
+        }`}
+      >
+        {desktopContent}
       </aside>
 
       {/* Mobile overlay */}
@@ -228,7 +365,7 @@ export function Sidebar({ organizer, planLimits, open, onClose }: SidebarProps) 
             onClick={onClose}
           />
           <aside className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden">
-            {sidebarContent}
+            {mobileContent}
           </aside>
         </>
       )}
