@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 function MenuIcon({ className }: { className?: string }) {
@@ -44,6 +46,39 @@ interface TopBarProps {
 }
 
 export function TopBar({ onMenuClick }: TopBarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+
+  // Sync input when URL params change externally
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '');
+  }, [searchParams]);
+
+  const pushSearch = useCallback((value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value.trim()) {
+      params.set('q', value.trim());
+    } else {
+      params.delete('q');
+    }
+    const target = pathname === '/dashboard' ? pathname : '/dashboard';
+    const qs = params.toString();
+    router.push(qs ? `${target}?${qs}` : target);
+  }, [router, pathname, searchParams]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      pushSearch(query);
+    }
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    pushSearch('');
+  };
+
   return (
     <header className="flex items-center justify-between gap-4 bg-white border-b border-gray-100 px-4 sm:px-6 h-14 flex-shrink-0">
       {/* Left: hamburger (mobile) */}
@@ -64,9 +99,23 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           <input
             type="text"
             placeholder="Search events..."
-            className="w-full pl-9 pr-4 py-1.5 bg-gray-50 rounded-lg text-sm text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-300 transition-all"
-            readOnly
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full pl-9 pr-8 py-1.5 bg-gray-50 rounded-lg text-sm text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-300 transition-all"
           />
+          {query && (
+            <button
+              onClick={handleClear}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Clear search"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

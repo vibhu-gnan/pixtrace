@@ -211,6 +211,7 @@ export async function getDashboardStats(organizerId: string): Promise<{
 export async function getEventsPage(
   cursor?: string | null,
   limit: number = EVENTS_PAGE_SIZE,
+  search?: string | null,
 ): Promise<{ events: EventData[]; hasMore: boolean }> {
   limit = Math.max(1, Math.min(limit, 200)); // Clamp to safe range
 
@@ -225,6 +226,10 @@ export async function getEventsPage(
     .eq('organizer_id', organizer.id)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false }); // Deterministic tiebreaker
+
+  if (search && search.trim()) {
+    query = query.ilike('name', `%${search.trim()}%`);
+  }
 
   if (cursor) {
     query = query.lt('created_at', cursor);

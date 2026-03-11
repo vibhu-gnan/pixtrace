@@ -20,9 +20,14 @@ function formatCount(n: number): string {
   return String(n);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q: searchQuery } = await searchParams;
   const [{ events, hasMore }, organizer] = await Promise.all([
-    getEventsPage(),
+    getEventsPage(null, undefined, searchQuery),
     getCurrentOrganizer(),
   ]);
 
@@ -120,7 +125,20 @@ export default async function DashboardPage() {
       </div>
 
       {/* Event cards grid */}
-      {events.length === 0 ? (
+      {events.length === 0 && searchQuery ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
+          <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">No events found</h3>
+          <p className="text-sm text-gray-500">
+            No events matching &ldquo;{searchQuery}&rdquo;
+          </p>
+        </div>
+      ) : events.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
           <div className="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center mx-auto mb-4">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-brand-500" strokeLinecap="round" strokeLinejoin="round">
@@ -141,7 +159,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <DashboardEventsClient initialEvents={events} initialHasMore={hasMore} />
+        <DashboardEventsClient initialEvents={events} initialHasMore={hasMore} searchQuery={searchQuery} />
       )}
     </div>
   );

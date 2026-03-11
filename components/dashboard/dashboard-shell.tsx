@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import type { PlanLimits } from '@/lib/plans/limits';
 import { Sidebar } from './sidebar';
@@ -69,7 +69,9 @@ export function DashboardShell({ organizer, planLimits, children }: DashboardShe
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar */}
-        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        <Suspense>
+          <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        </Suspense>
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">

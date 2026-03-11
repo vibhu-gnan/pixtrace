@@ -11,9 +11,10 @@ const MAX_FAILURES = 3;
 interface DashboardEventsClientProps {
   initialEvents: EventData[];
   initialHasMore: boolean;
+  searchQuery?: string | null;
 }
 
-export function DashboardEventsClient({ initialEvents, initialHasMore }: DashboardEventsClientProps) {
+export function DashboardEventsClient({ initialEvents, initialHasMore, searchQuery }: DashboardEventsClientProps) {
   const [events, setEvents] = useState(initialEvents);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
@@ -23,16 +24,18 @@ export function DashboardEventsClient({ initialEvents, initialHasMore }: Dashboa
   const hasMoreRef = useRef(initialHasMore);
   const eventsRef = useRef(initialEvents);
   const failureCountRef = useRef(0);
+  const searchRef = useRef(searchQuery);
 
-  // Sync props on server refresh (e.g. after event creation/deletion)
+  // Sync props on server refresh (e.g. after event creation/deletion or search)
   useEffect(() => {
     setEvents(initialEvents);
     setHasMore(initialHasMore);
     hasMoreRef.current = initialHasMore;
     eventsRef.current = initialEvents;
+    searchRef.current = searchQuery;
     failureCountRef.current = 0;
     setError(null);
-  }, [initialEvents, initialHasMore]);
+  }, [initialEvents, initialHasMore, searchQuery]);
 
   // Keep ref in sync with state
   useEffect(() => { eventsRef.current = events; }, [events]);
@@ -47,7 +50,7 @@ export function DashboardEventsClient({ initialEvents, initialHasMore }: Dashboa
       const currentEvents = eventsRef.current;
       const lastEvent = currentEvents[currentEvents.length - 1];
       const cursor = lastEvent?.created_at || null;
-      const { events: newEvents, hasMore: more } = await getEventsPage(cursor);
+      const { events: newEvents, hasMore: more } = await getEventsPage(cursor, undefined, searchRef.current);
 
       setEvents((prev) => {
         const existingIds = new Set(prev.map((e) => e.id));
