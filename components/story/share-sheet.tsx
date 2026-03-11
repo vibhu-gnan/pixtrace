@@ -37,6 +37,7 @@ export function ShareSheet({
   const [toastMessage, setToastMessage] = useState('');
   const sheetRef = useRef<HTMLDivElement>(null);
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Close on backdrop click
   const handleBackdropClick = useCallback(
@@ -56,13 +57,24 @@ export function ShareSheet({
     return () => document.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
 
-  // Reset state on open
+  // Reset state on open; abort any in-flight generation on close
   useEffect(() => {
     if (isOpen) {
       setGenerating(false);
       setToastMessage('');
+    } else {
+      abortRef.current?.abort();
+      abortRef.current = null;
     }
   }, [isOpen]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    };
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -83,9 +95,11 @@ export function ShareSheet({
     }
   }, []);
 
-  const generateCard = useCallback(async (): Promise<{ blob: Blob; file: File } | null> => {
+  const generateCard = useCallback(async (signal: AbortSignal): Promise<{ blob: Blob; file: File } | null> => {
     try {
       const { generateStoryCard } = await import('@/lib/story/story-card-generator');
+
+      const timeoutId = setTimeout(() => abortRef.current?.abort(), 15000);
       const blob = await generateStoryCard({
         photoUrl,
         photoR2Key,
@@ -93,12 +107,17 @@ export function ShareSheet({
         eventSubtitle,
         logoUrl: showLogo ? logoUrl : undefined,
         template: selectedTemplate,
-      });
+      }, signal);
+      clearTimeout(timeoutId);
+
+      if (signal.aborted) return null;
+
       const file = new File([blob], `${eventName.replace(/\s+/g, '-').toLowerCase()}-story.png`, {
         type: 'image/png',
       });
       return { blob, file };
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return null;
       console.error('Story generation failed:', err);
       return null;
     }
@@ -108,10 +127,17 @@ export function ShareSheet({
     if (generating) return;
     setGenerating(true);
 
-    const result = await generateCard();
+    // Abort any previous generation and create a fresh controller
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const result = await generateCard(controller.signal);
     if (!result) {
       setGenerating(false);
-      showToast('Failed to create story card');
+      if (!controller.signal.aborted) {
+        showToast('Failed to create story card. Try again.');
+      }
       return;
     }
 

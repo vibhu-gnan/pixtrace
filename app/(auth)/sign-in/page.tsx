@@ -25,11 +25,11 @@ function SignInForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Correct default redirect
   const getSafeRedirect = () => {
     const redirect = searchParams.get('redirect');
     if (!redirect) return '/dashboard';
-    if (!redirect.startsWith('/')) return '/dashboard';
+    // Must start with single slash, block protocol-relative URLs (//evil.com)
+    if (!redirect.startsWith('/') || redirect.startsWith('//')) return '/dashboard';
     return redirect;
   };
 
@@ -63,20 +63,26 @@ function SignInForm() {
   };
 
   const handleGoogleSignIn = async () => {
-    const supabase = createClient();
-    const redirectPath = getSafeRedirect();
+    try {
+      const supabase = createClient();
+      const redirectPath = getSafeRedirect();
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
 
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${baseUrl}/auth/callback?redirect=${encodeURIComponent(
-          redirectPath
-        )}`,
-      },
-    });
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${baseUrl}/auth/callback?redirect=${encodeURIComponent(
+            redirectPath
+          )}`,
+        },
+      });
+
+      if (oauthError) throw oauthError;
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in with Google');
+    }
   };
 
   return (

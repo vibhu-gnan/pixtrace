@@ -168,6 +168,47 @@ export async function getR2Object(key: string): Promise<{ body: Uint8Array; cont
 }
 
 /**
+ * Fetch an R2 object as a web-compatible ReadableStream (avoids buffering).
+ * Checks Content-Length BEFORE reading body to reject oversized files early.
+ *
+ * @throws {R2ConfigError} if env vars are missing
+ * @throws {R2AccessError} with statusCode 403/404/413
+ */
+export async function getR2ObjectStream(
+  key: string,
+  maxSize?: number,
+): Promise<{ stream: ReadableStream; contentType: string; contentLength: number }> {
+  try {
+    const { client, bucket } = ensureR2();
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const response = await client.send(command);
+
+    if (!response.Body) {
+      throw new R2AccessError(`R2 object has no body: "${key}"`, 404, 'EmptyBody');
+    }
+
+    const contentLength = response.ContentLength ?? 0;
+    if (maxSize && contentLength > maxSize) {
+      // Destroy the stream without buffering to avoid reading oversized files into memory
+      try {
+        const webStream = response.Body.transformToWebStream();
+        await webStream.cancel();
+      } catch {
+        // Best-effort cleanup — connection will be recycled by SDK
+      }
+      throw new R2AccessError(`R2 object too large: ${contentLength} bytes (max ${maxSize})`, 413, 'EntityTooLarge');
+    }
+
+    const contentType = response.ContentType || 'application/octet-stream';
+    const stream = response.Body.transformToWebStream() as ReadableStream;
+    return { stream, contentType, contentLength };
+  } catch (err) {
+    if (err instanceof R2AccessError || err instanceof R2ConfigError) throw err;
+    throw classifyError(err, key);
+  }
+}
+
+/**
  * Check if an object exists in R2
  */
 export async function objectExists(key: string): Promise<boolean> {
@@ -197,12 +238,15 @@ export async function deleteObjects(keys: string[]): Promise<void> {
 }
 
 /**
- * List all object keys in the R2 bucket (handles pagination)
+ * List all object keys in the R2 bucket (handles pagination).
+ * Safety limit: stops after 10,000 pages (~10M objects) to prevent runaway loops.
  */
 export async function listAllObjects(): Promise<string[]> {
   const { client, bucket } = ensureR2();
   const allKeys: string[] = [];
   let continuationToken: string | undefined;
+  const MAX_PAGES = 10_000; // Safety limit to prevent infinite pagination
+  let page = 0;
 
   do {
     const response = await client.send(
@@ -219,6 +263,11 @@ export async function listAllObjects(): Promise<string[]> {
     }
 
     continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    page++;
+    if (page >= MAX_PAGES) {
+      console.warn(`[R2] listAllObjects hit safety limit (${MAX_PAGES} pages, ${allKeys.length} keys). Stopping.`);
+      break;
+    }
   } while (continuationToken);
 
   return allKeys;

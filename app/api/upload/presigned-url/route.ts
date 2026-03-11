@@ -4,6 +4,35 @@ import { generatePresignedUrl } from '@/lib/storage/presigned-urls';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getOrganizerPlanLimits, canUpload } from '@/lib/plans/limits';
 
+// ── Optimistic Storage Reservation ─────────────────────────────
+// Prevents the race condition where 3 concurrent presigned-url requests
+// all see the same storage_used_bytes and all pass the limit check.
+// Reservations are in-memory (per-process) and auto-expire after 5 minutes.
+const RESERVATION_TTL_MS = 5 * 60 * 1000;
+const reservations = new Map<string, { bytes: number; expiresAt: number }[]>();
+
+function getReservedBytes(organizerId: string): number {
+  const now = Date.now();
+  const orgReservations = reservations.get(organizerId);
+  if (!orgReservations) return 0;
+
+  // Prune expired reservations
+  const active = orgReservations.filter((r) => r.expiresAt > now);
+  if (active.length !== orgReservations.length) {
+    if (active.length === 0) reservations.delete(organizerId);
+    else reservations.set(organizerId, active);
+  }
+
+  return active.reduce((sum, r) => sum + r.bytes, 0);
+}
+
+function addReservation(organizerId: string, bytes: number): void {
+  const entry = { bytes, expiresAt: Date.now() + RESERVATION_TTL_MS };
+  const existing = reservations.get(organizerId) || [];
+  existing.push(entry);
+  reservations.set(organizerId, existing);
+}
+
 interface VariantRequest {
   suffix: string;
   contentType: string;
@@ -90,12 +119,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check storage limits (fileSize is now required)
+  // Check storage limits (fileSize is now required).
+  // Include optimistic reservations from concurrent in-flight uploads
+  // to prevent the race condition where parallel requests all pass the check.
   const limits = await getOrganizerPlanLimits(organizer.id);
-  const uploadCheck = canUpload(limits, fileSize);
+  const reservedBytes = getReservedBytes(organizer.id);
+  const effectiveLimits = {
+    ...limits,
+    storageUsedBytes: limits.storageUsedBytes + reservedBytes,
+  };
+  const uploadCheck = canUpload(effectiveLimits, fileSize);
   if (!uploadCheck.allowed) {
     return NextResponse.json({ error: uploadCheck.reason }, { status: 403 });
   }
+
+  // Reserve this file's storage optimistically (cleared when upload completes
+  // and incrementStorageUsed updates the real counter, or auto-expires)
+  addReservation(organizer.id, fileSize);
 
   // Verify event belongs to organizer
   const supabase = createAdminClient();

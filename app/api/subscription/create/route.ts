@@ -9,7 +9,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { planId } = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { planId } = body;
 
   if (!planId || !['starter', 'pro'].includes(planId)) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });

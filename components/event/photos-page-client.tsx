@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useUploadStore } from '@/lib/upload/upload-manager';
 import { UploadBanner } from './upload-banner';
+import { StorageLimitModal } from './storage-limit-modal';
 import { PhotoGrid } from './photo-grid';
 import { AlbumCard } from './album-card';
 import { CreateAlbumCard } from './create-album-card';
@@ -109,7 +110,7 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
   const searchParams = useSearchParams();
   const albumIdFromUrl = searchParams.get('album');
 
-  const { items, isUploading, addFiles, startUpload } = useUploadStore();
+  const { items, isUploading, addFiles, startUpload, storageLimitError, clearStorageLimitError } = useUploadStore();
 
   // ─── State ───────────────────────────────────────────────
   const [dropdownAlbums, setDropdownAlbums] = useState(initialAlbums.map((a) => ({ id: a.id, name: a.name })));
@@ -537,6 +538,14 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
 
   return (
     <div>
+      {/* Storage Limit Modal — shown when upload is blocked by quota */}
+      {storageLimitError && (
+        <StorageLimitModal
+          info={storageLimitError}
+          onClose={clearStorageLimitError}
+        />
+      )}
+
       {/* Cover Bar — gallery cover configuration */}
       <CoverBar
         event={event}

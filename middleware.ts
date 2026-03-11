@@ -17,6 +17,13 @@ const PUBLIC_PREFIXES = [
   '/auth/callback',
 ];
 
+function setSecurityHeaders(response: NextResponse) {
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('X-DNS-Prefetch-Control', 'on');
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -35,7 +42,9 @@ export async function middleware(request: NextRequest) {
   const isSlugRoute = /^\/[a-zA-Z0-9_-]{6,32}$/.test(pathname) && !KNOWN_APP_ROUTES.has(pathname);
 
   if (isPublicRoute || isSlugRoute || pathname === '/') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    setSecurityHeaders(response);
+    return response;
   }
 
   // ─── Protected routes: authenticate ───
@@ -47,6 +56,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
+  setSecurityHeaders(response);
   return response;
 }
 

@@ -42,9 +42,9 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
 
   if (!event) return [];
 
-  // Supabase PostgREST caps at 1000 rows per request by default.
-  // Get total count first, then fetch in parallel batches of 1000.
+  // Fetch in controlled batches (max 10 concurrent) to prevent OOM on large events
   const batchSize = 1000;
+  const MAX_CONCURRENT_BATCHES = 10;
 
   const { count: totalCount } = await supabase
     .from('media')
@@ -53,25 +53,32 @@ export async function getMedia(eventId: string): Promise<MediaItem[]> {
 
   if (!totalCount || totalCount === 0) return [];
 
-  // Build all range requests needed, run in parallel
-  const batches: Promise<any[]>[] = [];
+  // Build range offsets, then process in chunks of MAX_CONCURRENT_BATCHES
+  const allMedia: any[] = [];
+  const offsets: number[] = [];
   for (let from = 0; from < totalCount; from += batchSize) {
-    batches.push(
-      (async () => {
+    offsets.push(from);
+  }
+
+  for (let i = 0; i < offsets.length; i += MAX_CONCURRENT_BATCHES) {
+    const chunk = offsets.slice(i, i + MAX_CONCURRENT_BATCHES);
+    const batchResults = await Promise.all(
+      chunk.map(async (from) => {
         const { data, error } = await supabase
           .from('media')
           .select('*')
           .eq('event_id', eventId)
           .order('created_at', { ascending: true })
           .range(from, from + batchSize - 1);
-        if (error) { console.error('Error fetching media batch:', error); return []; }
+        if (error) {
+          console.error(`Error fetching media batch [${from}-${from + batchSize - 1}]:`, error);
+          return [];
+        }
         return data || [];
-      })()
+      })
     );
+    allMedia.push(...batchResults.flat());
   }
-
-  const batchResults = await Promise.all(batches);
-  const allMedia: any[] = batchResults.flat();
 
   return Promise.all(allMedia.map(async (item: any) => ({
     id: item.id,

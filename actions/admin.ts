@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/admin/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getOrganizerPlanLimits, type PlanLimits } from '@/lib/plans/limits';
+import { listAllObjects, deleteObjects } from '@/lib/storage/r2-client';
 
 // ============================================================================
 // CONSTANTS
@@ -147,11 +149,28 @@ export async function getAdminUsers({
     return { users: [], total: 0, page: p, pageSize: PAGE_SIZE };
   }
 
-  const users = (data || []).map((u: any) => ({
-    ...u,
-    event_count: u.events?.length || 0,
-    events: undefined, // don't leak full event list
-  }));
+  // Fetch all plans for limit resolution
+  const { data: plans } = await supabase.from('plans').select('id, storage_limit_bytes, max_events');
+  const planMap = new Map((plans || []).map((p: any) => [p.id, p]));
+
+  const users = (data || []).map((u: any) => {
+    const userPlan = planMap.get(u.plan_id);
+    // Effective limits: custom overrides > plan defaults
+    const storageLimitBytes = u.custom_storage_limit_bytes != null
+      ? u.custom_storage_limit_bytes
+      : (userPlan?.storage_limit_bytes ?? 1073741824);
+    const maxEvents = u.custom_max_events != null
+      ? u.custom_max_events
+      : (userPlan?.max_events ?? 1);
+
+    return {
+      ...u,
+      event_count: u.events?.length || 0,
+      events: undefined, // don't leak full event list
+      storage_limit_bytes: storageLimitBytes,
+      max_events: maxEvents,
+    };
+  });
 
   return { users, total: count || 0, page: p, pageSize: PAGE_SIZE };
 }
@@ -211,11 +230,20 @@ export async function getAdminUserDetail(userId: string) {
     media_count: mediaCounts[e.id] || 0,
   }));
 
+  // Fetch effective plan limits for this user
+  let planLimits: PlanLimits | null = null;
+  try {
+    planLimits = await getOrganizerPlanLimits(userId);
+  } catch {
+    // Non-critical — admin page still works without limits
+  }
+
   return {
     user,
     events: eventsWithCounts,
     subscriptions: subscriptions || [],
     payments: payments || [],
+    planLimits,
   };
 }
 
@@ -257,19 +285,270 @@ export async function changeUserPlan(userId: string, newPlanId: string) {
   await requireAdmin();
   const supabase = createAdminClient();
 
+  if (!userId || typeof userId !== 'string') {
+    return { error: 'Valid user ID is required' };
+  }
+
   const validPlans = ['free', 'starter', 'pro', 'enterprise'];
   if (!validPlans.includes(newPlanId)) {
     return { error: 'Invalid plan' };
   }
 
+  // Fetch current plan to detect downgrade from enterprise
+  const { data: user, error: fetchError } = await supabase
+    .from('organizers')
+    .select('plan_id')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError || !user) {
+    return { error: 'User not found' };
+  }
+
+  const updates: Record<string, unknown> = {
+    plan_id: newPlanId,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Clear custom overrides when downgrading from enterprise
+  if (user.plan_id === 'enterprise' && newPlanId !== 'enterprise') {
+    updates.custom_storage_limit_bytes = null;
+    updates.custom_max_events = null;
+    updates.custom_feature_flags = null;
+  }
+
   const { error } = await supabase
     .from('organizers')
-    .update({ plan_id: newPlanId, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq('id', userId);
 
   if (error) {
     console.error('changeUserPlan error:', error);
     return { error: 'Failed to update plan' };
+  }
+
+  revalidatePath('/admin/users');
+  revalidatePath(`/admin/users/${userId}`);
+  return { success: true };
+}
+
+// ============================================================================
+// ADMIN CREATE USER
+// ============================================================================
+
+export interface AdminCreateUserData {
+  email: string;
+  name: string;
+  password: string;
+  planId: string;
+  isAdmin: boolean;
+  customStorageLimitGB?: number | null;
+  customMaxEvents?: number | null;
+}
+
+export async function adminCreateUser(data: AdminCreateUserData) {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  // Null guard — server actions can receive unexpected input
+  if (!data || typeof data !== 'object') {
+    return { error: 'Invalid request data' };
+  }
+
+  // Validate email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!data.email || typeof data.email !== 'string' || !emailRegex.test(data.email.trim())) {
+    return { error: 'Invalid email address' };
+  }
+
+  // Validate password
+  if (!data.password || typeof data.password !== 'string' || data.password.length < 8) {
+    return { error: 'Password must be at least 8 characters' };
+  }
+
+  if (data.password.length > 128) {
+    return { error: 'Password must be 128 characters or less' };
+  }
+
+  // Validate plan
+  const validPlans = ['free', 'starter', 'pro', 'enterprise'];
+  if (!validPlans.includes(data.planId)) {
+    return { error: 'Invalid plan' };
+  }
+
+  // Validate name
+  if (!data.name || typeof data.name !== 'string' || data.name.trim().length < 1) {
+    return { error: 'Name is required' };
+  }
+
+  if (data.name.trim().length > 255) {
+    return { error: 'Name must be 255 characters or less' };
+  }
+
+  const email = data.email.trim().toLowerCase();
+  const name = data.name.trim();
+
+  // Validate custom limits are sane numbers (NaN/Infinity protection)
+  if (data.customStorageLimitGB != null) {
+    if (typeof data.customStorageLimitGB !== 'number' || !Number.isFinite(data.customStorageLimitGB) || data.customStorageLimitGB < 0) {
+      return { error: 'Storage limit must be a valid non-negative number' };
+    }
+  }
+  if (data.customMaxEvents != null) {
+    if (typeof data.customMaxEvents !== 'number' || !Number.isFinite(data.customMaxEvents) || data.customMaxEvents < 0 || !Number.isInteger(data.customMaxEvents)) {
+      return { error: 'Max events must be a valid non-negative integer' };
+    }
+  }
+
+  // Create Supabase Auth user first — this is the source of truth for uniqueness.
+  // Skip the organizer email pre-check to eliminate TOCTOU race condition;
+  // Supabase Auth enforces email uniqueness atomically.
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    email,
+    password: data.password,
+    email_confirm: true,
+    user_metadata: { full_name: name },
+  });
+
+  if (authError) {
+    console.error('adminCreateUser auth error:', authError);
+    if (authError.message?.includes('already been registered') || authError.message?.includes('already exists')) {
+      return { error: 'An account with this email already exists' };
+    }
+    return { error: `Failed to create auth user: ${authError.message}` };
+  }
+
+  if (!authData.user) {
+    return { error: 'Auth user creation returned no user' };
+  }
+
+  // Build organizer record
+  const organizerData: Record<string, unknown> = {
+    auth_id: authData.user.id,
+    email,
+    name,
+    plan_id: data.planId,
+    is_admin: !!data.isAdmin,
+  };
+
+  // Set custom limits for enterprise users
+  if (data.planId === 'enterprise') {
+    if (data.customStorageLimitGB != null && data.customStorageLimitGB >= 0) {
+      organizerData.custom_storage_limit_bytes = Math.round(data.customStorageLimitGB * 1024 ** 3);
+    }
+    if (data.customMaxEvents != null && data.customMaxEvents >= 0) {
+      organizerData.custom_max_events = data.customMaxEvents;
+    }
+  }
+
+  // Insert organizer profile
+  const { data: organizer, error: insertError } = await supabase
+    .from('organizers')
+    .insert(organizerData)
+    .select('id')
+    .single();
+
+  if (insertError) {
+    console.error('adminCreateUser insert error:', insertError);
+    // Rollback: delete the auth user we just created
+    try {
+      await supabase.auth.admin.deleteUser(authData.user.id);
+    } catch (rollbackErr) {
+      console.error('adminCreateUser rollback failed — orphaned auth user:', authData.user.id, rollbackErr);
+    }
+    return { error: 'Failed to create organizer profile' };
+  }
+
+  revalidatePath('/admin/users');
+  return { success: true, userId: organizer.id };
+}
+
+// ============================================================================
+// ENTERPRISE CUSTOM LIMITS
+// ============================================================================
+
+export interface AdminCustomLimitsData {
+  customStorageLimitGB: number | null; // null = use plan default, 0 = unlimited
+  customMaxEvents: number | null;      // null = use plan default, 0 = unlimited
+  customFeatureFlags: Record<string, unknown> | null;
+}
+
+export async function adminSetCustomLimits(userId: string, limits: AdminCustomLimitsData) {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  if (!userId || typeof userId !== 'string') {
+    return { error: 'Valid user ID is required' };
+  }
+
+  if (!limits || typeof limits !== 'object') {
+    return { error: 'Invalid limits data' };
+  }
+
+  // NaN/Infinity guard on numeric inputs
+  if (limits.customStorageLimitGB !== null && limits.customStorageLimitGB !== undefined) {
+    if (typeof limits.customStorageLimitGB !== 'number' || !Number.isFinite(limits.customStorageLimitGB) || limits.customStorageLimitGB < 0) {
+      return { error: 'Storage limit must be a valid non-negative number' };
+    }
+  }
+  if (limits.customMaxEvents !== null && limits.customMaxEvents !== undefined) {
+    if (typeof limits.customMaxEvents !== 'number' || !Number.isFinite(limits.customMaxEvents) || limits.customMaxEvents < 0 || !Number.isInteger(limits.customMaxEvents)) {
+      return { error: 'Max events must be a valid non-negative integer' };
+    }
+  }
+
+  // Verify user exists and is on enterprise plan
+  const { data: user, error: fetchError } = await supabase
+    .from('organizers')
+    .select('plan_id')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError || !user) {
+    return { error: 'User not found' };
+  }
+
+  if (user.plan_id !== 'enterprise') {
+    return { error: 'Custom limits can only be set for enterprise plan users' };
+  }
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  // Storage: convert GB to bytes, null clears override
+  if (limits.customStorageLimitGB === null) {
+    updates.custom_storage_limit_bytes = null;
+  } else if (limits.customStorageLimitGB >= 0) {
+    updates.custom_storage_limit_bytes = Math.round(limits.customStorageLimitGB * 1024 ** 3);
+  }
+
+  // Max events: null clears override
+  if (limits.customMaxEvents === null) {
+    updates.custom_max_events = null;
+  } else if (limits.customMaxEvents >= 0) {
+    updates.custom_max_events = limits.customMaxEvents;
+  }
+
+  // Feature flags: null clears override, filter out empty objects
+  if (limits.customFeatureFlags === null) {
+    updates.custom_feature_flags = null;
+  } else if (limits.customFeatureFlags && typeof limits.customFeatureFlags === 'object') {
+    // Only store if at least one flag is truthy — avoid saving {downloads: false, ...} as an override
+    const truthyFlags = Object.fromEntries(
+      Object.entries(limits.customFeatureFlags).filter(([, v]) => !!v)
+    );
+    updates.custom_feature_flags = Object.keys(truthyFlags).length > 0 ? truthyFlags : null;
+  }
+
+  const { error } = await supabase
+    .from('organizers')
+    .update(updates)
+    .eq('id', userId);
+
+  if (error) {
+    console.error('adminSetCustomLimits error:', error);
+    return { error: 'Failed to update custom limits' };
   }
 
   revalidatePath('/admin/users');
@@ -556,4 +835,263 @@ export async function retryFailedFaceJobs(jobIds: string[]) {
 
   revalidatePath('/admin/face-jobs');
   return { success: true, count: jobIds.length };
+}
+
+// ============================================================================
+// STORAGE MAINTENANCE
+// ============================================================================
+
+const MAX_ORPHAN_KEYS_PER_RUN = 5000;
+const MAX_ORPHAN_RATIO = 0.5;
+const CLEANUP_BATCH_SIZE = 100;
+const SCAN_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Server-side cache for scan results.
+ * Keys are stored here instead of being sent to the client (avoids large payloads).
+ * Each entry auto-expires after 10 minutes.
+ */
+const scanResultCache = new Map<string, {
+  untrackedOrphanKeys: string[];
+  trackedOrphanIds: string[];
+  expiresAt: number;
+}>();
+
+function pruneScanCache() {
+  const now = Date.now();
+  for (const [id, entry] of scanResultCache) {
+    if (entry.expiresAt <= now) scanResultCache.delete(id);
+  }
+  // Hard cap: never hold more than 5 scan results (multi-admin safety)
+  if (scanResultCache.size > 5) {
+    const oldest = [...scanResultCache.entries()].sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+    for (let i = 0; i < oldest.length - 5; i++) {
+      scanResultCache.delete(oldest[i][0]);
+    }
+  }
+}
+
+/**
+ * Lightweight stats for initial page load — just counts tracked orphans.
+ */
+export async function getStorageMaintenanceStats() {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  const { count, error } = await supabase
+    .from('r2_orphaned_keys')
+    .select('id', { count: 'exact', head: true })
+    .is('cleaned_at', null);
+
+  if (error) {
+    console.error('getStorageMaintenanceStats error:', error);
+    return { trackedOrphanCount: 0 };
+  }
+
+  return { trackedOrphanCount: count || 0 };
+}
+
+export interface ScanResult {
+  success: true;
+  scanId: string;
+  r2ObjectCount: number;
+  dbKeyCount: number;
+  trackedOrphanCount: number;
+  untrackedOrphanCount: number;
+}
+
+/**
+ * Full bucket scan — expensive, triggered by admin button.
+ * Lists all R2 objects and compares against DB media keys.
+ */
+export async function scanOrphanedR2(): Promise<
+  ScanResult | { success: false; error: string }
+> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  // Step 1: List all R2 objects
+  let r2Keys: string[];
+  try {
+    r2Keys = await listAllObjects();
+  } catch (err: any) {
+    console.error('[StorageMaintenance] R2 list failed:', err);
+    return { success: false, error: `Failed to list R2 objects: ${err?.message || 'Unknown error'}` };
+  }
+
+  // Step 2: Fetch all known DB keys (paginated — Supabase PostgREST caps at ~1000 rows)
+  const dbKeys = new Set<string>();
+  let dbRowCount = 0;
+  const DB_PAGE_SIZE = 1000; // Match Supabase default max-rows to avoid silent truncation
+  let dbOffset = 0;
+  const DB_MAX_PAGES = 1000; // Safety: 1M rows max
+
+  for (let dbPage = 0; dbPage < DB_MAX_PAGES; dbPage++) {
+    const { data, error } = await supabase
+      .from('media')
+      .select('r2_key, thumbnail_r2_key, preview_r2_key')
+      .range(dbOffset, dbOffset + DB_PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('[StorageMaintenance] DB query failed:', error);
+      return { success: false, error: 'Failed to query media table' };
+    }
+
+    if (!data || data.length === 0) break;
+
+    for (const row of data) {
+      if (row.r2_key) dbKeys.add(row.r2_key);
+      if (row.thumbnail_r2_key) dbKeys.add(row.thumbnail_r2_key);
+      if (row.preview_r2_key) dbKeys.add(row.preview_r2_key);
+    }
+    dbRowCount += data.length;
+    // Advance by actual rows returned, not assumed page size
+    dbOffset += data.length;
+
+    // If we got fewer rows than requested, we've reached the end
+    if (data.length < DB_PAGE_SIZE) break;
+  }
+
+  // Safety: refuse if DB returned 0 rows but R2 has objects
+  if (dbRowCount === 0 && r2Keys.length > 0) {
+    return {
+      success: false,
+      error: 'Safety abort: Database returned 0 media rows but R2 has objects. This likely indicates a query failure.',
+    };
+  }
+
+  // Step 3: Fetch tracked orphans (pending cleanup)
+  const { data: trackedOrphans, error: trackedErr } = await supabase
+    .from('r2_orphaned_keys')
+    .select('id, r2_key')
+    .is('cleaned_at', null)
+    .limit(MAX_ORPHAN_KEYS_PER_RUN);
+
+  if (trackedErr) {
+    console.error('[StorageMaintenance] Tracked orphan query failed:', trackedErr);
+    return { success: false, error: 'Failed to query tracked orphans' };
+  }
+
+  const trackedKeySet = new Set((trackedOrphans || []).map((o) => o.r2_key));
+
+  // Step 4: Find untracked orphans (in R2 but not in DB AND not already tracked)
+  const allOrphanKeys = r2Keys.filter((key) => !dbKeys.has(key));
+
+  // Safety: refuse if orphan ratio > 50%
+  if (r2Keys.length > 0) {
+    const orphanRatio = allOrphanKeys.length / r2Keys.length;
+    if (orphanRatio > MAX_ORPHAN_RATIO) {
+      return {
+        success: false,
+        error: `Safety abort: ${(orphanRatio * 100).toFixed(1)}% of bucket objects appear orphaned (threshold: ${MAX_ORPHAN_RATIO * 100}%). This likely indicates a database query issue.`,
+      };
+    }
+  }
+
+  const untrackedOrphanKeys = allOrphanKeys
+    .filter((key) => !trackedKeySet.has(key))
+    .slice(0, MAX_ORPHAN_KEYS_PER_RUN);
+
+  // Store keys server-side to avoid sending large arrays through server actions
+  pruneScanCache();
+  const scanId = crypto.randomUUID();
+  scanResultCache.set(scanId, {
+    untrackedOrphanKeys,
+    trackedOrphanIds: (trackedOrphans || []).map((o) => o.id),
+    expiresAt: Date.now() + SCAN_CACHE_TTL_MS,
+  });
+
+  return {
+    success: true,
+    scanId,
+    r2ObjectCount: r2Keys.length,
+    dbKeyCount: dbKeys.size,
+    trackedOrphanCount: (trackedOrphans || []).length,
+    untrackedOrphanCount: untrackedOrphanKeys.length,
+  };
+}
+
+/**
+ * Delete orphaned R2 objects and mark tracked orphans as cleaned.
+ * Takes a scanId (from scanOrphanedR2) to retrieve keys from server-side cache.
+ * Processes in batches, continues on individual batch errors.
+ */
+export async function cleanOrphanedR2(
+  scanId: string,
+): Promise<{ success: boolean; deletedCount: number; cleanedTrackedCount: number; errors: string[] }> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  // Retrieve scan results from server-side cache
+  const cached = scanResultCache.get(scanId);
+  if (!cached || cached.expiresAt <= Date.now()) {
+    scanResultCache.delete(scanId);
+    return { success: false, deletedCount: 0, cleanedTrackedCount: 0, errors: ['Scan results expired. Please scan again.'] };
+  }
+
+  // Consume the cache entry (one-time use — prevents double-clean)
+  scanResultCache.delete(scanId);
+
+  const keysToDelete = cached.untrackedOrphanKeys;
+  const idsToClean = cached.trackedOrphanIds;
+
+  let deletedCount = 0;
+  let cleanedTrackedCount = 0;
+  const errors: string[] = [];
+
+  // Delete untracked orphan keys from R2 in batches
+  for (let i = 0; i < keysToDelete.length; i += CLEANUP_BATCH_SIZE) {
+    const batch = keysToDelete.slice(i, i + CLEANUP_BATCH_SIZE);
+    try {
+      await deleteObjects(batch);
+      deletedCount += batch.length;
+    } catch (err: any) {
+      const msg = `Batch ${Math.floor(i / CLEANUP_BATCH_SIZE) + 1}: ${err?.message || 'Unknown error'}`;
+      console.error('[StorageMaintenance] Delete batch error:', msg);
+      errors.push(msg);
+    }
+  }
+
+  // Clean tracked orphans: delete from R2 then mark as cleaned in DB
+  for (let i = 0; i < idsToClean.length; i += CLEANUP_BATCH_SIZE) {
+    const batchIds = idsToClean.slice(i, i + CLEANUP_BATCH_SIZE);
+
+    // Fetch the actual R2 keys for these IDs
+    const { data: rows, error: fetchErr } = await supabase
+      .from('r2_orphaned_keys')
+      .select('id, r2_key')
+      .in('id', batchIds)
+      .is('cleaned_at', null);
+
+    if (fetchErr || !rows || rows.length === 0) {
+      if (fetchErr) errors.push(`Tracked fetch error: ${fetchErr.message}`);
+      continue;
+    }
+
+    try {
+      await deleteObjects(rows.map((r) => r.r2_key));
+    } catch (err: any) {
+      errors.push(`Tracked delete batch: ${err?.message || 'Unknown error'}`);
+      // Continue to mark as cleaned anyway — the R2 objects may already be gone
+    }
+
+    // Mark as cleaned
+    const { error: updateErr } = await supabase
+      .from('r2_orphaned_keys')
+      .update({ cleaned_at: new Date().toISOString() })
+      .in('id', rows.map((r) => r.id));
+
+    if (updateErr) {
+      errors.push(`Tracked update error: ${updateErr.message}`);
+    } else {
+      cleanedTrackedCount += rows.length;
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    deletedCount,
+    cleanedTrackedCount,
+    errors,
+  };
 }

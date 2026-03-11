@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid or expired download link' }, { status: 403 });
     }
 
-    // Defense-in-depth: path traversal prevention
-    if (r2Key.includes('..') || r2Key.startsWith('/')) {
+    // Defense-in-depth: path traversal prevention — only allow safe R2 key characters
+    if (r2Key.includes('..') || r2Key.startsWith('/') || /[^\w/._-]/.test(r2Key)) {
         return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
     }
 

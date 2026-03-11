@@ -6,6 +6,15 @@ import { Pagination } from '@/components/admin/pagination';
 import { SearchInput } from '@/components/admin/search-input';
 import { FilterTabs } from '@/components/admin/filter-tabs';
 
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const gb = bytes / (1024 ** 3);
@@ -30,7 +39,9 @@ type UserRow = {
   plan_id: string;
   is_admin: boolean;
   storage_used_bytes: number;
+  storage_limit_bytes: number;
   event_count: number;
+  max_events: number;
   created_at: string;
 };
 
@@ -74,14 +85,45 @@ const columns: Column<UserRow>[] = [
   {
     key: 'events',
     header: 'Events',
-    render: (row) => <span className="text-sm text-gray-700">{row.event_count}</span>,
+    render: (row) => {
+      const atLimit = row.max_events > 0 && row.event_count >= row.max_events;
+      return (
+        <span className={`text-sm ${atLimit ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
+          {row.event_count}
+          <span className="text-gray-400">
+            /{row.max_events === 0 ? '\u221E' : row.max_events}
+          </span>
+        </span>
+      );
+    },
   },
   {
     key: 'storage',
     header: 'Storage',
-    render: (row) => (
-      <span className="text-sm text-gray-500">{formatBytes(row.storage_used_bytes)}</span>
-    ),
+    render: (row) => {
+      const pct = row.storage_limit_bytes > 0
+        ? (row.storage_used_bytes / row.storage_limit_bytes)
+        : 0;
+      const colorClass = pct > 0.9 ? 'bg-red-500' : pct > 0.7 ? 'bg-amber-500' : 'bg-brand-500';
+      return (
+        <div className="min-w-[80px]">
+          <span className="text-sm text-gray-500">
+            {formatBytes(row.storage_used_bytes)}
+            <span className="text-gray-400">
+              /{row.storage_limit_bytes === 0 ? '\u221E' : formatBytes(row.storage_limit_bytes)}
+            </span>
+          </span>
+          {row.storage_limit_bytes > 0 && (
+            <div className="w-full bg-gray-100 rounded-full h-1 mt-1">
+              <div
+                className={`h-1 rounded-full ${colorClass}`}
+                style={{ width: `${Math.min(100, pct * 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      );
+    },
   },
   {
     key: 'created',
@@ -133,6 +175,13 @@ export default async function AdminUsersPage({ searchParams }: Props) {
             {total}
           </span>
         </div>
+        <Link
+          href="/admin/users/create"
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-brand-500 text-white hover:bg-brand-600 transition-colors"
+        >
+          <PlusIcon />
+          Create User
+        </Link>
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">

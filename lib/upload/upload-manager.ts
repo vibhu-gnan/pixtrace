@@ -12,15 +12,25 @@ export interface UploadItem {
   error?: string;
 }
 
+export interface StorageLimitInfo {
+  storageUsedBytes: number;
+  storageLimitBytes: number;
+  planName: string;
+  planId: string;
+  reason: string;
+}
+
 interface UploadStore {
   items: UploadItem[];
   isUploading: boolean;
   uploadStartedAt: number | null;
+  storageLimitError: StorageLimitInfo | null;
 
   addFiles: (files: File[]) => void;
   removeItem: (id: string) => void;
   clearCompleted: () => void;
   clearAll: () => void;
+  clearStorageLimitError: () => void;
   startUpload: (eventId: string, albumId: string) => Promise<void>;
   updateItem: (id: string, update: Partial<UploadItem>) => void;
 }
@@ -32,6 +42,7 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
   items: [],
   isUploading: false,
   uploadStartedAt: null,
+  storageLimitError: null,
 
   addFiles: (files: File[]) => {
     const newItems: UploadItem[] = files.map((file) => ({
@@ -54,7 +65,11 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
   },
 
   clearAll: () => {
-    set({ items: [], isUploading: false, uploadStartedAt: null });
+    set({ items: [], isUploading: false, uploadStartedAt: null, storageLimitError: null });
+  },
+
+  clearStorageLimitError: () => {
+    set({ storageLimitError: null });
   },
 
   updateItem: (id: string, update: Partial<UploadItem>) => {
@@ -70,7 +85,39 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
     const pending = items.filter((item) => item.status === 'pending');
 
     if (pending.length === 0) return;
-    set({ isUploading: true, uploadStartedAt: Date.now() });
+
+    // Pre-flight storage check: verify total size fits within quota BEFORE
+    // starting any uploads. This prevents the confusing UX of files failing
+    // one-by-one after partial upload.
+    const totalSizeBytes = pending.reduce((sum, item) => sum + item.file.size, 0);
+    try {
+      const res = await fetch('/api/upload/check-storage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ totalSizeBytes }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.allowed) {
+          set({
+            storageLimitError: {
+              storageUsedBytes: data.storageUsedBytes,
+              storageLimitBytes: data.storageLimitBytes,
+              planName: data.planName,
+              planId: data.planId,
+              reason: data.reason,
+            },
+          });
+          return; // Don't start uploading
+        }
+      }
+      // If check-storage fails (network error, etc.), fall through —
+      // presigned-url will still enforce server-side
+    } catch {
+      // Non-critical — server-side check is the real gate
+    }
+
+    set({ isUploading: true, uploadStartedAt: Date.now(), storageLimitError: null });
 
     // Process in batches with concurrency limit
     const queue = [...pending];
@@ -143,7 +190,32 @@ async function uploadSingleFile(
 
       if (!presignRes.ok) {
         const errData = await presignRes.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to get presigned URL');
+        const errorMsg = errData.error || 'Failed to get presigned URL';
+
+        // If 403 = storage limit hit, stop ALL remaining uploads immediately.
+        // No point retrying — every file will fail the same way.
+        if (presignRes.status === 403 && errorMsg.includes('Storage limit')) {
+          const store = useUploadStore.getState();
+          // Mark all remaining pending/uploading items as error
+          for (const item of store.items) {
+            if (item.status === 'pending' || item.status === 'uploading') {
+              store.updateItem(item.id, { status: 'error', error: errorMsg, progress: 0 });
+            }
+          }
+          // Surface the storage limit modal
+          useUploadStore.setState({
+            storageLimitError: {
+              storageUsedBytes: 0,
+              storageLimitBytes: 0,
+              planName: '',
+              planId: '',
+              reason: errorMsg,
+            },
+          });
+          throw new Error(errorMsg);
+        }
+
+        throw new Error(errorMsg);
       }
 
       const presignData = await presignRes.json();
@@ -213,20 +285,18 @@ async function uploadSingleFile(
       console.error(`Upload attempt ${attempt + 1}/${MAX_RETRIES} failed for ${file.name}:`, err);
 
       if (attempt === MAX_RETRIES - 1) {
-        // Final retry failed
+        // Final retry failed — no delay needed, show error immediately
         updateItem(id, {
           status: 'error',
           error: err.message || 'Upload failed',
           progress: 0,
         });
       } else {
-        // Will retry - log retry info
+        // Wait before retry with exponential backoff
         const retryDelay = 1000 * Math.pow(2, attempt);
         console.log(`Retrying upload for ${file.name} in ${retryDelay}ms`);
+        await new Promise((r) => setTimeout(r, retryDelay));
       }
-
-      // Wait before retry with exponential backoff
-      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
     }
   }
 }
@@ -318,12 +388,21 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
       URL.revokeObjectURL(img.src);
+      // Treat invalid/zero dimensions as unknown rather than 0×0
+      if (w > 0 && h > 0) {
+        resolve({ width: w, height: h });
+      } else {
+        console.warn(`[Upload] Image has invalid dimensions ${w}×${h}: ${file.name}`);
+        resolve({ width: 0, height: 0 });
+      }
     };
     img.onerror = () => {
-      resolve({ width: 0, height: 0 });
       URL.revokeObjectURL(img.src);
+      console.warn(`[Upload] Failed to read image dimensions: ${file.name}`);
+      resolve({ width: 0, height: 0 });
     };
     img.src = URL.createObjectURL(file);
   });

@@ -45,7 +45,7 @@ export default async function AdminUserDetailPage({ params }: Props) {
 
   if (!data) notFound();
 
-  const { user, events, subscriptions, payments } = data;
+  const { user, events, subscriptions, payments, planLimits } = data;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -88,10 +88,113 @@ export default async function AdminUserDetailPage({ params }: Props) {
             </div>
           </div>
 
-          <UserAdminActions userId={user.id} isAdmin={user.is_admin} currentPlan={user.plan_id} />
+          <UserAdminActions
+            userId={user.id}
+            isAdmin={user.is_admin}
+            currentPlan={user.plan_id}
+            customStorageLimitBytes={user.custom_storage_limit_bytes ?? null}
+            customMaxEvents={user.custom_max_events ?? null}
+            customFeatureFlags={user.custom_feature_flags ?? null}
+          />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
+        {/* Plan Limits & Usage */}
+        {planLimits && (
+          <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Storage usage with progress */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Storage</p>
+                  <p className="text-xs text-gray-500">
+                    {formatBytes(planLimits.storageUsedBytes)}
+                    {' / '}
+                    {planLimits.storageLimitBytes === 0 ? 'Unlimited' : formatBytes(planLimits.storageLimitBytes)}
+                    {planLimits.customOverrides.storage && (
+                      <span className="ml-1 text-amber-600" title="Custom override">(custom)</span>
+                    )}
+                  </p>
+                </div>
+                {planLimits.storageLimitBytes > 0 ? (
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        (planLimits.storageUsedBytes / planLimits.storageLimitBytes) > 0.9
+                          ? 'bg-red-500'
+                          : (planLimits.storageUsedBytes / planLimits.storageLimitBytes) > 0.7
+                            ? 'bg-amber-500'
+                            : 'bg-brand-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (planLimits.storageUsedBytes / planLimits.storageLimitBytes) * 100)}%` }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="h-2 rounded-full bg-green-400" style={{ width: '5%' }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Events usage with progress */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Events</p>
+                  <p className="text-xs text-gray-500">
+                    {planLimits.eventCount}
+                    {' / '}
+                    {planLimits.maxEvents === 0 ? 'Unlimited' : planLimits.maxEvents}
+                    {planLimits.customOverrides.events && (
+                      <span className="ml-1 text-amber-600" title="Custom override">(custom)</span>
+                    )}
+                  </p>
+                </div>
+                {planLimits.maxEvents > 0 ? (
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        planLimits.eventCount >= planLimits.maxEvents
+                          ? 'bg-red-500'
+                          : (planLimits.eventCount / planLimits.maxEvents) > 0.7
+                            ? 'bg-amber-500'
+                            : 'bg-brand-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (planLimits.eventCount / planLimits.maxEvents) * 100)}%` }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="h-2 rounded-full bg-green-400" style={{ width: '5%' }} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Feature flags */}
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1.5">Features</p>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(planLimits.featureFlags).map(([key, value]) => (
+                  <span
+                    key={key}
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
+                      value
+                        ? 'bg-green-50 text-green-700 border border-green-200'
+                        : 'bg-gray-50 text-gray-400 border border-gray-200'
+                    }`}
+                  >
+                    {value ? '\u2713' : '\u2717'}{' '}
+                    {key.replace(/_/g, ' ')}
+                    {planLimits.customOverrides.features && (
+                      <span className="ml-0.5 text-amber-600">*</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">Storage Used</p>
             <p className="text-sm font-semibold text-gray-900 mt-0.5">{formatBytes(user.storage_used_bytes)}</p>

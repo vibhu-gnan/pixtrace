@@ -38,3 +38,12 @@ next-env.d.ts
 # drizzle
 drizzle/
 nul
+
+# python cache
+__pycache__/
+
+# claude code worktrees
+.claude/worktrees/
+
+# research / scratch
+not important/

@@ -201,8 +201,13 @@ function MasonryThumbnail({
     const [loaded, setLoaded] = useState(false);
     const [imgSrc, setImgSrc] = useState(item.preview_url || item.original_url);
     const refreshAttempted = useRef(false);
+    const retryCount = useRef(0);
+    const MAX_RETRIES = 3;
 
     const handleImageError = () => {
+        retryCount.current++;
+        if (retryCount.current > MAX_RETRIES) return; // Stop retrying — image is broken
+
         // Fallback chain: preview → original → server refresh
         if (imgSrc !== item.original_url && item.original_url) {
             setImgSrc(item.original_url);
@@ -214,7 +219,7 @@ function MasonryThumbnail({
                     const freshUrl = urls.thumbnail || urls.preview || urls.original;
                     if (freshUrl) setImgSrc(freshUrl);
                 }
-            });
+            }).catch(() => { /* URL refresh failed, image stays broken */ });
         }
     };
 

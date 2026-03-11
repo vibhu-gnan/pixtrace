@@ -1,6 +1,7 @@
-import { getAdminStats } from '@/actions/admin';
+import { getAdminStats, getStorageMaintenanceStats } from '@/actions/admin';
 import { StatsCard } from '@/components/admin/stats-card';
 import { StatusBadge } from '@/components/admin/status-badge';
+import { StorageMaintenanceSection } from '@/components/admin/storage-maintenance';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -78,7 +79,10 @@ const FACE_JOB_COLORS: Record<string, string> = {
 };
 
 export default async function AdminOverviewPage() {
-  const stats = await getAdminStats();
+  const [stats, storageStats] = await Promise.all([
+    getAdminStats(),
+    getStorageMaintenanceStats(),
+  ]);
 
   const totalFaceJobs = Object.values(stats.faceJobCounts).reduce((a, b) => a + b, 0);
 
@@ -228,6 +232,9 @@ export default async function AdminOverviewPage() {
           )}
         </div>
       </div>
+
+      {/* Row 5: Storage Maintenance */}
+      <StorageMaintenanceSection initialTrackedOrphanCount={storageStats.trackedOrphanCount} />
     </div>
   );
 }

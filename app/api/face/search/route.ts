@@ -64,14 +64,31 @@ export async function POST(request: NextRequest) {
     const selfieBuffer = await selfie.arrayBuffer();
     const selfieBase64 = Buffer.from(selfieBuffer).toString('base64');
 
-    const embedResp = await fetch(embedSelfieUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image_base64: selfieBase64,
-        secret: process.env.FACE_PROCESSING_SECRET,
-      }),
-    });
+    // 30s timeout — covers Modal cold starts without holding the function forever
+    const modalAbort = new AbortController();
+    const modalTimeout = setTimeout(() => modalAbort.abort(), 30000);
+
+    let embedResp: Response;
+    try {
+      embedResp = await fetch(embedSelfieUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_base64: selfieBase64,
+          secret: process.env.FACE_PROCESSING_SECRET,
+        }),
+        signal: modalAbort.signal,
+      });
+    } catch (err) {
+      clearTimeout(modalTimeout);
+      const isTimeout = (err as Error).name === 'AbortError';
+      console.error('Modal embed_selfie fetch failed:', isTimeout ? 'timeout (30s)' : err);
+      return NextResponse.json(
+        { error: isTimeout ? 'Face search timed out. Please try again.' : 'Face processing service unavailable' },
+        { status: isTimeout ? 504 : 503 },
+      );
+    }
+    clearTimeout(modalTimeout);
 
     const embedResult = await embedResp.json().catch(() => null);
 
@@ -191,16 +208,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch media details
+    // Fetch media details (album filter pushed to SQL to avoid fetching unnecessary rows)
     const mediaIds = allMatches.map(m => m.mediaId);
     let mediaQuery = adminClient
       .from('media')
       .select('id, album_id, r2_key, preview_r2_key, width, height')
       .in('id', mediaIds);
 
-    const { data: mediaItems } = await mediaQuery;
+    if (albumId) {
+      mediaQuery = mediaQuery.eq('album_id', albumId);
+    }
 
-    if (!mediaItems) {
+    const { data: filteredMedia } = await mediaQuery;
+
+    if (!filteredMedia) {
       return NextResponse.json({
         tier1: [],
         tier2: [],
@@ -208,11 +229,6 @@ export async function POST(request: NextRequest) {
         search_time_ms: Date.now() - startTime,
       });
     }
-
-    // Apply album filter if provided
-    const filteredMedia = albumId
-      ? mediaItems.filter(m => m.album_id === albumId)
-      : mediaItems;
 
     const mediaMap = new Map(filteredMedia.map(m => [m.id, m]));
 

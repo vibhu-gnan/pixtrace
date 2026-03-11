@@ -4,6 +4,7 @@ import { getPublicClient } from '@/lib/supabase/public';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUser } from '@/lib/auth';
 import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+import { getOrganizerPlanLimits, hasFeature } from '@/lib/plans/limits';
 
 export interface HeroSlide {
     url: string;
@@ -135,6 +136,23 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
 
     if (eventError || !event) {
         return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first' };
+    }
+
+    // Defense-in-depth: enforce plan feature flags on gallery render.
+    // If organizer's plan doesn't include downloads, override event's allow_download.
+    // This handles the case where a user had downloads enabled then downgraded.
+    if (event.allow_download) {
+        try {
+            const organizerId = (event as any).organizer_id;
+            if (organizerId) {
+                const limits = await getOrganizerPlanLimits(organizerId);
+                if (!hasFeature(limits, 'downloads')) {
+                    event.allow_download = false;
+                }
+            }
+        } catch {
+            // Non-critical — don't break gallery render if plan check fails
+        }
     }
 
     // 2-4. Fetch albums, count, and first page of media in parallel (3 independent queries)

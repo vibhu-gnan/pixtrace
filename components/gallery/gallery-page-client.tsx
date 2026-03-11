@@ -8,9 +8,11 @@ import type { GalleryMediaItem } from '@/actions/gallery';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
 import { FaceSearchToggle } from './face-search-toggle';
+import { FaceSearchStatusPill } from './face-search-status-pill';
 import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
 import { useFaceProfile } from '@/lib/face/use-face-profile';
-import type { FaceSearchResult, FaceSearchResults } from '@/lib/face/use-face-search';
+import { useFaceSearch } from '@/lib/face/use-face-search';
+import type { FaceSearchResult } from '@/lib/face/use-face-search';
 
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
@@ -60,14 +62,25 @@ export function GalleryPageClient({
     const [error, setError] = useState('');
     const [revoked, setRevoked] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [faceSearchOpen, setFaceSearchOpen] = useState(false);
+    const [selfieModalOpen, setSelfieModalOpen] = useState(false);
     const [faceSearchResults, setFaceSearchResults] = useState<FaceSearchResult[] | null>(null);
     const [faceSearchActive, setFaceSearchActive] = useState(false);
     const faceSearchActiveRef = useRef(false);
+    const selfieBlobRef = useRef<Blob | null>(null);
 
     // Auth + face profile state
     const { user, accessToken, loading: authLoading } = useGalleryAuth();
     const { hasProfile, loading: recalling, recallResults, checkProfile, runRecall } = useFaceProfile(eventHash, accessToken);
+
+    // Background face search hook — runs after selfie capture
+    const {
+        state: searchState,
+        results: searchResults,
+        error: searchError,
+        isSelfieQualityError,
+        search: runSearch,
+        reset: resetSearch,
+    } = useFaceSearch(eventHash, accessToken);
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const loadingRef = useRef(false);
@@ -78,6 +91,7 @@ export function GalleryPageClient({
     const activeAlbumRef = useRef<string | null>(null);
     const loadMoreRef = useRef<(() => void) | null>(null);
     const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const consecutiveEmptyLoads = useRef(0); // Guard against infinite retry loops
 
     // Pre-compute album name map to pass to server action (avoids re-querying albums per scroll page)
     const albumNamesRef = useRef<Record<string, string>>(
@@ -136,18 +150,52 @@ export function GalleryPageClient({
         return mapped;
     }, [faceSearchActive, faceSearchResults, media, activeAlbum, albums]);
 
-    // Face search result handlers
-    const handleFaceSearchResults = useCallback((results: FaceSearchResults) => {
-        const allResults = [...results.tier1, ...results.tier2];
-        setFaceSearchResults(allResults);
+    // ── Background search completion → cache results (user taps pill to activate) ──
+    useEffect(() => {
+        if (searchState === 'results' && searchResults && searchResults.totalMatches > 0) {
+            const allResults = [...searchResults.tier1, ...searchResults.tier2];
+            setFaceSearchResults(allResults);
+        }
+    }, [searchState, searchResults]);
+
+    // ── Selfie confirmed → close modal, start background search ──
+    const handleSelfieConfirmed = useCallback((blob: Blob) => {
+        selfieBlobRef.current = blob;
+        setSelfieModalOpen(false);
+        runSearch(blob);
+    }, [runSearch]);
+
+    // ── User taps the "Found N photos" pill → activate Mine mode ──
+    const handleViewSearchResults = useCallback(() => {
         setFaceSearchActive(true);
         faceSearchActiveRef.current = true;
-        setFaceSearchOpen(false);
         if (!albumOnly) setActiveAlbum(null);
+        resetSearch(); // Hide pill
         setTimeout(() => {
             document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
-    }, []);
+    }, [albumOnly, resetSearch]);
+
+    // ── Error retry from pill ──
+    const handleSearchRetry = useCallback(() => {
+        if (isSelfieQualityError) {
+            // Bad selfie — need a new one
+            resetSearch();
+            setSelfieModalOpen(true);
+        } else if (selfieBlobRef.current) {
+            // Network/timeout error — resubmit same blob
+            runSearch(selfieBlobRef.current);
+        } else {
+            // No cached blob — need new selfie
+            resetSearch();
+            setSelfieModalOpen(true);
+        }
+    }, [isSelfieQualityError, runSearch, resetSearch]);
+
+    // ── Dismiss pill (cancel if searching) ──
+    const handleSearchDismiss = useCallback(() => {
+        resetSearch();
+    }, [resetSearch]);
 
     const handleDismissFaceSearch = useCallback(() => {
         setFaceSearchActive(false);
@@ -171,8 +219,8 @@ export function GalleryPageClient({
                 document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
         } else {
-            // Open selfie modal directly — no auth required
-            setFaceSearchOpen(true);
+            // Open selfie modal — no auth required
+            setSelfieModalOpen(true);
         }
     }, [faceSearchActive, faceSearchResults, handleDismissFaceSearch, albumOnly]);
 
@@ -181,8 +229,9 @@ export function GalleryPageClient({
         setFaceSearchActive(false);
         faceSearchActiveRef.current = false;
         setFaceSearchResults(null);
-        setFaceSearchOpen(true);
-    }, []);
+        resetSearch();
+        setSelfieModalOpen(true);
+    }, [resetSearch]);
 
 
     // Track gallery view — fire exactly once, guarded against StrictMode double-mount
@@ -229,6 +278,7 @@ export function GalleryPageClient({
         }
         // Cancel any pending retry from the previous album
         if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+        consecutiveEmptyLoads.current = 0;
         if (activeAlbum === null) {
             setMedia(initialMedia);
             mediaRef.current = initialMedia;
@@ -265,9 +315,13 @@ export function GalleryPageClient({
 
     // Schedule a retry if sentinel is still visible after load completes.
     // Clears any pending retry first to avoid stacking.
+    // Max 5 consecutive retries that add zero new items — prevents infinite loop
+    // if server keeps returning hasMore:true but deduplication filters everything.
+    const MAX_CONSECUTIVE_EMPTY = 5;
     const scheduleRetryIfNeeded = useCallback(() => {
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         if (!hasMoreRef.current) return;
+        if (consecutiveEmptyLoads.current >= MAX_CONSECUTIVE_EMPTY) return;
         // Wait a tick for React to flush the new media into the DOM,
         // then check if the sentinel is still in/near the viewport.
         retryTimerRef.current = setTimeout(() => {
@@ -301,6 +355,12 @@ export function GalleryPageClient({
             setMedia((prev) => {
                 const existingIds = new Set(prev.map((m) => m.id));
                 const unique = newMedia.filter((m) => !existingIds.has(m.id));
+                // Track consecutive loads that add zero new items (infinite-loop guard)
+                if (unique.length === 0) {
+                    consecutiveEmptyLoads.current++;
+                } else {
+                    consecutiveEmptyLoads.current = 0;
+                }
                 const next = [...prev, ...unique];
                 // Sync ref immediately so next loadMore sees latest media
                 mediaRef.current = next;
@@ -631,8 +691,20 @@ export function GalleryPageClient({
                 </div>
             )}
 
-            {/* ── ALL / Mine Toggle (floating, always visible) ── */}
-            {!revoked && media.length > 0 && faceSearchEnabled && (
+            {/* ── Background Face Search Status Pill ── */}
+            {searchState !== 'idle' && (
+                <FaceSearchStatusPill
+                    state={searchState}
+                    matchCount={searchResults?.totalMatches ?? 0}
+                    errorMessage={searchError}
+                    onViewResults={handleViewSearchResults}
+                    onRetry={handleSearchRetry}
+                    onDismiss={handleSearchDismiss}
+                />
+            )}
+
+            {/* ── ALL / Mine Toggle (hidden when status pill is showing) ── */}
+            {!revoked && media.length > 0 && faceSearchEnabled && searchState === 'idle' && (
                 <FaceSearchToggle
                     active={faceSearchActive}
                     hasSearched={faceSearchResults !== null && faceSearchResults.length > 0}
@@ -656,13 +728,11 @@ export function GalleryPageClient({
                 />
             )}
 
-            {/* Face Search Modal — selfie capture + confirm + loading */}
-            {faceSearchOpen && (
+            {/* Selfie Capture Modal — camera only, search runs in background */}
+            {selfieModalOpen && (
                 <FaceSearchModal
-                    eventHash={eventHash}
-                    accessToken={accessToken}
-                    onResults={handleFaceSearchResults}
-                    onClose={() => setFaceSearchOpen(false)}
+                    onSelfieConfirmed={handleSelfieConfirmed}
+                    onClose={() => setSelfieModalOpen(false)}
                 />
             )}
 

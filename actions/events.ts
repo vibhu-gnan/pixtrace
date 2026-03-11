@@ -6,7 +6,7 @@ import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { nanoid } from 'nanoid';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
-import { getOrganizerPlanLimits, canCreateEvent } from '@/lib/plans/limits';
+import { getOrganizerPlanLimits, canCreateEvent, hasFeature } from '@/lib/plans/limits';
 import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
 
 export interface EventData {
@@ -148,20 +148,31 @@ export async function getEvents(): Promise<EventData[]> {
 
   if (!events || events.length === 0) return [];
 
-  // Fetch media counts + cover URLs in parallel
-  const [mediaCounts, coverUrlMap] = await Promise.all([
-    Promise.all(
-      events.map((event: any) =>
-        supabase
-          .from('media')
-          .select('id', { count: 'exact', head: true })
-          .eq('event_id', event.id)
-          .then(({ count }) => ({ id: event.id, count: count || 0 }))
-      )
-    ),
+  // Batch fetch media counts + cover URLs in parallel (avoids N+1)
+  // Use RPC or per-event HEAD counts in controlled batches (max 10 concurrent)
+  const MAX_CONCURRENT = 10;
+  const countMap: Record<string, number> = {};
+
+  const [, coverUrlMap] = await Promise.all([
+    (async () => {
+      for (let i = 0; i < events.length; i += MAX_CONCURRENT) {
+        const batch = events.slice(i, i + MAX_CONCURRENT);
+        const results = await Promise.all(
+          batch.map((event: any) =>
+            supabase
+              .from('media')
+              .select('id', { count: 'exact', head: true })
+              .eq('event_id', event.id)
+              .then(({ count }) => ({ id: event.id, count: count || 0 }))
+          )
+        );
+        for (const { id, count } of results) {
+          countMap[id] = count;
+        }
+      }
+    })(),
     resolveCoverUrls(events, supabase),
   ]);
-  const countMap = Object.fromEntries(mediaCounts.map(({ id, count }) => [id, count]));
 
   return events.map((event: any) => ({
     ...event,
@@ -206,20 +217,30 @@ export async function getEventsPage(
   const hasMore = events.length > limit;
   const pageEvents = hasMore ? events.slice(0, limit) : events;
 
-  // Fetch media counts + cover URLs in parallel
-  const [mediaCounts, coverUrlMap] = await Promise.all([
-    Promise.all(
-      pageEvents.map((event: any) =>
-        supabase
-          .from('media')
-          .select('id', { count: 'exact', head: true })
-          .eq('event_id', event.id)
-          .then(({ count }) => ({ id: event.id, count: count || 0 }))
-      )
-    ),
+  // Batch fetch media counts + cover URLs in parallel (avoids N+1 with controlled concurrency)
+  const MAX_CONCURRENT = 10;
+  const countMap: Record<string, number> = {};
+
+  const [, coverUrlMap] = await Promise.all([
+    (async () => {
+      for (let i = 0; i < pageEvents.length; i += MAX_CONCURRENT) {
+        const batch = pageEvents.slice(i, i + MAX_CONCURRENT);
+        const results = await Promise.all(
+          batch.map((event: any) =>
+            supabase
+              .from('media')
+              .select('id', { count: 'exact', head: true })
+              .eq('event_id', event.id)
+              .then(({ count }) => ({ id: event.id, count: count || 0 }))
+          )
+        );
+        for (const { id, count } of results) {
+          countMap[id] = count;
+        }
+      }
+    })(),
     resolveCoverUrls(pageEvents, supabase),
   ]);
-  const countMap = Object.fromEntries(mediaCounts.map(({ id, count }) => [id, count]));
 
   return {
     events: pageEvents.map((event: any) => ({
@@ -320,26 +341,38 @@ export async function updateEventHero(eventId: string, payload: {
 
   const supabase = createAdminClient();
 
-  // Read current theme to merge hero config
+  // Verify ownership
   const { data: currentEvent } = await supabase
     .from('events')
-    .select('theme')
+    .select('id')
     .eq('id', eventId)
     .eq('organizer_id', organizer.id)
     .single();
 
   if (!currentEvent) return { error: 'Event not found' };
 
-  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
   const heroMode = payload.heroMode ?? 'single';
 
   // Build hero config
   const heroConfig: Record<string, unknown> = { mode: heroMode };
   if (heroMode === 'slideshow' && payload.slideshowMediaIds?.length) {
-    heroConfig.slideshowMediaIds = payload.slideshowMediaIds;
+    // Verify all media IDs belong to this event (prevent cross-event IDOR)
+    const { data: validMedia } = await supabase
+      .from('media')
+      .select('id')
+      .eq('event_id', eventId)
+      .in('id', payload.slideshowMediaIds);
+    const validIds = new Set((validMedia || []).map((m: any) => m.id));
+    heroConfig.slideshowMediaIds = payload.slideshowMediaIds.filter(id => validIds.has(id));
   }
   if (heroMode === 'slideshow' && payload.mobileSlideshowMediaIds?.length) {
-    heroConfig.mobileSlideshowMediaIds = payload.mobileSlideshowMediaIds;
+    const { data: validMobile } = await supabase
+      .from('media')
+      .select('id')
+      .eq('event_id', eventId)
+      .in('id', payload.mobileSlideshowMediaIds);
+    const validMobileIds = new Set((validMobile || []).map((m: any) => m.id));
+    heroConfig.mobileSlideshowMediaIds = payload.mobileSlideshowMediaIds.filter(id => validMobileIds.has(id));
   }
   if (payload.intervalMs) {
     heroConfig.intervalMs = payload.intervalMs;
@@ -350,20 +383,24 @@ export async function updateEventHero(eventId: string, payload: {
   if (heroMode === 'single') {
     coverMediaId = payload.coverMediaId ?? null;
   } else if (heroMode === 'slideshow' && payload.slideshowMediaIds?.length) {
-    // Use first slideshow photo as OG image fallback
     coverMediaId = payload.slideshowMediaIds[0];
   }
-  // auto mode: cover_media_id = null (uses first photo fallback)
 
-  const { error } = await supabase
-    .from('events')
-    .update({
-      cover_media_id: coverMediaId,
-      theme: { ...currentTheme, hero: heroConfig },
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id);
+  // Atomic theme merge + cover_media_id update in parallel
+  const [themeResult, coverResult] = await Promise.all([
+    supabase.rpc('merge_event_theme', {
+      p_event_id: eventId,
+      p_organizer_id: organizer.id,
+      p_theme_patch: { hero: heroConfig },
+    }),
+    supabase
+      .from('events')
+      .update({ cover_media_id: coverMediaId, updated_at: new Date().toISOString() })
+      .eq('id', eventId)
+      .eq('organizer_id', organizer.id),
+  ]);
+
+  const error = themeResult.error || coverResult.error;
 
   if (error) {
     console.error('Error updating event hero:', error);
@@ -516,6 +553,14 @@ export async function updateEventPermissions(eventId: string, payload: {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
 
+  // Check plan feature flags before allowing premium toggles
+  if (payload.allowDownload === true) {
+    const limits = await getOrganizerPlanLimits(organizer.id);
+    if (!hasFeature(limits, 'downloads')) {
+      return { error: `Downloads are not available on your ${limits.planName} plan. Upgrade to enable downloads.` };
+    }
+  }
+
   const supabase = createAdminClient();
 
   // Create update object with only defined fields
@@ -590,35 +635,29 @@ export async function updateEventPhotoOrder(eventId: string, order: 'oldest_firs
 
   const supabase = createAdminClient();
 
-  const { data: currentEvent } = await supabase
-    .from('events')
-    .select('theme, event_hash')
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id)
-    .single();
-
-  if (!currentEvent) return { error: 'Event not found' };
-
-  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
-
-  const { error } = await supabase
-    .from('events')
-    .update({
-      theme: { ...currentTheme, photo_order: safeOrder },
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id);
+  // Atomic merge — no read-then-write race condition
+  const { error } = await supabase.rpc('merge_event_theme', {
+    p_event_id: eventId,
+    p_organizer_id: organizer.id,
+    p_theme_patch: { photo_order: safeOrder },
+  });
 
   if (error) {
     console.error('Error updating photo order:', error);
     return { error: 'Failed to update photo order' };
   }
 
+  // Get event_hash for revalidation
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
   revalidatePath(`/events/${eventId}/permissions`);
-  if (currentEvent.event_hash) {
-    revalidatePath(`/gallery/${currentEvent.event_hash}`);
-    revalidatePath(`/${currentEvent.event_hash}`);
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
   }
 
   return { success: true };
@@ -628,33 +667,38 @@ export async function updateEventLogo(eventId: string, logoUrl: string | null) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
 
+  // Check plan feature flag — setting a logo requires custom_branding
+  if (logoUrl) {
+    const limits = await getOrganizerPlanLimits(organizer.id);
+    if (!hasFeature(limits, 'custom_branding')) {
+      return { error: `Custom branding is not available on your ${limits.planName} plan. Upgrade to add a logo.` };
+    }
+  }
+
+  // Validate URL scheme — only allow https: or R2 keys (no protocol)
+  if (logoUrl) {
+    const isAbsoluteUrl = logoUrl.startsWith('http://') || logoUrl.startsWith('https://');
+    if (isAbsoluteUrl && !logoUrl.startsWith('https://')) {
+      return { error: 'Logo URL must use HTTPS' };
+    }
+    // Block dangerous schemes (javascript:, data:, etc.)
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(logoUrl) && !isAbsoluteUrl) {
+      return { error: 'Invalid logo URL' };
+    }
+  }
+
   const supabase = createAdminClient();
 
-  // Read current theme to avoid overwriting other keys
-  const { data: currentEvent } = await supabase
-    .from('events')
-    .select('theme')
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id)
-    .single();
+  // Atomic merge — when removing logo, also reset logoDisplay to 'none'
+  const patch = logoUrl
+    ? { logoUrl }
+    : { logoUrl: null, logoDisplay: 'none' };
 
-  if (!currentEvent) return { error: 'Event not found' };
-
-  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
-
-  // When removing logo, also reset logoDisplay to 'none'
-  const updatedTheme = logoUrl
-    ? { ...currentTheme, logoUrl }
-    : { ...currentTheme, logoUrl, logoDisplay: 'none' };
-
-  const { error } = await supabase
-    .from('events')
-    .update({
-      theme: updatedTheme,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id);
+  const { error } = await supabase.rpc('merge_event_theme', {
+    p_event_id: eventId,
+    p_organizer_id: organizer.id,
+    p_theme_patch: patch,
+  });
 
   if (error) {
     console.error('Error updating event logo:', error);
@@ -691,36 +735,28 @@ export async function updateEventLogoDisplay(eventId: string, logoDisplay: strin
 
   const supabase = createAdminClient();
 
-  // Read current theme
-  const { data: currentEvent } = await supabase
-    .from('events')
-    .select('theme, event_hash')
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id)
-    .single();
-
-  if (!currentEvent) return { error: 'Event not found' };
-
-  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
-
-  const { error } = await supabase
-    .from('events')
-    .update({
-      theme: { ...currentTheme, logoDisplay },
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id);
+  // Atomic merge — no read-then-write race condition
+  const { error } = await supabase.rpc('merge_event_theme', {
+    p_event_id: eventId,
+    p_organizer_id: organizer.id,
+    p_theme_patch: { logoDisplay },
+  });
 
   if (error) {
     console.error('Error updating logo display:', error);
     return { error: 'Failed to update logo display' };
   }
 
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
   revalidatePath(`/events/${eventId}`);
-  if (currentEvent.event_hash) {
-    revalidatePath(`/gallery/${currentEvent.event_hash}`);
-    revalidatePath(`/${currentEvent.event_hash}`);
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
   }
 
   return { success: true };
@@ -728,27 +764,40 @@ export async function updateEventLogoDisplay(eventId: string, logoDisplay: strin
 
 const MAX_PRELOADER_SIZE = 51200; // 50KB
 
-// Sanitize HTML to prevent stored XSS — strip <script>, event handlers, and dangerous elements
+// Sanitize HTML to prevent stored XSS — strip dangerous tags, attributes, and protocols.
+// Uses layered regex approach (safe for Node.js server actions without DOM dependencies).
 function sanitizePreloaderHtml(html: string): string {
   return html
-    // Remove all script tags and their content
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    // Remove event handler attributes (onclick, onload, onerror, etc.)
-    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    // Remove javascript: protocol in href/src/action attributes
-    .replace(/(href|src|action)\s*=\s*(?:"javascript:[^"]*"|'javascript:[^']*')/gi, '$1=""')
-    // Remove data: protocol in src (can embed scripts)
-    .replace(/src\s*=\s*(?:"data:[^"]*"|'data:[^']*')/gi, 'src=""')
-    // Remove <iframe>, <object>, <embed>, <form>, <meta> tags
-    .replace(/<\/?(iframe|object|embed|form|meta|link|base)\b[^>]*>/gi, '')
-    // Remove style expressions (IE) and -moz-binding
-    .replace(/expression\s*\(/gi, '')
-    .replace(/-moz-binding\s*:/gi, '');
+    // 1. Remove <script> tags and their content (including nested/malformed/unclosed)
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script\s*>/gi, '')
+    // 1b. Remove any remaining <script> opening tags (unclosed script tags)
+    .replace(/<script\b[^>]*>/gi, '')
+    // 2. Remove ALL event handler attributes — match on\w+ with any quote style or unquoted
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    // 3. Remove javascript:/data:/vbscript: in href/src/action/xlink:href/formaction attrs
+    .replace(/(href|src|action|xlink:href|formaction)\s*=\s*(?:"(?:javascript|data|vbscript)\s*:[^"]*"|'(?:javascript|data|vbscript)\s*:[^']*')/gi, '$1=""')
+    // 4. Remove dangerous tags: iframe, object, embed, form, meta, link, base, applet, template
+    .replace(/<\/?(iframe|object|embed|form|meta|link|base|applet|template)\b[^>]*>/gi, '')
+    // 5. Remove <svg> event attributes that bypass on* filtering (set/animate onbegin etc.)
+    .replace(/<(set|animate\w*)\b[^>]*\bon\w+[^>]*>/gi, '')
+    // 6. Remove style expressions (IE) and -moz-binding (Firefox)
+    .replace(/expression\s*\(/gi, 'blocked(')
+    .replace(/-moz-binding\s*:/gi, '-blocked:')
+    // 7. Remove url() in style attributes pointing to javascript:/data:
+    .replace(/url\s*\(\s*(?:"|')?(?:javascript|data)\s*:/gi, 'url(blocked:');
 }
 
 export async function updateEventCustomPreloader(eventId: string, html: string | null) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
+
+  // Check plan feature flag — custom preloader requires custom_branding
+  if (html) {
+    const limits = await getOrganizerPlanLimits(organizer.id);
+    if (!hasFeature(limits, 'custom_branding')) {
+      return { error: `Custom branding is not available on your ${limits.planName} plan. Upgrade to use custom preloaders.` };
+    }
+  }
 
   // Validate size
   if (html && html.length > MAX_PRELOADER_SIZE) {
@@ -760,40 +809,28 @@ export async function updateEventCustomPreloader(eventId: string, html: string |
 
   const supabase = createAdminClient();
 
-  const { data: currentEvent } = await supabase
-    .from('events')
-    .select('theme, event_hash')
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id)
-    .single();
-
-  if (!currentEvent) return { error: 'Event not found' };
-
-  const currentTheme = (currentEvent.theme as Record<string, unknown>) || {};
-
-  // Set or clear the custom preloader
-  const updatedTheme = sanitizedHtml
-    ? { ...currentTheme, customPreloader: sanitizedHtml }
-    : { ...currentTheme, customPreloader: undefined };
-
-  const { error } = await supabase
-    .from('events')
-    .update({
-      theme: updatedTheme,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', eventId)
-    .eq('organizer_id', organizer.id);
+  // Atomic merge — set or clear the custom preloader
+  const { error } = await supabase.rpc('merge_event_theme', {
+    p_event_id: eventId,
+    p_organizer_id: organizer.id,
+    p_theme_patch: { customPreloader: sanitizedHtml },
+  });
 
   if (error) {
     console.error('Error updating custom preloader:', error);
     return { error: 'Failed to update custom preloader' };
   }
 
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
   revalidatePath(`/events/${eventId}`);
-  if (currentEvent.event_hash) {
-    revalidatePath(`/gallery/${currentEvent.event_hash}`);
-    revalidatePath(`/${currentEvent.event_hash}`);
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
   }
 
   return { success: true };

@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const { searchParams } = new URL(request.url);
     const hash = searchParams.get('hash');
 
-    if (!hash || hash.length > 32) {
+    if (!hash || hash.length < 6 || hash.length > 32 || !/^[a-zA-Z0-9_-]+$/.test(hash)) {
         return NextResponse.json({ ok: false }, { status: 400 });
     }
 

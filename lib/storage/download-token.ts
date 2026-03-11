@@ -13,12 +13,19 @@ import crypto from 'crypto';
 
 const TOKEN_TTL_SECONDS = 4 * 60 * 60; // 4 hours (matches presigned URL TTL)
 
+let _secretWarningLogged = false;
+
 function getSecret(): string {
   const secret = process.env.DOWNLOAD_TOKEN_SECRET;
   if (secret && secret.length >= 32) return secret;
 
   // Fallback: derive from existing secrets so deployment doesn't break
   // if DOWNLOAD_TOKEN_SECRET isn't set yet. This is deterministic per env.
+  if (!_secretWarningLogged) {
+    const level = process.env.NODE_ENV === 'production' ? 'error' : 'warn';
+    console[level]('[Security] DOWNLOAD_TOKEN_SECRET not set or too short (<32 chars). Using derived fallback. Set a dedicated 32+ char random secret in production.');
+    _secretWarningLogged = true;
+  }
   const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.R2_SECRET_ACCESS_KEY;
   if (!fallback) {
     throw new Error('DOWNLOAD_TOKEN_SECRET (or SUPABASE_SERVICE_ROLE_KEY) must be set');

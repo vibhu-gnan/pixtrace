@@ -31,7 +31,9 @@ function l2Normalize(vec: number[]): number[] {
  * Compute the mean of multiple vectors, then L2-normalize.
  */
 function buildPrototype(embeddings: number[][]): number[] {
+  if (embeddings.length === 0) return [];
   const dim = embeddings[0].length;
+  if (dim === 0) return [];
   const mean = new Array(dim).fill(0);
   for (const emb of embeddings) {
     for (let i = 0; i < dim; i++) mean[i] += emb[i];
@@ -52,9 +54,16 @@ function toPgVector(embedding: number[]): string {
  * Supabase returns vector columns as strings, not arrays.
  */
 function parseEmbedding(raw: unknown): number[] {
-  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw) && raw.every(x => typeof x === 'number')) return raw;
   if (typeof raw === 'string') {
-    return JSON.parse(raw);
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((x: unknown) => typeof x === 'number')) {
+        return parsed;
+      }
+    } catch {
+      console.error('[FaceSearch] Failed to parse embedding string');
+    }
   }
   return [];
 }

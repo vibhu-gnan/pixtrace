@@ -13,31 +13,37 @@ const W = 1080;
 const H = 1920;
 const PADDING = 40;
 
-export async function generateStoryCard(options: StoryCardOptions): Promise<Blob> {
-  const photo = await loadImageFromUrl(options.photoUrl, options.photoR2Key);
-  const logo = options.logoUrl ? await loadImageFromUrl(options.logoUrl).catch(() => null) : null;
+export async function generateStoryCard(options: StoryCardOptions, signal?: AbortSignal): Promise<Blob> {
+  const photo = await loadImageFromUrl(options.photoUrl, options.photoR2Key, signal);
+  const logo = options.logoUrl ? await loadImageFromUrl(options.logoUrl, undefined, signal).catch(() => null) : null;
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  switch (options.template) {
-    case 'full-bleed':
-      renderFullBleed(ctx, photo, logo, options);
-      break;
-    case 'polaroid':
-      renderPolaroid(ctx, photo, logo, options);
-      break;
-    case 'immersive':
-      renderImmersive(ctx, photo, logo, options);
-      break;
-    case 'glass-frame':
-      renderGlassFrame(ctx, photo, logo, options);
-      break;
-  }
+  try {
+    switch (options.template) {
+      case 'full-bleed':
+        renderFullBleed(ctx, photo, logo, options);
+        break;
+      case 'polaroid':
+        renderPolaroid(ctx, photo, logo, options);
+        break;
+      case 'immersive':
+        renderImmersive(ctx, photo, logo, options);
+        break;
+      case 'glass-frame':
+        renderGlassFrame(ctx, photo, logo, options);
+        break;
+    }
 
-  return canvasToPNG(canvas);
+    return await canvasToPNG(canvas);
+  } finally {
+    // Release the ~8MB pixel buffer immediately
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 // ─── Template Renderers ──────────────────────────────────────
@@ -319,24 +325,34 @@ function renderGlassFrame(
 
 // ─── Shared Utilities ────────────────────────────────────────
 
-async function loadImageFromUrl(url: string, r2Key?: string): Promise<HTMLImageElement> {
+async function loadImageFromUrl(url: string, r2Key?: string, signal?: AbortSignal): Promise<HTMLImageElement> {
   // Proxy R2 images through our API to avoid CORS issues with canvas
   const fetchUrl = r2Key
     ? `/api/proxy-image?r2Key=${encodeURIComponent(r2Key)}`
     : url;
 
-  const res = await fetch(fetchUrl);
+  const res = await fetch(fetchUrl, { signal });
   if (!res.ok) throw new Error(`Failed to fetch image: ${url}`);
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);
 
   return new Promise((resolve, reject) => {
+    // Clean up if aborted while decoding
+    const onAbort = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new DOMException('Image load aborted', 'AbortError'));
+    };
+    if (signal?.aborted) { onAbort(); return; }
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     const img = new Image();
     img.onload = () => {
+      signal?.removeEventListener('abort', onAbort);
       URL.revokeObjectURL(objectUrl);
       resolve(img);
     };
     img.onerror = () => {
+      signal?.removeEventListener('abort', onAbort);
       URL.revokeObjectURL(objectUrl);
       reject(new Error(`Failed to decode image: ${url}`));
     };
@@ -448,6 +464,7 @@ function drawWrappedText(
   maxWidth: number,
   lineHeight: number,
 ) {
+  const MAX_LINES = 6; // Prevent excessive lines from extremely long text
   const words = text.split(' ');
   let line = '';
   const lines: string[] = [];
@@ -456,12 +473,13 @@ function drawWrappedText(
     const testLine = line ? `${line} ${word}` : word;
     if (ctx.measureText(testLine).width > maxWidth && line) {
       lines.push(line);
+      if (lines.length >= MAX_LINES) break;
       line = word;
     } else {
       line = testLine;
     }
   }
-  if (line) lines.push(line);
+  if (line && lines.length < MAX_LINES) lines.push(line);
 
   // Draw from bottom up so startY is the bottom of the text block
   const totalHeight = (lines.length - 1) * lineHeight;

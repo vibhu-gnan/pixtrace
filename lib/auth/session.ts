@@ -11,6 +11,9 @@ export interface OrganizerProfile {
   razorpay_customer_id: string | null;
   storage_used_bytes: number;
   is_admin: boolean;
+  custom_storage_limit_bytes: number | null;
+  custom_max_events: number | null;
+  custom_feature_flags: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
