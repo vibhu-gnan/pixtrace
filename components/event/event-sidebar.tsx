@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import * as Progress from '@radix-ui/react-progress';
+import type { PlanLimits } from '@/lib/plans/limits';
 
 // ─── SVG Icons ───────────────────────────────────────────────
 
@@ -63,14 +64,25 @@ function ArrowLeftIcon({ className }: { className?: string }) {
 
 // ─── Sidebar Component ──────────────────────────────────────
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const gb = bytes / (1024 ** 3);
+  if (gb >= 1) return `${gb.toFixed(1)}GB`;
+  const mb = bytes / (1024 ** 2);
+  if (mb >= 1) return `${mb.toFixed(0)}MB`;
+  const kb = bytes / 1024;
+  return `${kb.toFixed(0)}KB`;
+}
+
 interface EventSidebarProps {
   eventId: string;
   open: boolean;
   onClose: () => void;
   coverPreviewUrl: string | null;
+  planLimits: PlanLimits | null;
 }
 
-export function EventSidebar({ eventId, open, onClose, coverPreviewUrl }: EventSidebarProps) {
+export function EventSidebar({ eventId, open, onClose, coverPreviewUrl, planLimits }: EventSidebarProps) {
   const pathname = usePathname();
 
   const navItems = [
@@ -156,27 +168,53 @@ export function EventSidebar({ eventId, open, onClose, coverPreviewUrl }: EventS
       </nav>
 
       {/* Storage Card */}
-      <div className="px-4 pb-4">
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Storage</span>
-            <span className="text-xs font-bold text-brand-500">75%</span>
+      {planLimits && (() => {
+        const isUnlimited = planLimits.storageLimitBytes === 0;
+        const storagePercent = isUnlimited
+          ? 0
+          : Math.min(100, Math.round((planLimits.storageUsedBytes / planLimits.storageLimitBytes) * 100));
+        const usedDisplay = formatBytes(planLimits.storageUsedBytes);
+        const limitDisplay = isUnlimited ? 'Unlimited' : formatBytes(planLimits.storageLimitBytes);
+
+        return (
+          <div className="px-4 pb-4">
+            <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Storage</span>
+                {!isUnlimited && (
+                  <span className={`text-xs font-bold ${storagePercent >= 90 ? 'text-red-500' : 'text-brand-500'}`}>
+                    {storagePercent}%
+                  </span>
+                )}
+              </div>
+              {!isUnlimited && (
+                <Progress.Root
+                  className="relative overflow-hidden bg-gray-100 rounded-full w-full h-2"
+                  value={storagePercent}
+                >
+                  <Progress.Indicator
+                    className={`h-full rounded-full transition-transform duration-500 ${storagePercent >= 90 ? 'bg-red-500' : 'bg-brand-500'}`}
+                    style={{ width: `${storagePercent}%` }}
+                  />
+                </Progress.Root>
+              )}
+              <p className="text-[11px] text-gray-400 mt-2">{usedDisplay} of {limitDisplay} used</p>
+              {planLimits.planId !== 'enterprise' && (
+                <Link
+                  href="/pricing"
+                  className={`block w-full mt-3 text-xs font-medium text-center rounded-lg py-2 transition-colors ${
+                    !isUnlimited && storagePercent >= 90
+                      ? 'bg-blue-600 text-white hover:bg-blue-500'
+                      : 'text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {planLimits.planId === 'free' ? 'Upgrade Plan' : 'Change Plan'}
+                </Link>
+              )}
+            </div>
           </div>
-          <Progress.Root
-            className="relative overflow-hidden bg-gray-100 rounded-full w-full h-2"
-            value={75}
-          >
-            <Progress.Indicator
-              className="bg-brand-500 h-full rounded-full transition-transform duration-500"
-              style={{ width: '75%' }}
-            />
-          </Progress.Root>
-          <p className="text-[11px] text-gray-400 mt-2">15GB of 20GB used</p>
-          <button className="w-full mt-3 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">
-            Upgrade Plan
-          </button>
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 

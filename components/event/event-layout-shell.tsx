@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { EventData } from '@/actions/events';
+import type { PlanLimits } from '@/lib/plans/limits';
 import { EventSidebar } from './event-sidebar';
 import { EventTopBar } from './event-top-bar';
 import { Footer } from '@/components/dashboard/footer';
@@ -9,10 +10,11 @@ import { Footer } from '@/components/dashboard/footer';
 interface EventLayoutShellProps {
   event: EventData;
   coverPreviewUrl?: string | null;
+  planLimits?: PlanLimits | null;
   children: React.ReactNode;
 }
 
-export function EventLayoutShell({ event, coverPreviewUrl, children }: EventLayoutShellProps) {
+export function EventLayoutShell({ event, coverPreviewUrl, planLimits, children }: EventLayoutShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -23,6 +25,7 @@ export function EventLayoutShell({ event, coverPreviewUrl, children }: EventLayo
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         coverPreviewUrl={coverPreviewUrl ?? null}
+        planLimits={planLimits ?? null}
       />
 
       {/* Main content area */}
