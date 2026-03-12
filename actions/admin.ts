@@ -847,6 +847,47 @@ export async function retryFailedFaceJobs(jobIds: string[]) {
 }
 
 // ============================================================================
+// EMAIL LOGS
+// ============================================================================
+
+export async function getAdminEmailLogs({
+  page = 1,
+  status = '',
+  emailType = '',
+}: {
+  page?: number;
+  status?: string;
+  emailType?: string;
+} = {}) {
+  await requireAdmin();
+  const supabase = createAdminClient();
+  const { from, to, page: p } = paginate(page);
+
+  let query = supabase
+    .from('email_logs')
+    .select('*', { count: 'exact' });
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  if (emailType) {
+    query = query.eq('email_type', emailType);
+  }
+
+  const { data, count, error } = await query
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    console.error('getAdminEmailLogs error:', error);
+    return { logs: [], total: 0, page: p, pageSize: PAGE_SIZE };
+  }
+
+  return { logs: data || [], total: count || 0, page: p, pageSize: PAGE_SIZE };
+}
+
+// ============================================================================
 // STORAGE RECALCULATION
 // ============================================================================
 

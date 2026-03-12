@@ -117,6 +117,7 @@ async function sendWarningEmails(supabase: SupabaseClient): Promise<number> {
           deadlineDate,
           planName: plan?.name || 'Free',
         }),
+        emailType: 'storage_warning',
       });
 
       // Only mark as warned if email was actually sent — if it failed, retry next cron run
@@ -186,6 +187,7 @@ async function deleteExpiredContent(supabase: SupabaseClient) {
             limitDisplay: formatBytes(effectiveLimit),
             planName,
           }),
+          emailType: 'storage_deleted',
         }).catch((err) => {
           console.error(`[StorageCleanup] Post-deletion email failed for ${org.id}:`, err);
         });

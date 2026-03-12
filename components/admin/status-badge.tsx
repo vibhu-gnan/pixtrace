@@ -19,6 +19,9 @@ const STATUS_COLORS: Record<string, string> = {
   disputed:    'bg-red-100 text-red-700',
   no_faces:    'bg-red-100 text-red-700',
 
+  sent:        'bg-green-100 text-green-700',
+  skipped:     'bg-yellow-100 text-yellow-700',
+
   cancelled:   'bg-gray-100 text-gray-600',
   closed:      'bg-gray-100 text-gray-600',
   paused:      'bg-gray-100 text-gray-600',

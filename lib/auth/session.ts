@@ -66,7 +66,30 @@ export async function getCurrentOrganizer(): Promise<OrganizerProfile | null> {
     return null;
   }
 
+  // Fire-and-forget: send welcome email (don't block first page load)
+  sendWelcomeEmail(newOrganizer as OrganizerProfile).catch((err) => {
+    console.error('[WelcomeEmail] Failed:', err);
+  });
+
   return newOrganizer as OrganizerProfile;
+}
+
+async function sendWelcomeEmail(organizer: OrganizerProfile): Promise<void> {
+  const { sendEmail } = await import('@/lib/email/resend');
+  const { welcomeSubject, welcomeHtml } = await import(
+    '@/lib/email/templates/welcome'
+  );
+
+  const sent = await sendEmail({
+    to: organizer.email,
+    subject: welcomeSubject(),
+    html: welcomeHtml({ name: organizer.name }),
+    emailType: 'welcome',
+  });
+
+  if (sent) {
+    console.log(`[WelcomeEmail] Sent to ${organizer.email}`);
+  }
 }
 
 /**
