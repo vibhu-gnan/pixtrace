@@ -75,7 +75,7 @@ export function TestEmailSender() {
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="test@example.com"
-            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+            className="w-full px-3 py-2 text-sm text-gray-900 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
             maxLength={320}
             autoComplete="email"
           />
@@ -91,7 +91,7 @@ export function TestEmailSender() {
             id="test-template"
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
+            className="w-full px-3 py-2 text-sm text-gray-900 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500"
           >
             {TEMPLATES.map((t) => (
               <option key={t.id} value={t.id}>
