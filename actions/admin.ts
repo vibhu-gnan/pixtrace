@@ -305,6 +305,11 @@ export async function changeUserPlan(userId: string, newPlanId: string) {
     return { error: 'User not found' };
   }
 
+  // No-op if plan is already the same
+  if (user.plan_id === newPlanId) {
+    return { success: true };
+  }
+
   const updates: Record<string, unknown> = {
     plan_id: newPlanId,
     updated_at: new Date().toISOString(),
@@ -335,6 +340,15 @@ export async function changeUserPlan(userId: string, newPlanId: string) {
   } catch (err) {
     console.error('Grace period check failed after admin plan change:', err);
   }
+
+  // Fire-and-forget: send plan change notification email
+  import('@/lib/email/send-plan-change-email')
+    .then(({ sendPlanChangeEmail }) =>
+      sendPlanChangeEmail(userId, user.plan_id, newPlanId),
+    )
+    .catch((err) => {
+      console.error('[ChangeUserPlan] Plan change email failed:', err);
+    });
 
   revalidatePath('/admin/users');
   revalidatePath(`/admin/users/${userId}`);
@@ -467,6 +481,25 @@ export async function adminCreateUser(data: AdminCreateUserData) {
     }
     return { error: 'Failed to create organizer profile' };
   }
+
+  // Fire-and-forget: send welcome email (don't block admin UI)
+  import('@/lib/email/resend')
+    .then(({ sendEmail }) =>
+      import('@/lib/email/templates/welcome').then(({ welcomeSubject, welcomeHtml }) =>
+        sendEmail({
+          to: email,
+          subject: welcomeSubject(),
+          html: welcomeHtml({ name }),
+          emailType: 'welcome',
+        }),
+      ),
+    )
+    .then((sent) => {
+      if (sent) console.log(`[AdminCreateUser] Welcome email sent to ${email}`);
+    })
+    .catch((err) => {
+      console.error('[AdminCreateUser] Welcome email failed:', err);
+    });
 
   revalidatePath('/admin/users');
   return { success: true, userId: organizer.id };
@@ -885,6 +918,134 @@ export async function getAdminEmailLogs({
   }
 
   return { logs: data || [], total: count || 0, page: p, pageSize: PAGE_SIZE };
+}
+
+// ============================================================================
+// SEND TEST EMAIL
+// ============================================================================
+
+const VALID_TEST_TEMPLATES = ['generic', 'welcome', 'storage_warning', 'storage_deleted', 'plan_change'] as const;
+type TestTemplate = (typeof VALID_TEST_TEMPLATES)[number];
+
+export async function sendTestEmail(data: {
+  to: string;
+  template: string;
+}): Promise<{ success?: boolean; error?: string }> {
+  await requireAdmin();
+
+  // Validate email — type, length cap (RFC 5321: max 254), format
+  if (!data.to || typeof data.to !== 'string' || data.to.length > 320) {
+    return { error: 'Invalid email address' };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(data.to.trim())) {
+    return { error: 'Invalid email address' };
+  }
+
+  // Whitelist template values — untrusted client input falls back to generic
+  const template: TestTemplate = VALID_TEST_TEMPLATES.includes(data.template as TestTemplate)
+    ? (data.template as TestTemplate)
+    : 'generic';
+
+  const to = data.to.trim().toLowerCase();
+  let subject: string;
+  let html: string;
+  let emailType: string;
+
+  switch (template) {
+    case 'welcome': {
+      const { welcomeSubject, welcomeHtml } = await import('@/lib/email/templates/welcome');
+      subject = `[TEST] ${welcomeSubject()}`;
+      html = welcomeHtml({ name: 'Test User' });
+      emailType = 'test_welcome';
+      break;
+    }
+    case 'storage_warning': {
+      const { storageWarningSubject, storageWarningHtml } = await import('@/lib/email/templates/storage-warning');
+      subject = `[TEST] ${storageWarningSubject()}`;
+      html = storageWarningHtml({
+        name: 'Test User',
+        usedDisplay: '1.8 GB',
+        limitDisplay: '1 GB',
+        overByDisplay: '820 MB',
+        deadlineDate: '15 April 2026',
+        planName: 'Free',
+      });
+      emailType = 'test_storage_warning';
+      break;
+    }
+    case 'storage_deleted': {
+      const { storageDeletedSubject, storageDeletedHtml } = await import('@/lib/email/templates/storage-deleted');
+      subject = `[TEST] ${storageDeletedSubject(3)}`;
+      html = storageDeletedHtml({
+        name: 'Test User',
+        eventsDeleted: 3,
+        bytesFreedDisplay: '920 MB',
+        currentUsageDisplay: '880 MB',
+        limitDisplay: '1 GB',
+        planName: 'Free',
+      });
+      emailType = 'test_storage_deleted';
+      break;
+    }
+    case 'plan_change': {
+      const { planChangeSubject, planChangeHtml } = await import('@/lib/email/templates/plan-change');
+      subject = `[TEST] ${planChangeSubject('upgrade')}`;
+      html = planChangeHtml({
+        name: 'Test User',
+        direction: 'upgrade',
+        oldPlanName: 'Free',
+        newPlanName: 'Pro',
+        oldStorage: '1 GB',
+        newStorage: '50 GB',
+        oldMaxEvents: '1 event',
+        newMaxEvents: 'Unlimited events',
+        features: ['Original Quality Downloads', 'Custom Branding', 'Client Proofing'],
+      });
+      emailType = 'test_plan_change';
+      break;
+    }
+    default: {
+      subject = '[TEST] PIXTRACE Email Test';
+      html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="background:#2563eb;padding:24px 32px;">
+      <h1 style="margin:0;color:#fff;font-size:18px;font-weight:600;">PIXTRACE</h1>
+    </div>
+    <div style="padding:32px;">
+      <p style="margin:0 0 16px;color:#111827;font-size:15px;line-height:1.6;">
+        This is a test email from PIXTRACE admin dashboard.
+      </p>
+      <p style="margin:0;color:#6b7280;font-size:13px;">
+        If you received this, email delivery is working correctly.
+      </p>
+    </div>
+    <div style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;color:#9ca3af;font-size:11px;text-align:center;">
+        PIXTRACE &middot; Test Email
+      </p>
+    </div>
+  </div>
+</body>
+</html>`.trim();
+      emailType = 'test';
+      break;
+    }
+  }
+
+  const { sendEmail } = await import('@/lib/email/resend');
+  const sent = await sendEmail({ to, subject, html, emailType });
+
+  if (!sent) {
+    return { error: 'Failed to send email. Check Resend API key configuration.' };
+  }
+
+  return { success: true };
 }
 
 // ============================================================================

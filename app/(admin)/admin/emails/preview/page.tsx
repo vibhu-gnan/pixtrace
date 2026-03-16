@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { welcomeSubject, welcomeHtml } from '@/lib/email/templates/welcome';
 import { storageWarningSubject, storageWarningHtml } from '@/lib/email/templates/storage-warning';
 import { storageDeletedSubject, storageDeletedHtml } from '@/lib/email/templates/storage-deleted';
+import { planChangeSubject, planChangeHtml } from '@/lib/email/templates/plan-change';
 
 // ─── Sample data for each template ─────────────────────────
 
@@ -33,6 +34,21 @@ const TEMPLATES = {
       currentUsageDisplay: '880 MB',
       limitDisplay: '1 GB',
       planName: 'Free',
+    }),
+  },
+  plan_change: {
+    label: 'Plan Change',
+    subject: planChangeSubject('upgrade'),
+    html: planChangeHtml({
+      name: 'Rahul Sharma',
+      direction: 'upgrade',
+      oldPlanName: 'Free',
+      newPlanName: 'Pro',
+      oldStorage: '1 GB',
+      newStorage: '50 GB',
+      oldMaxEvents: '1 event',
+      newMaxEvents: 'Unlimited events',
+      features: ['Original Quality Downloads', 'Custom Branding', 'Client Proofing'],
     }),
   },
 } as const;

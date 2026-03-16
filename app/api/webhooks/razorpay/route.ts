@@ -254,6 +254,15 @@ async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any)
       });
 
       console.log(`[Razorpay Webhook] Plan updated: organizer ${sub.organizer_id} → ${plan.id}`);
+
+      // Fire-and-forget: send plan change notification email
+      import('@/lib/email/send-plan-change-email')
+        .then(({ sendPlanChangeEmail }) =>
+          sendPlanChangeEmail(sub.organizer_id, sub.plan_id, plan.id),
+        )
+        .catch((err) => {
+          console.error('[Razorpay Webhook] Plan change email failed:', err);
+        });
     }
   }
 }

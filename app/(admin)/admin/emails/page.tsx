@@ -4,6 +4,7 @@ import { DataTable, type Column } from '@/components/admin/data-table';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { Pagination } from '@/components/admin/pagination';
 import { FilterTabs } from '@/components/admin/filter-tabs';
+import { TestEmailSender } from './test-email-sender';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('en-IN', {
@@ -102,6 +103,7 @@ const typeTabs = [
   { label: 'Welcome', value: 'welcome' },
   { label: 'Storage Warning', value: 'storage_warning' },
   { label: 'Storage Deleted', value: 'storage_deleted' },
+  { label: 'Plan Change', value: 'plan_change' },
 ];
 
 interface Props {
@@ -137,6 +139,8 @@ export default async function AdminEmailsPage({ searchParams }: Props) {
           Preview Templates
         </Link>
       </div>
+
+      <TestEmailSender />
 
       <div className="flex flex-wrap items-center gap-4">
         <FilterTabs tabs={statusTabs} paramName="status" />
