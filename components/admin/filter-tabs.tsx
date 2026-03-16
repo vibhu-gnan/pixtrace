@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useTransition, useOptimistic } from 'react';
 
 interface FilterTab {
   label: string;
@@ -19,8 +20,13 @@ export function FilterTabs({ tabs, paramName = 'status', defaultValue = '' }: Fi
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const current = searchParams.get(paramName) || defaultValue;
+  const [isPending, startTransition] = useTransition();
+  const [optimisticValue, setOptimisticValue] = useOptimistic(current);
 
   const handleClick = (value: string) => {
+    // Skip if already on this tab
+    if (value === optimisticValue) return;
+
     const params = new URLSearchParams(searchParams.toString());
     if (value === defaultValue) {
       params.delete(paramName);
@@ -28,13 +34,16 @@ export function FilterTabs({ tabs, paramName = 'status', defaultValue = '' }: Fi
       params.set(paramName, value);
     }
     params.delete('page');
-    router.push(`${pathname}?${params.toString()}`);
+    startTransition(() => {
+      setOptimisticValue(value);
+      router.replace(`${pathname}?${params.toString()}`);
+    });
   };
 
   return (
     <div className="flex flex-wrap gap-2">
       {tabs.map((tab) => {
-        const isActive = current === tab.value;
+        const isActive = optimisticValue === tab.value;
         return (
           <button
             key={tab.value}
@@ -43,7 +52,7 @@ export function FilterTabs({ tabs, paramName = 'status', defaultValue = '' }: Fi
               isActive
                 ? 'bg-brand-500 text-white shadow-sm'
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
+            } ${isPending && !isActive ? 'opacity-60' : ''}`}
           >
             {tab.label}
             {tab.count !== undefined && (

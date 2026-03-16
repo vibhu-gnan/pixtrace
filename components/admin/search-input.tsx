@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useTransition } from 'react';
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -23,12 +23,20 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  // Use refs to always read latest values inside the debounced timer,
+  // avoiding stale closures if URL changes between keystrokes
+  const searchParamsRef = useRef(searchParams);
+  const pathnameRef = useRef(pathname);
+  useEffect(() => { searchParamsRef.current = searchParams; }, [searchParams]);
+  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
   const currentValue = searchParams.get(paramName) || '';
 
   // Sync input value on mount / URL change
   useEffect(() => {
-    if (inputRef.current) {
+    if (inputRef.current && document.activeElement !== inputRef.current) {
       inputRef.current.value = currentValue;
     }
   }, [currentValue]);
@@ -40,7 +48,8 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
       if (timerRef.current) clearTimeout(timerRef.current);
 
       timerRef.current = setTimeout(() => {
-        const params = new URLSearchParams(searchParams.toString());
+        // Read latest URL state from refs, not the closure
+        const params = new URLSearchParams(searchParamsRef.current.toString());
         if (value) {
           params.set(paramName, value);
         } else {
@@ -48,10 +57,12 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
         }
         // Reset to page 1 on search
         params.delete('page');
-        router.push(`${pathname}?${params.toString()}`);
+        startTransition(() => {
+          router.replace(`${pathnameRef.current}?${params.toString()}`);
+        });
       }, 300);
     },
-    [router, pathname, searchParams, paramName]
+    [router, paramName, startTransition]
   );
 
   // Cleanup on unmount
@@ -70,7 +81,9 @@ export function SearchInput({ placeholder = 'Search...', paramName = 'search' }:
         defaultValue={currentValue}
         onChange={handleChange}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-2 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-300 transition-shadow"
+        className={`w-full pl-10 pr-4 py-2 bg-white rounded-lg text-sm text-gray-700 placeholder:text-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-300 transition-shadow ${
+          isPending ? 'opacity-70' : ''
+        }`}
       />
     </div>
   );

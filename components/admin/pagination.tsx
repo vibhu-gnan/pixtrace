@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useTransition, useOptimistic } from 'react';
 
 interface PaginationProps {
   currentPage: number;
@@ -14,24 +14,30 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [optimisticPage, setOptimisticPage] = useOptimistic(currentPage);
 
   const goToPage = useCallback(
     (page: number) => {
+      if (page === optimisticPage) return;
       const params = new URLSearchParams(searchParams.toString());
       if (page <= 1) {
         params.delete('page');
       } else {
         params.set('page', String(page));
       }
-      router.push(`${pathname}?${params.toString()}`);
+      startTransition(() => {
+        setOptimisticPage(page);
+        router.push(`${pathname}?${params.toString()}`);
+      });
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams, optimisticPage, startTransition, setOptimisticPage]
   );
 
   if (totalPages <= 1) return null;
 
-  const start = (currentPage - 1) * pageSize + 1;
-  const end = Math.min(currentPage * pageSize, totalItems);
+  const start = (optimisticPage - 1) * pageSize + 1;
+  const end = Math.min(optimisticPage * pageSize, totalItems);
 
   // Build visible page numbers (max 5 with ellipsis)
   const pages: (number | 'ellipsis')[] = [];
@@ -39,20 +45,20 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
     for (let i = 1; i <= totalPages; i++) pages.push(i);
   } else {
     pages.push(1);
-    if (currentPage > 3) pages.push('ellipsis');
+    if (optimisticPage > 3) pages.push('ellipsis');
     for (
-      let i = Math.max(2, currentPage - 1);
-      i <= Math.min(totalPages - 1, currentPage + 1);
+      let i = Math.max(2, optimisticPage - 1);
+      i <= Math.min(totalPages - 1, optimisticPage + 1);
       i++
     ) {
       pages.push(i);
     }
-    if (currentPage < totalPages - 2) pages.push('ellipsis');
+    if (optimisticPage < totalPages - 2) pages.push('ellipsis');
     pages.push(totalPages);
   }
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+    <div className={`flex items-center justify-between px-6 py-4 border-t border-gray-100 ${isPending ? 'opacity-60' : ''}`}>
       <p className="text-sm text-gray-500">
         Showing <span className="font-medium text-gray-700">{start}</span>–
         <span className="font-medium text-gray-700">{end}</span> of{' '}
@@ -61,8 +67,8 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
 
       <div className="flex items-center gap-1">
         <button
-          onClick={() => goToPage(currentPage - 1)}
-          disabled={currentPage <= 1}
+          onClick={() => goToPage(optimisticPage - 1)}
+          disabled={optimisticPage <= 1}
           className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Prev
@@ -78,7 +84,7 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
               key={p}
               onClick={() => goToPage(p)}
               className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                p === currentPage
+                p === optimisticPage
                   ? 'bg-brand-500 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
@@ -89,8 +95,8 @@ export function Pagination({ currentPage, totalPages, totalItems, pageSize }: Pa
         )}
 
         <button
-          onClick={() => goToPage(currentPage + 1)}
-          disabled={currentPage >= totalPages}
+          onClick={() => goToPage(optimisticPage + 1)}
+          disabled={optimisticPage >= totalPages}
           className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           Next
