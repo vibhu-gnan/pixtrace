@@ -7,12 +7,23 @@ import {
   type InvoiceLineItem,
   type InvoiceStatus,
 } from '@/lib/invoice/types';
-import { INVOICE_DEFAULTS } from '@/lib/invoice/constants';
+import { INVOICE_DEFAULTS, getPlanCode } from '@/lib/invoice/constants';
+import { getNextInvoiceNumber, saveInvoice } from '@/actions/admin';
+import { invoiceTotal } from '@/lib/invoice/types';
+
+export interface InvoiceModalPrefill extends Partial<InvoiceData> {
+  /** plan_id from DB (e.g. "starter", "pro") for auto invoice numbering */
+  planId?: string | null;
+  /** organizer_id from DB for tracking */
+  organizerId?: string | null;
+  /** payment_id from DB for linking */
+  paymentId?: string | null;
+}
 
 interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  prefillData?: Partial<InvoiceData> | null;
+  prefillData?: InvoiceModalPrefill | null;
 }
 
 const EMPTY_LINE_ITEM: InvoiceLineItem = {
@@ -24,15 +35,6 @@ const EMPTY_LINE_ITEM: InvoiceLineItem = {
 };
 
 const MAX_LINE_ITEMS = 12;
-
-function generateInvoiceNumber(): string {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const rand = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
-  return `INV${yy}${mm}${dd}${rand}`;
-}
 
 function formatDateForInput(dateStr: string | null | undefined): string {
   if (!dateStr) {
@@ -61,7 +63,14 @@ function formatDateForDisplay(dateStr: string): string {
 
 export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps) {
   const [generating, setGenerating] = useState(false);
+  const [loadingNumber, setLoadingNumber] = useState(false);
   const [error, setError] = useState('');
+
+  // Tracking data (not editable by user)
+  const [planId, setPlanId] = useState<string | null>(null);
+  const [organizerId, setOrganizerId] = useState<string | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [dailySequence, setDailySequence] = useState(0);
 
   // Form state
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -87,10 +96,16 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
   const [terms, setTerms] = useState(INVOICE_DEFAULTS.terms.join('\n'));
 
   const resetToDefaults = useCallback(
-    (prefill?: Partial<InvoiceData> | null) => {
+    (prefill?: InvoiceModalPrefill | null) => {
       const today = new Date().toISOString().split('T')[0];
 
-      setInvoiceNumber(prefill?.invoiceNumber || generateInvoiceNumber());
+      // Set tracking data
+      setPlanId(prefill?.planId ?? null);
+      setOrganizerId(prefill?.organizerId ?? null);
+      setPaymentId(prefill?.paymentId ?? null);
+
+      // Temporarily set invoice number (will be replaced by server call)
+      setInvoiceNumber('Loading...');
       setDateOfIssue(formatDateForInput(prefill?.dateOfIssue) || today);
       setDueDate(formatDateForInput(prefill?.dueDate) || today);
       setCurrency(prefill?.currency || 'INR');
@@ -121,11 +136,49 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
     [],
   );
 
+  // Fetch next invoice number from server when modal opens or date changes
+  const fetchInvoiceNumber = useCallback(
+    async (pId: string | null, date: string) => {
+      setLoadingNumber(true);
+      try {
+        const planCode = getPlanCode(pId);
+        const result = await getNextInvoiceNumber(planCode, date);
+        if (result.error) {
+          setError(result.error);
+        } else {
+          setInvoiceNumber(result.invoiceNumber);
+          setDailySequence(result.dailySequence);
+        }
+      } catch {
+        // Fallback: generate a local placeholder
+        const code = getPlanCode(pId);
+        const d = new Date(date + 'T00:00:00');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = String(d.getFullYear());
+        setInvoiceNumber(`${code}${dd}${mm}${yyyy}0000`);
+        setDailySequence(0);
+      } finally {
+        setLoadingNumber(false);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (isOpen) {
       resetToDefaults(prefillData);
     }
   }, [isOpen, prefillData, resetToDefaults]);
+
+  // Auto-fetch invoice number after reset completes
+  useEffect(() => {
+    if (isOpen && dateOfIssue) {
+      fetchInvoiceNumber(planId, dateOfIssue);
+    }
+    // Only re-fetch when modal opens or issue date changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, dateOfIssue]);
 
   // Escape key to close
   useEffect(() => {
@@ -183,13 +236,37 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
     setError('');
 
     try {
-      // Dynamic import to avoid loading jspdf on page load
-      const { generateInvoicePdf } = await import('@/lib/invoice/generate-invoice-pdf');
-
+      const filteredItems = lineItems.filter((item) => item.product.trim());
       const hasPayment = paymentMethod || transactionId;
 
-      const invoiceData: InvoiceData = {
+      // 1. Save invoice record to DB for tracking
+      const total = invoiceTotal(filteredItems, taxRate);
+      const saveResult = await saveInvoice({
         invoiceNumber,
+        planCode: getPlanCode(planId),
+        issueDate: dateOfIssue,
+        dailySequence,
+        paymentId: paymentId || null,
+        organizerId: organizerId || null,
+        recipientName: recipientName.trim(),
+        recipientEmail: recipientEmail.trim(),
+        amountPaise: Math.round(total * 100),
+      });
+
+      if (!saveResult.success) {
+        setError(saveResult.error || 'Failed to save invoice record');
+        return;
+      }
+
+      // Use the final invoice number (may have been incremented by retry)
+      const finalNumber = saveResult.invoiceNumber;
+      setInvoiceNumber(finalNumber);
+
+      // 2. Generate PDF with the saved invoice number
+      const { generateInvoicePdf } = await import('@/lib/invoice/generate-invoice-pdf');
+
+      const invoiceData: InvoiceData = {
+        invoiceNumber: finalNumber,
         dateOfIssue: formatDateForDisplay(dateOfIssue),
         dueDate: formatDateForDisplay(dueDate),
         currency,
@@ -202,7 +279,7 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
             .filter(Boolean),
           email: recipientEmail.trim(),
         },
-        lineItems: lineItems.filter((item) => item.product.trim()),
+        lineItems: filteredItems,
         taxRate,
         payment: hasPayment
           ? {
@@ -218,8 +295,7 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
       };
 
       const doc = generateInvoicePdf(invoiceData);
-      // Sanitize invoice number for safe filename
-      const safeNum = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_') || 'DRAFT';
+      const safeNum = finalNumber.replace(/[^a-zA-Z0-9_-]/g, '_') || 'DRAFT';
       doc.save(`Pixtrace_Invoice_${safeNum}.pdf`);
     } catch (err) {
       console.error('Invoice generation error:', err);
@@ -274,7 +350,17 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
               {/* Invoice Info */}
               <Section title="Invoice Details">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Invoice #" value={invoiceNumber} onChange={setInvoiceNumber} />
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">
+                      Invoice # {loadingNumber && <span className="text-blue-400">(auto-generating...)</span>}
+                    </label>
+                    <input
+                      type="text"
+                      value={invoiceNumber}
+                      readOnly
+                      className="w-full px-3 py-1.5 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg outline-none font-mono cursor-default"
+                    />
+                  </div>
                   <SelectField
                     label="Status"
                     value={status}
@@ -495,7 +581,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors"
+        className="w-full px-3 py-1.5 text-sm text-gray-900 border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors"
       />
     </div>
   );
@@ -519,7 +605,7 @@ function TextArea({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
-        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors resize-none"
+        className="w-full px-3 py-1.5 text-sm text-gray-900 border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors resize-none"
       />
     </div>
   );
@@ -542,7 +628,7 @@ function SelectField({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors bg-white"
+        className="w-full px-3 py-1.5 text-sm text-gray-900 border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none transition-colors bg-white"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>

@@ -3,9 +3,9 @@
 import { useState, useTransition } from 'react';
 import { DataTable, type Column } from '@/components/admin/data-table';
 import { StatusBadge } from '@/components/admin/status-badge';
-import { InvoiceModal } from '@/components/admin/invoice-modal';
+import { InvoiceModal, type InvoiceModalPrefill } from '@/components/admin/invoice-modal';
 import { getPaymentForInvoice } from '@/actions/admin';
-import type { InvoiceData, InvoiceLineItem } from '@/lib/invoice/types';
+import type { InvoiceLineItem } from '@/lib/invoice/types';
 import { INVOICE_DEFAULTS } from '@/lib/invoice/constants';
 
 type PaymentRow = {
@@ -46,7 +46,7 @@ export function PaymentHistorySection({
   paymentsTotalPages,
 }: PaymentHistorySectionProps) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [prefillData, setPrefillData] = useState<Partial<InvoiceData> | null>(null);
+  const [prefillData, setPrefillData] = useState<InvoiceModalPrefill | null>(null);
   const [loadingPaymentId, setLoadingPaymentId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -70,7 +70,9 @@ export function PaymentHistorySection({
           // Pass raw ISO dates — the modal's formatDateForInput handles conversion
           const rawDate = d.paidAt || d.createdAt;
           setPrefillData({
-            invoiceNumber: undefined, // auto-generated
+            planId: d.planId,
+            organizerId: d.organizerId,
+            paymentId: d.paymentId,
             dateOfIssue: rawDate,
             dueDate: rawDate,
             currency: 'INR',
@@ -86,7 +88,7 @@ export function PaymentHistorySection({
               method: d.method ? `${d.method} via Razorpay` : 'Razorpay',
               transactionId: d.razorpayPaymentId || '',
               utr: '',
-              date: rawDate, // raw ISO — modal formats for display, PDF formats separately
+              date: rawDate,
               amount: d.amountRupees,
             },
             notes: INVOICE_DEFAULTS.notes,
@@ -95,6 +97,9 @@ export function PaymentHistorySection({
         } else {
           // Fallback: use the row data directly with raw ISO dates
           setPrefillData({
+            planId: null,
+            organizerId: null,
+            paymentId: payment.id,
             status: 'paid',
             dateOfIssue: payment.paid_at || payment.created_at,
             dueDate: payment.paid_at || payment.created_at,

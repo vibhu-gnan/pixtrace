@@ -1416,8 +1416,10 @@ export async function cleanOrphanedR2(
 
 export interface PaymentInvoiceData {
   paymentId: string;
+  organizerId: string | null;
   recipientName: string;
   recipientEmail: string;
+  planId: string | null;
   planName: string;
   amountRupees: number;
   method: string | null;
@@ -1442,6 +1444,7 @@ export async function getPaymentForInvoice(
     .select(
       `
       id,
+      organizer_id,
       amount,
       method,
       razorpay_payment_id,
@@ -1474,8 +1477,10 @@ export async function getPaymentForInvoice(
   return {
     data: {
       paymentId: data.id,
+      organizerId: data.organizer_id,
       recipientName: organizer?.name || organizer?.email?.split('@')[0] || 'Unknown',
       recipientEmail: organizer?.email || '',
+      planId: sub?.plan_id || null,
       planName: plan?.name || sub?.plan_id || 'Pixtrace Plan',
       amountRupees: data.amount / 100,
       method: data.method,
@@ -1484,4 +1489,113 @@ export async function getPaymentForInvoice(
       createdAt: data.created_at,
     },
   };
+}
+
+// ============================================================================
+// INVOICE NUMBERING & TRACKING
+// ============================================================================
+
+/**
+ * Get the next available invoice number for a given plan code and date.
+ * Atomically claims the sequence by inserting a placeholder row.
+ * Returns the full invoice number string.
+ */
+export async function getNextInvoiceNumber(
+  planCode: string,
+  issueDateStr: string, // YYYY-MM-DD
+): Promise<{ invoiceNumber: string; dailySequence: number; error?: string }> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  // Validate inputs
+  const code = (planCode || '99').slice(0, 2).padStart(2, '0');
+  const issueDate = issueDateStr || new Date().toISOString().split('T')[0];
+
+  // Find max daily_sequence for this date
+  const { data: existing, error: queryErr } = await supabase
+    .from('invoices')
+    .select('daily_sequence')
+    .eq('issue_date', issueDate)
+    .order('daily_sequence', { ascending: false })
+    .limit(1);
+
+  if (queryErr) {
+    console.error('getNextInvoiceNumber query error:', queryErr);
+    return { invoiceNumber: '', dailySequence: 0, error: 'Failed to query invoice sequence' };
+  }
+
+  const nextSeq = (existing?.[0]?.daily_sequence || 0) + 1;
+
+  // Build the number
+  const d = new Date(issueDate + 'T00:00:00');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(d.getFullYear());
+  const seq = String(nextSeq).padStart(4, '0');
+  const invoiceNumber = `${code}${dd}${mm}${yyyy}${seq}`;
+
+  return { invoiceNumber, dailySequence: nextSeq };
+}
+
+/**
+ * Save an issued invoice to the database.
+ * Uses INSERT with conflict handling on (issue_date, daily_sequence)
+ * to prevent race conditions between concurrent admins.
+ * Retries with the next sequence number on conflict (up to 3 attempts).
+ */
+export async function saveInvoice(params: {
+  invoiceNumber: string;
+  planCode: string;
+  issueDate: string; // YYYY-MM-DD
+  dailySequence: number;
+  paymentId?: string | null;
+  organizerId?: string | null;
+  recipientName: string;
+  recipientEmail: string;
+  amountPaise: number;
+}): Promise<{ success: boolean; invoiceNumber: string; error?: string }> {
+  await requireAdmin();
+  const supabase = createAdminClient();
+
+  const MAX_RETRIES = 3;
+  let seq = params.dailySequence;
+  let invoiceNum = params.invoiceNumber;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const { error: insertErr } = await supabase.from('invoices').insert({
+      invoice_number: invoiceNum,
+      plan_code: (params.planCode || '99').slice(0, 2),
+      issue_date: params.issueDate,
+      daily_sequence: seq,
+      payment_id: params.paymentId || null,
+      organizer_id: params.organizerId || null,
+      recipient_name: params.recipientName || '',
+      recipient_email: params.recipientEmail || '',
+      amount: params.amountPaise || 0,
+      status: 'issued',
+    });
+
+    if (!insertErr) {
+      return { success: true, invoiceNumber: invoiceNum };
+    }
+
+    // Check if it's a unique constraint violation (race condition)
+    if (insertErr.code === '23505') {
+      // Another admin took this sequence — increment and retry
+      seq += 1;
+      const d = new Date(params.issueDate + 'T00:00:00');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = String(d.getFullYear());
+      const code = (params.planCode || '99').slice(0, 2).padStart(2, '0');
+      invoiceNum = `${code}${dd}${mm}${yyyy}${String(seq).padStart(4, '0')}`;
+      continue;
+    }
+
+    // Non-conflict error — bail
+    console.error('saveInvoice error:', insertErr);
+    return { success: false, invoiceNumber: invoiceNum, error: 'Failed to save invoice' };
+  }
+
+  return { success: false, invoiceNumber: invoiceNum, error: 'Too many concurrent invoice creations. Please try again.' };
 }

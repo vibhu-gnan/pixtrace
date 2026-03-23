@@ -21,6 +21,44 @@ export const INVOICE_COLORS = {
   white: '#FFFFFF',
 } as const;
 
+/**
+ * Plan ID → 2-digit invoice code mapping.
+ * Format: {planCode}{DDMMYYYY}{dailySeq4}
+ * Example: 01240220260001 = Starter plan, 24 Feb 2026, 1st invoice of day
+ */
+export const PLAN_INVOICE_CODES: Record<string, string> = {
+  free: '00',
+  starter: '01',
+  pro: '02',
+  enterprise: '03',
+};
+
+/** Fallback code for manual/unknown plans */
+export const DEFAULT_PLAN_CODE = '99';
+
+/** Get 2-digit plan code from plan_id */
+export function getPlanCode(planId: string | null | undefined): string {
+  if (!planId) return DEFAULT_PLAN_CODE;
+  const normalized = planId.toLowerCase().trim();
+  return PLAN_INVOICE_CODES[normalized] || DEFAULT_PLAN_CODE;
+}
+
+/**
+ * Build invoice number from parts.
+ * Format: {planCode}{DDMMYYYY}{seq} — e.g. 01240220260001
+ */
+export function buildInvoiceNumber(
+  planCode: string,
+  date: Date,
+  dailySequence: number,
+): string {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(date.getFullYear());
+  const seq = String(Math.max(1, dailySequence)).padStart(4, '0');
+  return `${planCode}${dd}${mm}${yyyy}${seq}`;
+}
+
 export const INVOICE_DEFAULTS: {
   notes: string;
   terms: string[];
