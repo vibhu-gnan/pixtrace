@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/auth/client';
 import type { User } from '@/types';
-import { LoadingSpinner } from '@/components/UI/LoadingStates';
 
 export default function Navigation() {
   const [user, setUser] = useState<User | null>(null);
@@ -76,24 +75,6 @@ export default function Navigation() {
     }
   };
 
-  if (loading) {
-    return (
-      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-background-dark/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center">
-              <span className="material-icons text-white text-lg">filter_center_focus</span>
-            </div>
-            <span className="text-xl font-bold text-white tracking-tight">PIXTRACE</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <LoadingSpinner size="sm" />
-          </div>
-        </div>
-      </nav>
-    );
-  }
-
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-background-dark/80 backdrop-blur-md" role="navigation" aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -120,7 +101,7 @@ export default function Navigation() {
             </div>
           )}
 
-          {user && (
+          {!loading && user && (
             <>
               <Link
                 href="/dashboard"
@@ -170,7 +151,7 @@ export default function Navigation() {
           >
             Pricing
           </Link>
-          {user && (
+          {!loading && user && (
             <>
               <Link
                 href="/dashboard"
