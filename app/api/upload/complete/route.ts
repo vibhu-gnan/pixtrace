@@ -130,7 +130,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ media });
   } catch (error) {
-    console.error('Error in upload complete:', error);
+    const { captureError } = await import('@/lib/monitoring/sentry');
+    captureError(error, { source: 'upload-complete', userId: organizer.id });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

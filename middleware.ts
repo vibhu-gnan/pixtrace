@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   '/api/face',
   '/api/import/cleanup',
   '/api/cron/storage-cleanup',
+  '/api/health',
   '/sign-in',
   '/sign-up',
   '/pricing',

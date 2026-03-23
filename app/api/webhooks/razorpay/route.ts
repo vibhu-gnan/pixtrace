@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { checkAndSetGracePeriod } from '@/lib/plans/grace-period';
+import { captureError } from '@/lib/monitoring/sentry';
 import crypto from 'crypto';
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
@@ -136,7 +137,11 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     // Log the failed webhook to a dead-letter table for manual review / replay.
     // Then return 500 so Razorpay retries (up to its retry limit).
-    console.error(`[Razorpay Webhook] Handler error for ${event.event}:`, err);
+    captureError(err, {
+      source: 'razorpay-webhook',
+      level: 'error',
+      extra: { eventType: event.event, payload: event.payload },
+    });
 
     // Best-effort: persist failed event for manual recovery
     try {
@@ -466,9 +471,18 @@ async function handleDisputeCreated(supabase: SupabaseClient, payload: any) {
     .eq('razorpay_payment_id', dispute.payment_id);
 
   // Prominent alert — chargebacks cost money and need fast response
+  captureError(new Error(`DISPUTE ALERT: Payment ${dispute.payment_id} disputed`), {
+    source: 'razorpay-dispute',
+    level: 'fatal',
+    extra: {
+      paymentId: dispute.payment_id,
+      amount: dispute.amount,
+      respondBy: dispute.respond_by ? new Date(dispute.respond_by * 1000).toISOString() : 'N/A',
+    },
+  });
   console.error(
-    `[⚠️ DISPUTE ALERT] Payment ${dispute.payment_id} has been disputed.\n` +
-    `Amount: ₹${(dispute.amount / 100).toFixed(2)} | ` +
+    `[DISPUTE ALERT] Payment ${dispute.payment_id} has been disputed.\n` +
+    `Amount: ${(dispute.amount / 100).toFixed(2)} | ` +
     `Respond by: ${dispute.respond_by ? new Date(dispute.respond_by * 1000).toISOString() : 'N/A'}`
   );
 }

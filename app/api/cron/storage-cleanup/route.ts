@@ -4,6 +4,7 @@ import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { sendEmail } from '@/lib/email/resend';
 import { storageWarningSubject, storageWarningHtml } from '@/lib/email/templates/storage-warning';
 import { storageDeletedSubject, storageDeletedHtml } from '@/lib/email/templates/storage-deleted';
+import { captureError, captureWarning } from '@/lib/monitoring/sentry';
 
 /**
  * GET|POST /api/cron/storage-cleanup
@@ -22,7 +23,7 @@ async function handler(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    console.error('[StorageCleanup] CRON_SECRET not configured');
+    captureError(new Error('CRON_SECRET not configured'), { source: 'storage-cleanup', level: 'fatal' });
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 503 });
   }
 
@@ -41,6 +42,16 @@ async function handler(request: NextRequest) {
   console.log(
     `[StorageCleanup] Done. Warnings sent: ${warningsSent}, organizers cleaned: ${organizersProcessed}, events deleted: ${eventsDeleted}`,
   );
+
+  // Report any errors during cleanup to Sentry
+  if (errors.length > 0) {
+    captureWarning(`Storage cleanup completed with ${errors.length} errors`, {
+      errors,
+      warningsSent,
+      organizersProcessed,
+      eventsDeleted,
+    });
+  }
 
   return NextResponse.json({
     warningsSent,
