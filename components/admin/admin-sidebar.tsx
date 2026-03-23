@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import { SignOutButton } from '@/components/dashboard/sign-out-button';
 
@@ -218,17 +219,29 @@ export function AdminSidebar({ organizer, open, onClose }: AdminSidebarProps) {
       </aside>
 
       {/* Mobile overlay */}
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-            onClick={onClose}
-          />
-          <aside className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden">
-            {sidebarContent}
-          </aside>
-        </>
-      )}
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              onClick={onClose}
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="fixed inset-y-0 left-0 w-64 z-50 lg:hidden"
+            >
+              {sidebarContent}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

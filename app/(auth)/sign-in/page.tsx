@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/auth/client';
 import Link from 'next/link';
@@ -87,7 +88,12 @@ function SignInForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background-dark px-4">
-      <div className="w-full max-w-md space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="w-full max-w-md space-y-8"
+      >
 
         <div>
           <h2 className="text-center text-3xl font-bold text-white">
@@ -109,11 +115,19 @@ function SignInForm() {
 
         <form className="space-y-6" onSubmit={handleSignIn}>
 
+          <AnimatePresence>
           {error && (
-            <div className="rounded-md bg-red-900/50 border border-red-500/50 p-4">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="rounded-md bg-red-900/50 border border-red-500/50 p-4"
+            >
               <p className="text-sm text-red-200">{error}</p>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           <div className="-space-y-px rounded-md shadow-sm">
             <input
@@ -140,7 +154,7 @@ function SignInForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-primary px-3 py-3 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+            className="w-full rounded-md bg-primary px-3 py-3 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50 transition-all duration-200"
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
@@ -156,7 +170,7 @@ function SignInForm() {
           </div>
 
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

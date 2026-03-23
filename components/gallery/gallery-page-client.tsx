@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { GalleryGrid } from './gallery-grid';
 import { getPublicGalleryPage } from '@/actions/gallery';
 import type { GalleryMediaItem } from '@/actions/gallery';
@@ -540,8 +541,15 @@ export function GalleryPageClient({
     return (
         <>
             {/* ── Draft Preview Banner ──────────────────────────── */}
+            <AnimatePresence>
             {isOwnerPreview && (
-                <div className="bg-amber-50 border-b border-amber-200">
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-amber-50 border-b border-amber-200"
+                >
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-center gap-2 text-sm text-amber-800">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -550,8 +558,9 @@ export function GalleryPageClient({
                         <span className="font-medium">Draft Preview</span>
                         <span className="hidden sm:inline text-amber-600">— Only you can see this. Publish your event to make it public.</span>
                     </div>
-                </div>
+                </motion.div>
             )}
+            </AnimatePresence>
 
             {/* ── Sticky Info Bar ───────────────────────────────── */}
             <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
@@ -657,11 +666,19 @@ export function GalleryPageClient({
                                 </div>
                             )}
                             {/* Copied toast */}
+                            <AnimatePresence>
                             {copied && (
-                                <div className="absolute right-0 top-full mt-1 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md shadow-lg z-40 whitespace-nowrap">
+                                <motion.div
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -4 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="absolute right-0 top-full mt-1 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md shadow-lg z-40 whitespace-nowrap"
+                                >
                                     Link copied!
-                                </div>
+                                </motion.div>
                             )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 </div>
@@ -686,8 +703,15 @@ export function GalleryPageClient({
             </div>
 
             {/* ── Error / End ──────────────────────────────────── */}
+            <AnimatePresence>
             {error && !faceSearchActive && (
-                <div className="py-8 text-center">
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.2 }}
+                    className="py-8 text-center"
+                >
                     <p className="text-sm text-red-500 mb-2">{error}</p>
                     <button
                         onClick={loadMore}
@@ -695,8 +719,9 @@ export function GalleryPageClient({
                     >
                         Try again
                     </button>
-                </div>
+                </motion.div>
             )}
+            </AnimatePresence>
             {((!hasMore && !loading && media.length > 0 && !faceSearchActive) || (faceSearchActive && displayMedia.length > 0)) && (
                 <div className={`py-8 flex justify-center${faceSearchActive ? ' pb-20' : ''}`}>
                     <button
@@ -709,28 +734,46 @@ export function GalleryPageClient({
             )}
 
             {/* ── Background Face Search Status Pill ── */}
+            <AnimatePresence>
             {searchState !== 'idle' && (
-                <FaceSearchStatusPill
-                    state={searchState}
-                    matchCount={searchResults?.totalMatches ?? 0}
-                    errorMessage={searchError}
-                    onViewResults={handleViewSearchResults}
-                    onRetry={handleSearchRetry}
-                    onDismiss={handleSearchDismiss}
-                />
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.25 }}
+                >
+                    <FaceSearchStatusPill
+                        state={searchState}
+                        matchCount={searchResults?.totalMatches ?? 0}
+                        errorMessage={searchError}
+                        onViewResults={handleViewSearchResults}
+                        onRetry={handleSearchRetry}
+                        onDismiss={handleSearchDismiss}
+                    />
+                </motion.div>
             )}
+            </AnimatePresence>
 
             {/* ── ALL / Mine Toggle (hidden when status pill is showing) ── */}
+            <AnimatePresence>
             {!revoked && media.length > 0 && faceSearchEnabled && searchState === 'idle' && (
-                <FaceSearchToggle
-                    active={faceSearchActive}
-                    hasSearched={faceSearchResults !== null && faceSearchResults.length > 0}
-                    hasProfile={hasProfile}
-                    recalling={recalling}
-                    onToggle={handleFaceToggle}
-                    onRescan={user ? handleRescan : undefined}
-                />
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ duration: 0.25 }}
+                >
+                    <FaceSearchToggle
+                        active={faceSearchActive}
+                        hasSearched={faceSearchResults !== null && faceSearchResults.length > 0}
+                        hasProfile={hasProfile}
+                        recalling={recalling}
+                        onToggle={handleFaceToggle}
+                        onRescan={user ? handleRescan : undefined}
+                    />
+                </motion.div>
             )}
+            </AnimatePresence>
 
             {/* Share sheet for gallery header */}
             {media.length > 0 && (

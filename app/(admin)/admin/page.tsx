@@ -147,7 +147,7 @@ export default async function AdminOverviewPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {stats.recentUsers.map((user: any) => (
-                <div key={user.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50">
+                <div key={user.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {user.name || user.email?.split('@')[0]}
@@ -174,7 +174,7 @@ export default async function AdminOverviewPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {stats.recentEvents.map((event: any) => (
-                <div key={event.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50">
+                <div key={event.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{event.name}</p>
                     <p className="text-xs text-gray-400 truncate">

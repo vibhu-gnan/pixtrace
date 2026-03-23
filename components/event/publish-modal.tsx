@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { publishEvent, unpublishEvent } from '@/actions/events';
 import QRCode from 'qrcode';
 
@@ -107,26 +108,46 @@ export function PublishModal({ eventId, eventName, eventHash, isAlreadyPublished
         }
     };
 
-    if (!isOpen) return null;
-
     return (
+        <AnimatePresence>
+        {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={onClose}
+            />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden"
+            >
                 {/* Publishing state */}
+                <AnimatePresence mode="wait">
                 {publishing && (
-                    <div className="p-10 text-center">
+                    <motion.div
+                        key="publishing"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="p-10 text-center"
+                    >
                         <div className="w-10 h-10 border-3 border-brand-200 border-t-brand-500 rounded-full animate-spin mx-auto mb-4" />
                         <p className="text-gray-600 font-medium">Publishing your event...</p>
-                    </div>
+                    </motion.div>
                 )}
 
                 {/* Error state */}
                 {error && (
-                    <div className="p-8 text-center">
+                    <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center">
                         <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
@@ -136,12 +157,12 @@ export function PublishModal({ eventId, eventName, eventHash, isAlreadyPublished
                         <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
                             Close
                         </button>
-                    </div>
+                    </motion.div>
                 )}
 
                 {/* Success state — show gallery link & QR */}
                 {published && !error && (
-                    <div className="p-6">
+                    <motion.div key="success" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-6">
                         {/* Header */}
                         <div className="text-center mb-6">
                             <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-3">
@@ -248,9 +269,12 @@ export function PublishModal({ eventId, eventName, eventHash, isAlreadyPublished
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </motion.div>
                 )}
-            </div>
+                </AnimatePresence>
+            </motion.div>
         </div>
+        )}
+        </AnimatePresence>
     );
 }

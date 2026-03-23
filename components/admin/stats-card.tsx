@@ -9,7 +9,7 @@ interface StatsCardProps {
 
 export function StatsCard({ title, value, subtitle, icon, trend, className = '' }: StatsCardProps) {
   return (
-    <div className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm ${className}`}>
+    <div className={`bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow duration-200 ${className}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-500 truncate">{title}</p>

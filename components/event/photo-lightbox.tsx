@@ -635,7 +635,7 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     <>
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/95 z-50 backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 bg-black/95 z-50 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out duration-200" />
         <Dialog.Content
           className="fixed inset-0 z-50 flex items-center justify-center focus:outline-none"
           style={{ touchAction: 'none' }}

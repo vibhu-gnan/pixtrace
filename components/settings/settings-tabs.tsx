@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import { ProfileForm } from './profile-form';
 import { NotificationSettings } from './notification-settings';
@@ -70,19 +71,29 @@ export function SettingsTabs({ organizer, authInfo }: SettingsTabsProps) {
         </nav>
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'profile' && (
-        <ProfileForm organizer={organizer} authInfo={authInfo} />
-      )}
-      {activeTab === 'notifications' && (
-        <NotificationSettings organizer={organizer} />
-      )}
-      {activeTab === 'event-defaults' && (
-        <EventDefaultsForm organizer={organizer} />
-      )}
-      {activeTab === 'account' && (
-        <AccountSettings organizer={organizer} authInfo={authInfo} />
-      )}
+      {/* Tab content with crossfade transition */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+        >
+          {activeTab === 'profile' && (
+            <ProfileForm organizer={organizer} authInfo={authInfo} />
+          )}
+          {activeTab === 'notifications' && (
+            <NotificationSettings organizer={organizer} />
+          )}
+          {activeTab === 'event-defaults' && (
+            <EventDefaultsForm organizer={organizer} />
+          )}
+          {activeTab === 'account' && (
+            <AccountSettings organizer={organizer} authInfo={authInfo} />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

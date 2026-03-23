@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { StoryTemplate } from '@/lib/story/story-card-generator';
 
 interface ShareSheetProps {
@@ -190,20 +191,31 @@ export function ShareSheet({
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   }, [eventName, galleryUrl]);
 
-  if (!isOpen) return null;
-
   return (
+    <AnimatePresence>
+    {isOpen && (
     <div
       className="fixed inset-0 z-[9999] flex items-end justify-center"
       onClick={handleBackdropClick}
     >
       {/* Blurred backdrop */}
-      <div className="absolute inset-0 bg-black/60 animate-in fade-in duration-200" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as React.CSSProperties} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0 bg-black/60"
+        style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as React.CSSProperties}
+      />
 
       {/* Sheet */}
-      <div
+      <motion.div
         ref={sheetRef}
-        className="relative w-full max-w-lg animate-in slide-in-from-bottom duration-300 overflow-hidden"
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="relative w-full max-w-lg overflow-hidden"
         style={{
           borderRadius: '24px 24px 0 0',
           background: 'linear-gradient(160deg, rgba(40,40,55,0.98) 0%, rgba(12,12,18,0.99) 100%)',
@@ -399,13 +411,23 @@ export function ShareSheet({
         </div>
 
         {/* Toast */}
+        <AnimatePresence>
         {toastMessage && (
-          <div className="absolute top-[-52px] left-1/2 -translate-x-1/2 bg-white text-gray-900 text-sm font-semibold px-5 py-2 rounded-full shadow-xl animate-in fade-in slide-in-from-bottom-2 whitespace-nowrap">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+            className="absolute top-[-52px] left-1/2 -translate-x-1/2 bg-white text-gray-900 text-sm font-semibold px-5 py-2 rounded-full shadow-xl whitespace-nowrap"
+          >
             {toastMessage}
-          </div>
+          </motion.div>
         )}
-      </div>
+        </AnimatePresence>
+      </motion.div>
     </div>
+    )}
+    </AnimatePresence>
   );
 }
 

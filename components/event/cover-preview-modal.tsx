@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { HeroSlideshow } from '@/components/gallery/hero-slideshow';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -89,8 +90,6 @@ export function CoverPreviewModal({
     };
   }, [isOpen, handleKeyDown]);
 
-  if (!isOpen) return null;
-
   // Determine which slides to show based on mode and view
   const getSlides = () => {
     if (heroMode === 'slideshow') {
@@ -132,15 +131,27 @@ export function CoverPreviewModal({
       : 'Auto (first 5)';
 
   return (
+    <AnimatePresence>
+    {isOpen && (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8">
       {/* Backdrop */}
-      <div
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal container */}
-      <div className="relative z-10 w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="relative z-10 w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -287,7 +298,9 @@ export function CoverPreviewModal({
             This is a preview of how your gallery cover will appear to visitors
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
+    )}
+    </AnimatePresence>
   );
 }

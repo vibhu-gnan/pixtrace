@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/auth/client';
 import Link from 'next/link';
@@ -75,25 +76,36 @@ function SignUpForm() {
     });
   };
 
-  if (success) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background-dark px-4">
-        <div className="w-full max-w-md text-center space-y-4">
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background-dark px-4 sm:px-6 lg:px-8">
+      <AnimatePresence mode="wait">
+      {success ? (
+        <motion.div
+          key="success"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="w-full max-w-md text-center space-y-4"
+        >
           <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-            <span className="material-icons text-primary text-3xl">check_circle</span>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
           </div>
           <h2 className="text-2xl font-bold text-white">Account created!</h2>
           <p className="text-slate-400">
             {isPaidPlan ? 'Redirecting to checkout...' : 'Redirecting to your dashboard...'}
           </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background-dark px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
+        </motion.div>
+      ) : (
+      <motion.div
+        key="form"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -16 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="w-full max-w-md space-y-8"
+      >
         {/* Logo */}
         <div className="text-center">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
@@ -136,11 +148,19 @@ function SignUpForm() {
         </div>
 
         <form className="space-y-4" onSubmit={handleSignUp}>
+          <AnimatePresence>
           {error && (
-            <div className="rounded-md bg-red-900/50 border border-red-500/50 p-4">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="rounded-md bg-red-900/50 border border-red-500/50 p-4"
+            >
               <p className="text-sm text-red-200">{error}</p>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           <input
             type="text"
@@ -186,7 +206,9 @@ function SignUpForm() {
             </Link>
           </p>
         </form>
-      </div>
+      </motion.div>
+      )}
+      </AnimatePresence>
     </div>
   );
 }
