@@ -101,7 +101,7 @@ export default function Navigation() {
             </div>
           )}
 
-          {!loading && user && (
+          {!loading && user ? (
             <>
               <Link
                 href="/dashboard"
@@ -117,6 +117,21 @@ export default function Navigation() {
               >
                 Sign Out
               </button>
+            </>
+          ) : !loading && (
+            <>
+              <Link
+                href="/sign-in"
+                className="hidden md:block text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/pricing"
+                className="hidden md:block px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-blue-600 transition-colors"
+              >
+                Get Started
+              </Link>
             </>
           )}
 
@@ -151,7 +166,7 @@ export default function Navigation() {
           >
             Pricing
           </Link>
-          {!loading && user && (
+          {!loading && user ? (
             <>
               <Link
                 href="/dashboard"
@@ -167,6 +182,14 @@ export default function Navigation() {
                 Sign Out
               </button>
             </>
+          ) : !loading && (
+            <Link
+              href="/sign-in"
+              className="block text-sm font-medium text-slate-300 hover:text-white transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Sign In
+            </Link>
           )}
         </div>
       )}
