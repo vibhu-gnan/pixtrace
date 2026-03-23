@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { deleteEvent } from '@/actions/events';
 
 export function DeleteEventButton({
@@ -10,14 +11,21 @@ export function DeleteEventButton({
   eventId: string;
   eventName: string;
 }) {
+  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleDelete = async () => {
     setLoading(true);
+    setError('');
     try {
       await deleteEvent(eventId);
-    } catch {
+      // Redirect to dashboard after successful deletion
+      router.replace('/dashboard');
+      router.refresh();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete event');
       setLoading(false);
       setConfirming(false);
     }
@@ -26,6 +34,7 @@ export function DeleteEventButton({
   if (confirming) {
     return (
       <div className="flex items-center gap-2">
+        {error && <span className="text-xs text-red-500">{error}</span>}
         <span className="text-xs text-red-600">Delete &quot;{eventName}&quot;?</span>
         <button
           onClick={handleDelete}

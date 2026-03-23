@@ -13,13 +13,18 @@ export function CancelSubscriptionButton() {
   const handleCancel = async () => {
     setLoading(true);
     setError('');
-    const result = await cancelSubscription();
-    setLoading(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setConfirming(false);
-      router.refresh();
+    try {
+      const result = await cancelSubscription();
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setConfirming(false);
+        router.refresh();
+      }
+    } catch {
+      setError('Failed to cancel subscription. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

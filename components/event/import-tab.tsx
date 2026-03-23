@@ -74,10 +74,13 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCountRef = useRef(0);
+  const unmountedRef = useRef(false);
 
   // Cleanup polling on unmount
   useEffect(() => {
+    unmountedRef.current = false;
     return () => {
+      unmountedRef.current = true;
       if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, []);
@@ -101,8 +104,10 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
     const interval = count < 5 ? 1000 : 5000;
 
     pollRef.current = setTimeout(async () => {
+      if (unmountedRef.current) return; // Stop polling if component unmounted
       try {
         const statusRes = await fetch(`/api/import/status?jobId=${id}`);
+        if (unmountedRef.current) return;
         const statusData = await statusRes.json();
 
         if (!statusRes.ok) {
@@ -129,9 +134,10 @@ export function ImportTab({ eventId, albums, onImportComplete }: ImportTabProps)
 
         // Still in progress — schedule next poll
         pollCountRef.current++;
-        schedulePoll(id);
+        if (!unmountedRef.current) schedulePoll(id);
       } catch {
-        // Network error — retry
+        // Network error — retry (unless unmounted)
+        if (unmountedRef.current) return;
         pollCountRef.current++;
         schedulePoll(id);
       }

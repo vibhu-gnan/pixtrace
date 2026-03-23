@@ -70,7 +70,7 @@ export function DashboardShell({ organizer, planLimits, children }: DashboardShe
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar */}
-        <Suspense>
+        <Suspense fallback={<div className="h-16 border-b border-gray-200 bg-white" />}>
           <TopBar onMenuClick={() => setSidebarOpen(true)} />
         </Suspense>
 

@@ -189,7 +189,10 @@ function PhotosPageContent({ eventId, eventName, media: initialMedia, albums: in
         mediaRef.current = albumMedia;
         hasMoreRef.current = more;
         setHasMore(more);
-      }).catch(() => {});
+      }).catch(() => {
+        // Album fetch failed — fall back to showing all media (already loaded from initialMedia)
+        console.warn('Album deep-link fetch failed, showing all media');
+      });
     }
   }, [albumIdFromUrl, eventId]);
 

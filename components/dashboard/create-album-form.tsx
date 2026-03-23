@@ -19,18 +19,23 @@ export function CreateAlbumForm({ eventId, onAlbumCreated, onCancel }: CreateAlb
   const handleSubmit = async (formData: FormData) => {
     setError('');
     setLoading(true);
-    const result = await createAlbum(eventId, formData);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      if (onAlbumCreated) {
-        onAlbumCreated();
+    try {
+      const result = await createAlbum(eventId, formData);
+      if (result.error) {
+        setError(result.error);
       } else {
-        setOpen(false);
-        router.refresh();
+        if (onAlbumCreated) {
+          onAlbumCreated();
+        } else {
+          setOpen(false);
+          router.refresh();
+        }
       }
+    } catch {
+      setError('Failed to create album. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleCancel = () => {

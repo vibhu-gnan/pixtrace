@@ -223,27 +223,37 @@ export function AlbumListRow({ album, coverUrl, eventHash, onClick, dragHandlePr
 
   const handleDelete = async () => {
     setLoading(true);
-    const result = await deleteAlbum(album.id, album.event_id);
-    if (result.error) {
-      console.error('Failed to delete album:', result.error);
-    } else {
-      router.refresh();
+    try {
+      const result = await deleteAlbum(album.id, album.event_id);
+      if (result.error) {
+        console.error('Failed to delete album:', result.error);
+      } else {
+        router.refresh();
+      }
+      setShowDeleteConfirm(false);
+    } catch {
+      console.error('Failed to delete album');
+    } finally {
+      setLoading(false);
     }
-    setShowDeleteConfirm(false);
-    setLoading(false);
   };
 
   const handleRename = async (formData: FormData) => {
     setLoading(true);
     setError('');
-    const result = await updateAlbum(album.id, album.event_id, formData);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.refresh();
-      setShowRenameModal(false);
+    try {
+      const result = await updateAlbum(album.id, album.event_id, formData);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+        setShowRenameModal(false);
+      }
+    } catch {
+      setError('Failed to rename album. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

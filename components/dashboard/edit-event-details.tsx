@@ -32,19 +32,24 @@ export function EditEventDetails({ eventId, name, description, eventDate, eventE
     e.preventDefault();
     setError('');
     setLoading(true);
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    if (isPublic) {
-      formData.set('isPublic', '1');
+    try {
+      const form = e.currentTarget;
+      const formData = new FormData(form);
+      if (isPublic) {
+        formData.set('isPublic', '1');
+      }
+      const result = await updateEvent(eventId, formData);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setShowModal(false);
+      router.refresh();
+    } catch {
+      setError('Failed to update event. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    const result = await updateEvent(eventId, formData);
-    setLoading(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
-    setShowModal(false);
-    router.refresh();
   };
 
   const eventDateValue = eventDate ? eventDate.slice(0, 10) : '';
