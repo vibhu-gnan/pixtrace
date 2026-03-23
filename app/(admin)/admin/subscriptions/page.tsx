@@ -3,6 +3,7 @@ import { DataTable, type Column } from '@/components/admin/data-table';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { Pagination } from '@/components/admin/pagination';
 import { FilterTabs } from '@/components/admin/filter-tabs';
+import { PaymentHistorySection } from '@/components/admin/payment-history-section';
 
 function formatAmount(paise: number): string {
   return `₹${(paise / 100).toLocaleString('en-IN')}`;
@@ -89,67 +90,7 @@ const subColumns: Column<SubRow>[] = [
   },
 ];
 
-// ─── Payment table columns ───────────────────────────────────
-
-type PaymentRow = {
-  id: string;
-  amount: number;
-  status: string;
-  method: string | null;
-  paid_at: string | null;
-  created_at: string;
-  razorpay_payment_id: string | null;
-  organizers: { name: string | null; email: string } | null;
-};
-
-const paymentColumns: Column<PaymentRow>[] = [
-  {
-    key: 'date',
-    header: 'Date',
-    render: (row) => (
-      <span className="text-sm text-gray-700">{formatDate(row.paid_at || row.created_at)}</span>
-    ),
-  },
-  {
-    key: 'user',
-    header: 'User',
-    render: (row) => (
-      <div className="min-w-0">
-        <p className="text-sm text-gray-900 truncate">
-          {row.organizers?.name || row.organizers?.email?.split('@')[0] || '—'}
-        </p>
-      </div>
-    ),
-  },
-  {
-    key: 'amount',
-    header: 'Amount',
-    render: (row) => (
-      <span className="text-sm font-medium text-gray-900">{formatAmount(row.amount)}</span>
-    ),
-  },
-  {
-    key: 'method',
-    header: 'Method',
-    render: (row) => (
-      <span className="text-sm text-gray-500 capitalize">{row.method || '—'}</span>
-    ),
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (row) => <StatusBadge status={row.status} />,
-  },
-  {
-    key: 'razorpay',
-    header: 'Payment ID',
-    render: (row) => (
-      <span className="text-xs font-mono text-gray-400 truncate block max-w-[180px]">
-        {row.razorpay_payment_id || '—'}
-      </span>
-    ),
-  },
-];
+// Payment columns are now defined in PaymentHistorySection client component
 
 const statusTabs = [
   { label: 'All', value: '' },
@@ -207,30 +148,13 @@ export default async function AdminSubscriptionsPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* Payments Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-gray-900">Payment History</h2>
-          <span className="text-sm text-gray-400 bg-gray-100 px-2.5 py-0.5 rounded-full font-medium">
-            {paymentsData.total}
-          </span>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <DataTable
-            columns={paymentColumns}
-            data={paymentsData.payments}
-            rowKey={(row) => row.id}
-            emptyMessage="No payments recorded."
-          />
-          {/* Note: uses payments_page param to not conflict with subscriptions page param */}
-          {paymentsTotalPages > 1 && (
-            <div className="border-t border-gray-100 px-6 py-3 text-sm text-gray-400">
-              Showing page {paymentsPage} of {paymentsTotalPages} ({paymentsData.total} total payments)
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Payments Section (client component with invoice modal) */}
+      <PaymentHistorySection
+        paymentsData={paymentsData.payments}
+        paymentsTotal={paymentsData.total}
+        paymentsPage={paymentsPage}
+        paymentsTotalPages={paymentsTotalPages}
+      />
     </div>
   );
 }

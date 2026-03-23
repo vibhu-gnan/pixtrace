@@ -1409,3 +1409,79 @@ export async function cleanOrphanedR2(
     errors,
   };
 }
+
+// ============================================================================
+// INVOICE DATA (for pre-filling invoice modal)
+// ============================================================================
+
+export interface PaymentInvoiceData {
+  paymentId: string;
+  recipientName: string;
+  recipientEmail: string;
+  planName: string;
+  amountRupees: number;
+  method: string | null;
+  razorpayPaymentId: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export async function getPaymentForInvoice(
+  paymentId: string,
+): Promise<{ data: PaymentInvoiceData | null; error?: string }> {
+  await requireAdmin();
+
+  if (!paymentId || typeof paymentId !== 'string') {
+    return { data: null, error: 'Invalid payment ID' };
+  }
+
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from('payment_history')
+    .select(
+      `
+      id,
+      amount,
+      method,
+      razorpay_payment_id,
+      paid_at,
+      created_at,
+      organizers (name, email),
+      subscriptions (plan_id, plans (name))
+    `,
+    )
+    .eq('id', paymentId)
+    .single();
+
+  if (error || !data) {
+    console.error('getPaymentForInvoice error:', error);
+    return { data: null, error: 'Payment not found' };
+  }
+
+  // Supabase returns joined relations as arrays; grab the first element
+  const organizerRaw = data.organizers as unknown;
+  const organizer = (Array.isArray(organizerRaw) ? organizerRaw[0] : organizerRaw) as
+    | { name: string | null; email: string }
+    | null;
+  const subscriptionRaw = data.subscriptions as unknown;
+  const sub = (Array.isArray(subscriptionRaw) ? subscriptionRaw[0] : subscriptionRaw) as
+    | { plan_id: string; plans: unknown }
+    | null;
+  const plansRaw = sub?.plans;
+  const plan = (Array.isArray(plansRaw) ? plansRaw[0] : plansRaw) as { name: string } | null;
+
+  return {
+    data: {
+      paymentId: data.id,
+      recipientName: organizer?.name || organizer?.email?.split('@')[0] || 'Unknown',
+      recipientEmail: organizer?.email || '',
+      planName: plan?.name || sub?.plan_id || 'Pixtrace Plan',
+      amountRupees: data.amount / 100,
+      method: data.method,
+      razorpayPaymentId: data.razorpay_payment_id,
+      paidAt: data.paid_at,
+      createdAt: data.created_at,
+    },
+  };
+}
