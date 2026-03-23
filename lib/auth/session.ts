@@ -1,12 +1,31 @@
 import { getUser } from './index';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export interface NotificationPreferences {
+  email_new_gallery_view: boolean;
+  email_photo_upload_activity: boolean;
+  email_storage_warnings: boolean;
+  email_billing_alerts: boolean;
+  email_product_updates: boolean;
+  email_tips_and_tutorials: boolean;
+}
+
+export interface DefaultEventPreferences {
+  watermark_enabled: boolean;
+  downloads_enabled: boolean;
+  auto_approve_photos: boolean;
+}
+
 export interface OrganizerProfile {
   id: string;
   auth_id: string;
   email: string;
   name: string | null;
   avatar_url: string | null;
+  phone: string | null;
+  business_name: string | null;
+  notification_preferences: NotificationPreferences;
+  default_event_preferences: DefaultEventPreferences;
   plan_id: string;
   razorpay_customer_id: string | null;
   storage_used_bytes: number;

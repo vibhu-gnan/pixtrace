@@ -29,6 +29,21 @@ export const organizers = pgTable('organizers', {
   name: varchar('name', { length: 255 }),
   avatarUrl: text('avatar_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  phone: varchar('phone', { length: 20 }),
+  businessName: varchar('business_name', { length: 255 }),
+  notificationPreferences: jsonb('notification_preferences').$type<{
+    email_new_gallery_view: boolean;
+    email_photo_upload_activity: boolean;
+    email_storage_warnings: boolean;
+    email_billing_alerts: boolean;
+    email_product_updates: boolean;
+    email_tips_and_tutorials: boolean;
+  }>().default(sql`'{"email_new_gallery_view":true,"email_photo_upload_activity":true,"email_storage_warnings":true,"email_billing_alerts":true,"email_product_updates":false,"email_tips_and_tutorials":false}'::jsonb`).notNull(),
+  defaultEventPreferences: jsonb('default_event_preferences').$type<{
+    watermark_enabled: boolean;
+    downloads_enabled: boolean;
+    auto_approve_photos: boolean;
+  }>().default(sql`'{"watermark_enabled":true,"downloads_enabled":false,"auto_approve_photos":true}'::jsonb`).notNull(),
   isAdmin: boolean('is_admin').default(false).notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

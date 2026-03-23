@@ -78,7 +78,7 @@ const navItems = [
   { label: 'My Events', href: '/dashboard', icon: HomeIcon, enabled: true },
   { label: 'Billing', href: '/billing', icon: CreditCardIcon, enabled: true },
   { label: 'Analytics', href: '#', icon: ChartIcon, enabled: false },
-  { label: 'Settings', href: '#', icon: CogIcon, enabled: false },
+  { label: 'Settings', href: '/settings', icon: CogIcon, enabled: true },
 ];
 
 // ─── Tooltip wrapper for collapsed state ─────────────────────
