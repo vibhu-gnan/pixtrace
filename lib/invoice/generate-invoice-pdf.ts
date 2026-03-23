@@ -194,7 +194,7 @@ function drawInvoiceDetails(doc: jsPDF, toSectionEndY: number, data: InvoiceData
   const details: [string, string][] = [
     ['Invoice #:', safeText(data.invoiceNumber, 'DRAFT')],
     ['Date of Issue:', safeText(data.dateOfIssue, '-')],
-    ['Due Date:', safeText(data.dueDate, '-')],
+    ['Next Payment Due:', safeText(data.dueDate, '-')],
     ['Balance:', formatINR(balance)],
     ['Currency:', safeText(data.currency, 'INR')],
   ];

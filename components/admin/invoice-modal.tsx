@@ -49,6 +49,16 @@ function formatDateForInput(dateStr: string | null | undefined): string {
   }
 }
 
+function addOneMonth(dateStr: string): string {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split('T')[0];
+  } catch {
+    return dateStr;
+  }
+}
+
 function formatDateForDisplay(dateStr: string): string {
   try {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', {
@@ -106,8 +116,9 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
 
       // Temporarily set invoice number (will be replaced by server call)
       setInvoiceNumber('Loading...');
-      setDateOfIssue(formatDateForInput(prefill?.dateOfIssue) || today);
-      setDueDate(formatDateForInput(prefill?.dueDate) || today);
+      const issueDate = formatDateForInput(prefill?.dateOfIssue) || today;
+      setDateOfIssue(issueDate);
+      setDueDate(addOneMonth(issueDate));
       setCurrency(prefill?.currency || 'INR');
       setStatus(prefill?.status || 'paid');
 
@@ -179,6 +190,13 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
     // Only re-fetch when modal opens or issue date changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, dateOfIssue]);
+
+  // Auto-sync: next payment due = issue date + 1 month
+  useEffect(() => {
+    if (dateOfIssue) {
+      setDueDate(addOneMonth(dateOfIssue));
+    }
+  }, [dateOfIssue]);
 
   // Escape key to close
   useEffect(() => {
@@ -372,7 +390,7 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
                     ]}
                   />
                   <Field label="Date of Issue" value={dateOfIssue} onChange={setDateOfIssue} type="date" />
-                  <Field label="Due Date" value={dueDate} onChange={setDueDate} type="date" />
+                  <Field label="Next Payment Due" value={dueDate} onChange={setDueDate} type="date" />
                   <Field label="Currency" value={currency} onChange={setCurrency} />
                 </div>
               </Section>
