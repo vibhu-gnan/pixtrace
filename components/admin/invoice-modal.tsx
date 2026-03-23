@@ -372,12 +372,25 @@ export function InvoiceModal({ isOpen, onClose, prefillData }: InvoiceModalProps
                     <label className="block text-xs text-gray-500 mb-1">
                       Invoice # {loadingNumber && <span className="text-blue-400">(auto-generating...)</span>}
                     </label>
-                    <input
-                      type="text"
-                      value={invoiceNumber}
-                      readOnly
-                      className="w-full px-3 py-1.5 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg outline-none font-mono cursor-default"
-                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={invoiceNumber}
+                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                        className="w-full px-3 py-1.5 text-sm text-gray-900 border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 outline-none font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fetchInvoiceNumber(planId, dateOfIssue)}
+                        disabled={loadingNumber}
+                        className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shrink-0 disabled:opacity-50"
+                        title="Re-generate invoice number"
+                      >
+                        <svg className={`w-3.5 h-3.5 ${loadingNumber ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                   <SelectField
                     label="Status"
