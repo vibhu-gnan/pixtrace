@@ -215,55 +215,39 @@ export default function Home() {
 
                 <div className="mt-12 flex items-center gap-4 text-sm text-slate-500">
                   <div className="flex -space-x-3">
-                    <div className="w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-blue-500 to-purple-500" />
-                    <div className="w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-purple-500 to-pink-500" />
-                    <div className="w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-pink-500 to-orange-500" />
+                    <div className="flex items-center justify-center font-bold text-xs text-white w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-blue-500 to-purple-500 z-30 shadow-sm">JD</div>
+                    <div className="flex items-center justify-center font-bold text-xs text-white w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-purple-500 to-pink-500 z-20 shadow-sm">SM</div>
+                    <div className="flex items-center justify-center font-bold text-xs text-white w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-pink-500 to-orange-500 z-10 shadow-sm">RK</div>
                   </div>
                   <p>Trusted by 2,000+ Event Photographers</p>
                 </div>
               </div>
 
-              {/* Hero gallery grid — sourced from public/homepage/ (or R2 via NEXT_PUBLIC_HERO_IMAGES_BASE_URL).
-                  bg-slate-900 acts as a fallback while each image loads or if it fails. */}
-              <div className="relative h-[600px] w-full hidden lg:block perspective-1000" aria-hidden="true">
-                <div className="absolute inset-0 grid grid-cols-3 gap-4 transform rotate-y-12 rotate-x-6 scale-90 opacity-80 grid-mask">
+              {/* Hero gallery grids — sourced from public/homepage/ (or R2 via NEXT_PUBLIC_HERO_IMAGES_BASE_URL). */}
+              <div className="relative w-full lg:h-[600px] [perspective:1000px]" aria-hidden="true">
+                
+                {/* Desktop 3D Grid */}
+                <div 
+                  className="hidden lg:grid absolute inset-0 grid-cols-3 gap-4 opacity-85 grid-mask origin-center transition-transform duration-1000 ease-out"
+                  style={{ transform: "rotateX(6deg) rotateY(-12deg) scale(0.95)" }}
+                >
                   {HERO_GRID.map((col, colIdx) => (
-                    <div
-                      key={colIdx}
-                      className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}
-                    >
+                    <div key={colIdx} className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}>
                       {col.map((tile) => (
                         <div
                           key={tile.file}
-                          className={[
-                            'relative rounded-xl overflow-hidden group bg-slate-900',
-                            tile.h,
-                            tile.badge
-                              ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]'
-                              : '',
-                          ].join(' ')}
+                          className={`relative rounded-xl overflow-hidden group bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]' : ''}`}
                         >
                           <Image
                             src={heroImageSrc(tile.file)}
                             alt=""
                             fill
                             sizes={tile.sizes}
-                            className={[
-                              'object-cover',
-                              tile.badge
-                                ? ''
-                                : 'transition-transform duration-500 group-hover:scale-105',
-                            ].join(' ')}
+                            className={`object-cover ${tile.badge ? '' : 'transition-transform duration-500 group-hover:scale-105'}`}
                             priority={tile.priority}
                             loading={tile.priority ? undefined : 'eager'}
                           />
-
-                          {tile.overlay && (
-                            <div
-                              className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`}
-                            />
-                          )}
-
+                          {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
                           {tile.badge && (
                             <>
                               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
@@ -277,6 +261,36 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+
+                {/* Mobile 2D Fallback */}
+                <div className="block lg:hidden mt-8 md:mt-12 h-[380px] sm:h-[450px] relative overflow-hidden grid-mask">
+                  <div className="absolute inset-x-0 top-0 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 opacity-95">
+                    {HERO_GRID.map((col, colIdx) => (
+                      <div key={colIdx} className={`flex flex-col gap-3 sm:gap-4 ${colIdx === 2 ? 'hidden sm:flex' : ''} ${colIdx === 0 ? '-mt-6 sm:-mt-8' : ''}`}>
+                        {col.map((tile) => (
+                          <div key={tile.file} className={`relative rounded-xl overflow-hidden bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_20px_rgba(43,108,238,0.15)]' : ''}`}>
+                            <Image
+                              src={heroImageSrc(tile.file)}
+                              alt=""
+                              fill
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 0px"
+                              className="object-cover"
+                              priority={tile.priority}
+                              loading={tile.priority ? undefined : 'eager'}
+                            />
+                            {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
+                            {tile.badge && (
+                              <div className="absolute bottom-3 left-3 bg-background-dark/90 backdrop-blur px-2 py-1 rounded text-[10px] text-primary font-mono border border-primary/20">
+                                {tile.badge}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             </div>
           </section>
