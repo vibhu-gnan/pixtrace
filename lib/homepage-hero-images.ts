@@ -65,19 +65,19 @@ export const HERO_GRID: HeroTile[][] = [
     {
       file: 'hero-01.jpg',
       h: 'h-64',
-      sizes: '(min-width: 1024px) 200px, 0px',
+      sizes: '200px',
       overlay: 'from-blue-600/25 to-purple-600/25',
     },
     {
       file: 'hero-02.jpg',
       h: 'h-48',
-      sizes: '(min-width: 1024px) 200px, 0px',
+      sizes: '200px',
       overlay: 'from-purple-600/20 to-pink-600/20',
     },
     {
       file: 'hero-03.jpg',
       h: 'h-64',
-      sizes: '(min-width: 1024px) 200px, 0px',
+      sizes: '200px',
       overlay: 'from-pink-600/20 to-orange-600/20',
     },
   ],
@@ -86,7 +86,7 @@ export const HERO_GRID: HeroTile[][] = [
     {
       file: 'hero-04.jpg',
       h: 'h-56',
-      sizes: '(min-width: 1024px) 220px, 0px',
+      sizes: '220px',
       overlay: '',
       priority: true,
       badge: 'PREMIUM GALLERY',
@@ -94,7 +94,7 @@ export const HERO_GRID: HeroTile[][] = [
     {
       file: 'hero-05.jpg',
       h: 'h-72',
-      sizes: '(min-width: 1024px) 220px, 0px',
+      sizes: '220px',
       overlay: 'from-cyan-600/15 to-blue-600/15',
     },
   ],
@@ -103,13 +103,13 @@ export const HERO_GRID: HeroTile[][] = [
     {
       file: 'hero-06.jpg',
       h: 'h-48',
-      sizes: '(min-width: 1024px) 200px, 0px',
+      sizes: '200px',
       overlay: 'from-indigo-600/15 to-blue-600/15',
     },
     {
       file: 'hero-07.jpg',
       h: 'h-80',
-      sizes: '(min-width: 1024px) 200px, 0px',
+      sizes: '200px',
       overlay: 'from-slate-800/30 to-slate-900/40',
     },
   ],

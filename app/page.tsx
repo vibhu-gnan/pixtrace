@@ -255,6 +255,7 @@ export default function Home() {
                                 : 'transition-transform duration-500 group-hover:scale-105',
                             ].join(' ')}
                             priority={tile.priority}
+                            loading={tile.priority ? undefined : 'eager'}
                           />
 
                           {tile.overlay && (
