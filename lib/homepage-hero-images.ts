@@ -89,7 +89,6 @@ export const HERO_GRID: HeroTile[][] = [
       sizes: '220px',
       overlay: '',
       priority: true,
-      badge: 'PREMIUM GALLERY',
     },
     {
       file: 'hero-05.jpg',
