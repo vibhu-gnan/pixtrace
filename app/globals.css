@@ -113,12 +113,43 @@ body {
   animation: progressIndeterminate 1.2s ease-in-out infinite;
 }
 
+/* Hero column infinite scroll — content is duplicated so 50% = one full cycle */
+@keyframes heroScrollUp {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+@keyframes heroScrollDown {
+  0%   { transform: translateY(-50%); }
+  100% { transform: translateY(0); }
+}
+
+/* Vertical fade mask for the scrolling columns (fades top + bottom) */
+.hero-scroll-mask {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 8%,
+    black 85%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 8%,
+    black 85%,
+    transparent 100%
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-slideshow-img,
   .skeleton-enter {
     animation: none !important;
   }
   .skeleton-shimmer {
+    animation: none !important;
+  }
+  .hero-scroll-col {
     animation: none !important;
   }
 }

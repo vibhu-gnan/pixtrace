@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { heroImageSrc, HERO_GRID, COLUMN_OFFSETS } from '@/lib/homepage-hero-images';
+import { heroImageSrc, HERO_GRID } from '@/lib/homepage-hero-images';
 import Navigation from '@/components/Navigation';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import type { Metadata } from 'next';
@@ -223,80 +223,112 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Hero gallery grids — sourced from public/homepage/ (or R2 via NEXT_PUBLIC_HERO_IMAGES_BASE_URL). */}
+              {/* Hero gallery grids — infinite scroll marquee columns.
+                  Each column's tiles are rendered 2× for seamless looping.
+                  Columns alternate scroll direction (up/down/up) at different
+                  speeds for organic visual depth. Pure CSS — no client JS. */}
               <div className="relative w-full lg:h-[600px]" style={{ perspective: '1200px' }} aria-hidden="true">
                 
-                {/* Desktop 3D Grid — uses flex instead of CSS grid to prevent 
-                    middle-column collapse under 3D perspective transforms */}
+                {/* Desktop 3D Scrolling Grid */}
                 <div 
-                  className="hidden lg:flex absolute inset-0 gap-4 opacity-90 grid-mask"
+                  className="hidden lg:flex absolute inset-0 gap-4 opacity-90 hero-scroll-mask"
                   style={{ 
                     transform: 'rotateX(6deg) rotateY(-12deg) scale(0.90)',
                     transformOrigin: 'center center',
                     transformStyle: 'preserve-3d',
                   }}
                 >
-                  {HERO_GRID.map((col, colIdx) => (
-                    <div 
-                      key={colIdx} 
-                      className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}
-                      style={{ flex: '1 1 0%', minWidth: 0 }}
-                    >
-                      {col.map((tile) => (
-                        <div
-                          key={tile.file}
-                          className={`relative shrink-0 rounded-xl overflow-hidden group bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]' : ''}`}
+                  {HERO_GRID.map((col, colIdx) => {
+                    const direction = colIdx % 2 === 0 ? 'heroScrollUp' : 'heroScrollDown';
+                    const durations = ['25s', '30s', '22s'];
+                    return (
+                      <div 
+                        key={colIdx} 
+                        className="overflow-hidden"
+                        style={{ flex: '1 1 0%', minWidth: 0 }}
+                      >
+                        <div 
+                          className="hero-scroll-col flex flex-col gap-4"
+                          style={{ animation: `${direction} ${durations[colIdx]} linear infinite` }}
                         >
-                          <Image
-                            src={heroImageSrc(tile.file)}
-                            alt=""
-                            fill
-                            sizes={tile.sizes}
-                            className={`object-cover ${tile.badge ? '' : 'transition-transform duration-500 group-hover:scale-105'}`}
-                            priority={tile.priority}
-                            loading={tile.priority ? undefined : 'eager'}
-                          />
-                          {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
-                          {tile.badge && (
-                            <>
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
-                              <div className="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">
-                                {tile.badge}
+                          {/* Render tiles twice for seamless loop */}
+                          {[0, 1].map((setIdx) =>
+                            col.map((tile) => (
+                              <div
+                                key={`${tile.file}-${setIdx}`}
+                                className={`relative shrink-0 rounded-xl overflow-hidden group bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]' : ''}`}
+                              >
+                                <Image
+                                  src={heroImageSrc(tile.file)}
+                                  alt=""
+                                  fill
+                                  sizes={tile.sizes}
+                                  className={`object-cover ${tile.badge ? '' : 'transition-transform duration-500 group-hover:scale-105'}`}
+                                  priority={setIdx === 0 && tile.priority}
+                                  loading={setIdx === 0 && tile.priority ? undefined : 'lazy'}
+                                />
+                                {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
+                                {tile.badge && (
+                                  <>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
+                                    <div className="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">
+                                      {tile.badge}
+                                    </div>
+                                  </>
+                                )}
                               </div>
-                            </>
+                            ))
                           )}
                         </div>
-                      ))}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Mobile 2D Fallback */}
-                <div className="block lg:hidden mt-8 md:mt-12 h-[380px] sm:h-[450px] relative overflow-hidden grid-mask">
-                  <div className="absolute inset-x-0 top-0 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 opacity-95">
-                    {HERO_GRID.map((col, colIdx) => (
-                      <div key={colIdx} className={`flex flex-col gap-3 sm:gap-4 ${colIdx === 2 ? 'hidden sm:flex' : ''} ${colIdx === 0 ? '-mt-6 sm:-mt-8' : ''}`}>
-                        {col.map((tile) => (
-                          <div key={tile.file} className={`relative rounded-xl overflow-hidden bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_20px_rgba(43,108,238,0.15)]' : ''}`}>
-                            <Image
-                              src={heroImageSrc(tile.file)}
-                              alt=""
-                              fill
-                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 0px"
-                              className="object-cover"
-                              priority={tile.priority}
-                              loading={tile.priority ? undefined : 'eager'}
-                            />
-                            {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
-                            {tile.badge && (
-                              <div className="absolute bottom-3 left-3 bg-background-dark/90 backdrop-blur px-2 py-1 rounded text-[10px] text-primary font-mono border border-primary/20">
-                                {tile.badge}
-                              </div>
+                {/* Mobile Scrolling Grid */}
+                <div className="block lg:hidden mt-8 md:mt-12 h-[380px] sm:h-[450px] relative overflow-hidden hero-scroll-mask">
+                  <div className="absolute inset-x-0 top-0 flex gap-3 sm:gap-4 opacity-95">
+                    {HERO_GRID.map((col, colIdx) => {
+                      const direction = colIdx % 2 === 0 ? 'heroScrollUp' : 'heroScrollDown';
+                      const durations = ['20s', '26s', '18s'];
+                      return (
+                        <div 
+                          key={colIdx} 
+                          className={`overflow-hidden ${colIdx === 2 ? 'hidden sm:block' : ''}`}
+                          style={{ flex: '1 1 0%', minWidth: 0 }}
+                        >
+                          <div 
+                            className="hero-scroll-col flex flex-col gap-3 sm:gap-4"
+                            style={{ animation: `${direction} ${durations[colIdx]} linear infinite` }}
+                          >
+                            {[0, 1].map((setIdx) =>
+                              col.map((tile) => (
+                                <div 
+                                  key={`${tile.file}-m-${setIdx}`} 
+                                  className={`relative shrink-0 rounded-xl overflow-hidden bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_20px_rgba(43,108,238,0.15)]' : ''}`}
+                                >
+                                  <Image
+                                    src={heroImageSrc(tile.file)}
+                                    alt=""
+                                    fill
+                                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 0px"
+                                    className="object-cover"
+                                    priority={setIdx === 0 && tile.priority}
+                                    loading={setIdx === 0 && tile.priority ? undefined : 'lazy'}
+                                  />
+                                  {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
+                                  {tile.badge && (
+                                    <div className="absolute bottom-3 left-3 bg-background-dark/90 backdrop-blur px-2 py-1 rounded text-[10px] text-primary font-mono border border-primary/20">
+                                      {tile.badge}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
                             )}
                           </div>
-                        ))}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
