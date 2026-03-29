@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import Navigation from '@/components/Navigation';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -221,68 +222,89 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Hero Gallery Grid - Desktop Only */}
+              {/* Hero Gallery Grid - Desktop Only (Unsplash — free for commercial use) */}
               <div className="relative h-[600px] w-full hidden lg:block perspective-1000" aria-hidden="true">
                 <div className="absolute inset-0 grid grid-cols-3 gap-4 transform rotate-y-12 rotate-x-6 scale-90 opacity-80 grid-mask">
                   <div className="flex flex-col gap-4 -mt-12">
-                    <div className="relative rounded-xl overflow-hidden h-64 group bg-gradient-to-br from-blue-600 to-purple-600">
-                      <div className="w-full h-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
-                      <div className="absolute inset-0 bg-primary/10"></div>
+                    <div className="relative rounded-xl overflow-hidden h-64 group bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="200px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/25 to-purple-600/25 pointer-events-none" />
                     </div>
-                    <div className="relative rounded-xl overflow-hidden h-48 group bg-gradient-to-br from-purple-600 to-pink-600">
-                      <div className="w-full h-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
+                    <div className="relative rounded-xl overflow-hidden h-48 group bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1606800052052-a08af7148866?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="200px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-pink-600/20 pointer-events-none" />
                     </div>
-                    <div className="relative rounded-xl overflow-hidden h-64 group bg-gradient-to-br from-pink-600 to-orange-600">
-                      <div className="w-full h-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
+                    <div className="relative rounded-xl overflow-hidden h-64 group bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1591604466107-ec655d5a7c64?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="200px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-pink-600/20 to-orange-600/20 pointer-events-none" />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-4">
-                    <div className="relative rounded-xl overflow-hidden h-56 group border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)] bg-gradient-to-br from-emerald-600 to-cyan-600">
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
+                    <div className="relative rounded-xl overflow-hidden h-56 group border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)] bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1519167758481-83f29da8c0f4?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="220px"
+                        className="object-cover"
+                        priority
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
                       <div className="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">
                         PREMIUM GALLERY
                       </div>
                     </div>
-                    <div className="relative rounded-xl overflow-hidden h-72 group bg-gradient-to-br from-cyan-600 to-blue-600">
-                      <div className="w-full h-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
+                    <div className="relative rounded-xl overflow-hidden h-72 group bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1464366400609-398bd0961a7d?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="220px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/15 to-blue-600/15 pointer-events-none" />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-4 -mt-8">
-                    <div className="relative rounded-xl overflow-hidden h-48 group bg-gradient-to-br from-indigo-600 to-blue-600">
-                      <div className="w-full h-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
+                    <div className="relative rounded-xl overflow-hidden h-48 group bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1601925260368-f2b47d2b866e?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="200px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/15 to-blue-600/15 pointer-events-none" />
                     </div>
-                    <div className="relative rounded-xl overflow-hidden h-80 group bg-gradient-to-br from-slate-700 to-slate-800">
-                      <div className="w-full h-full flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="material-icons text-6xl text-white/40" aria-hidden="true">
-                          image
-                        </span>
-                      </div>
+                    <div className="relative rounded-xl overflow-hidden h-80 group bg-slate-900">
+                      <Image
+                        src="https://images.unsplash.com/photo-1523438093499-845260dd59d7?auto=format&fit=crop&w=800&q=80"
+                        alt=""
+                        fill
+                        sizes="200px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/30 to-slate-900/40 pointer-events-none" />
                     </div>
                   </div>
                 </div>
