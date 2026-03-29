@@ -224,19 +224,28 @@ export default function Home() {
               </div>
 
               {/* Hero gallery grids — sourced from public/homepage/ (or R2 via NEXT_PUBLIC_HERO_IMAGES_BASE_URL). */}
-              <div className="relative w-full lg:h-[600px] [perspective:1000px]" aria-hidden="true">
+              <div className="relative w-full lg:h-[600px]" style={{ perspective: '1200px' }} aria-hidden="true">
                 
-                {/* Desktop 3D Grid */}
+                {/* Desktop 3D Grid — uses flex instead of CSS grid to prevent 
+                    middle-column collapse under 3D perspective transforms */}
                 <div 
-                  className="hidden lg:grid absolute inset-0 grid-cols-3 gap-4 opacity-85 grid-mask origin-center transition-transform duration-1000 ease-out"
-                  style={{ transform: "perspective(1200px) rotateX(8deg) rotateY(12deg) scale(0.9)" }}
+                  className="hidden lg:flex absolute inset-0 gap-4 opacity-90 grid-mask"
+                  style={{ 
+                    transform: 'rotateX(6deg) rotateY(-12deg) scale(0.90)',
+                    transformOrigin: 'center center',
+                    transformStyle: 'preserve-3d',
+                  }}
                 >
                   {HERO_GRID.map((col, colIdx) => (
-                    <div key={colIdx} className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}>
+                    <div 
+                      key={colIdx} 
+                      className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}
+                      style={{ flex: '1 1 0%', minWidth: 0 }}
+                    >
                       {col.map((tile) => (
                         <div
                           key={tile.file}
-                          className={`relative rounded-xl overflow-hidden group bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]' : ''}`}
+                          className={`relative shrink-0 rounded-xl overflow-hidden group bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]' : ''}`}
                         >
                           <Image
                             src={heroImageSrc(tile.file)}
