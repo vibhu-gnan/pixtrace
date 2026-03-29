@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { heroImageSrc, HERO_GRID_FILENAMES } from '@/lib/homepage-hero-images';
+import { heroImageSrc, HERO_GRID, COLUMN_OFFSETS } from '@/lib/homepage-hero-images';
 import Navigation from '@/components/Navigation';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import type { Metadata } from 'next';
@@ -223,81 +223,58 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Hero gallery: files in public/homepage/; optional R2 via NEXT_PUBLIC_HERO_IMAGES_BASE_URL */}
+              {/* Hero gallery grid — sourced from public/homepage/ (or R2 via NEXT_PUBLIC_HERO_IMAGES_BASE_URL).
+                  bg-slate-900 acts as a fallback while each image loads or if it fails. */}
               <div className="relative h-[600px] w-full hidden lg:block perspective-1000" aria-hidden="true">
                 <div className="absolute inset-0 grid grid-cols-3 gap-4 transform rotate-y-12 rotate-x-6 scale-90 opacity-80 grid-mask">
-                  <div className="flex flex-col gap-4 -mt-12">
-                    {(
-                      [
-                        { file: HERO_GRID_FILENAMES.col1[0], h: 'h-64', overlay: 'from-blue-600/25 to-purple-600/25' },
-                        { file: HERO_GRID_FILENAMES.col1[1], h: 'h-48', overlay: 'from-purple-600/20 to-pink-600/20' },
-                        { file: HERO_GRID_FILENAMES.col1[2], h: 'h-64', overlay: 'from-pink-600/20 to-orange-600/20' },
-                      ] as const
-                    ).map(({ file, h, overlay }) => (
-                      <div key={file} className={`relative rounded-xl overflow-hidden ${h} group bg-slate-900`}>
-                        <Image
-                          src={heroImageSrc(file)}
-                          alt=""
-                          fill
-                          sizes="200px"
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
+                  {HERO_GRID.map((col, colIdx) => (
+                    <div
+                      key={colIdx}
+                      className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}
+                    >
+                      {col.map((tile) => (
                         <div
-                          className={`absolute inset-0 bg-gradient-to-br ${overlay} pointer-events-none`}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                          key={tile.file}
+                          className={[
+                            'relative rounded-xl overflow-hidden group bg-slate-900',
+                            tile.h,
+                            tile.badge
+                              ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]'
+                              : '',
+                          ].join(' ')}
+                        >
+                          <Image
+                            src={heroImageSrc(tile.file)}
+                            alt=""
+                            fill
+                            sizes={tile.sizes}
+                            className={[
+                              'object-cover',
+                              tile.badge
+                                ? ''
+                                : 'transition-transform duration-500 group-hover:scale-105',
+                            ].join(' ')}
+                            priority={tile.priority}
+                          />
 
-                  <div className="flex flex-col gap-4">
-                    <div className="relative rounded-xl overflow-hidden h-56 group border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)] bg-slate-900">
-                      <Image
-                        src={heroImageSrc(HERO_GRID_FILENAMES.col2[0])}
-                        alt=""
-                        fill
-                        sizes="220px"
-                        className="object-cover"
-                        priority
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
-                      <div className="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">
-                        PREMIUM GALLERY
-                      </div>
-                    </div>
-                    <div className="relative rounded-xl overflow-hidden h-72 group bg-slate-900">
-                      <Image
-                        src={heroImageSrc(HERO_GRID_FILENAMES.col2[1])}
-                        alt=""
-                        fill
-                        sizes="220px"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-600/15 to-blue-600/15 pointer-events-none" />
-                    </div>
-                  </div>
+                          {tile.overlay && (
+                            <div
+                              className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`}
+                            />
+                          )}
 
-                  <div className="flex flex-col gap-4 -mt-8">
-                    <div className="relative rounded-xl overflow-hidden h-48 group bg-slate-900">
-                      <Image
-                        src={heroImageSrc(HERO_GRID_FILENAMES.col3[0])}
-                        alt=""
-                        fill
-                        sizes="200px"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/15 to-blue-600/15 pointer-events-none" />
+                          {tile.badge && (
+                            <>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
+                              <div className="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">
+                                {tile.badge}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                    <div className="relative rounded-xl overflow-hidden h-80 group bg-slate-900">
-                      <Image
-                        src={heroImageSrc(HERO_GRID_FILENAMES.col3[1])}
-                        alt=""
-                        fill
-                        sizes="200px"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-br from-slate-800/30 to-slate-900/40 pointer-events-none" />
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
