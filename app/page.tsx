@@ -229,7 +229,7 @@ export default function Home() {
                 {/* Desktop 3D Grid */}
                 <div 
                   className="hidden lg:grid absolute inset-0 grid-cols-3 gap-4 opacity-85 grid-mask origin-center transition-transform duration-1000 ease-out"
-                  style={{ transform: "rotateX(6deg) rotateY(-12deg) scale(0.95)" }}
+                  style={{ transform: "perspective(1200px) rotateX(8deg) rotateY(12deg) scale(0.9)" }}
                 >
                   {HERO_GRID.map((col, colIdx) => (
                     <div key={colIdx} className={`flex flex-col gap-4 ${COLUMN_OFFSETS[colIdx]}`}>
