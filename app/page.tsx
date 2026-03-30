@@ -6,16 +6,16 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'PIXTRACE - Event Photo Gallery & QR Code Sharing for Photographers',
+  title: 'PIXTRACE - AI Face Recognition Photo Delivery for Event Photographers',
   description:
-    'PIXTRACE is the premium event gallery platform for photographers. Share original-quality photos with guests instantly via QR codes. Perfect for weddings, corporate events, parties & more. Start free today.',
+    'Upload event photos once. Pixtrace\'s face recognition automatically finds and delivers every guest\'s photos — no manual sorting, no tagging, no follow-up. Try free.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'PIXTRACE - Event Photo Gallery & QR Code Sharing for Photographers',
+    title: 'PIXTRACE - AI Face Recognition Photo Delivery for Event Photographers',
     description:
-      'Share original-quality event photos with guests instantly via QR codes. The premium gallery platform for weddings, corporate events & more.',
+      'Upload event photos once. Pixtrace\'s face recognition automatically finds and delivers every guest\'s photos — no manual sorting, no tagging.',
     url: '/',
     type: 'website',
   },
@@ -162,37 +162,48 @@ export default function Home() {
 
         <main>
           {/* Hero Section */}
-          <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+          <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden" aria-labelledby="hero-heading">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/20 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none"></div>
 
             <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
               <div className="relative z-10 max-w-2xl">
+                {/* Announcement Badge — face recognition USP */}
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-primary mb-6">
                   <span className="relative flex h-2 w-2" aria-label="Live indicator">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                   </span>
-                  New Gallery Engine v2.0 Live
+                  ⚡ Face recognition delivery — results in under 5 seconds
                 </div>
 
-                <h1 className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-[1.1]">
-                  Event Photo Gallery with{' '}
+                {/* Audience qualifier */}
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">
+                  For Wedding &amp; Event Photographers
+                </p>
+
+                <h1 id="hero-heading" className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-[1.1]">
+                  Your Guests Find Their Photos in Seconds{' '}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">
-                    QR Code Sharing.
+                    — Not Days.
                   </span>
                 </h1>
 
-                <p className="text-lg text-slate-400 mb-8 max-w-lg leading-relaxed">
-                  The premium gallery platform for event photographers. Deliver original-quality photos to your guests instantly via simple QR codes. Perfect for weddings, corporate events &amp; parties.
+                <p className="text-lg text-slate-400 mb-4 max-w-lg leading-relaxed">
+                  Upload your event photos once. Pixtrace&apos;s face recognition automatically finds and delivers every guest&apos;s photos to them — no manual sorting, no tagging, no follow-up.
+                </p>
+
+                {/* Pain point urgency line */}
+                <p className="text-sm text-slate-500 mb-8 max-w-lg leading-relaxed italic border-l-2 border-primary/40 pl-4">
+                  Most photographers spend 3–5 hours after every event sorting and sending photos. Pixtrace does it in minutes.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Link
                     href="/pricing"
                     className="px-8 py-4 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg transition-all shadow-[0_0_30px_-10px_rgba(43,108,238,0.6)] flex items-center justify-center gap-2 group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark"
-                    aria-label="View pricing plans"
+                    aria-label="Try Pixtrace free — no credit card required"
                   >
-                    Get Started Free
+                    Try It Free — No Credit Card
                     <span
                       className="material-icons text-sm group-hover:translate-x-1 transition-transform"
                       aria-hidden="true"
@@ -202,31 +213,29 @@ export default function Home() {
                   </Link>
 
                   <Link
-                    href="/gallery"
-                    className="px-8 py-4 glass-panel text-white font-semibold rounded-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                    aria-label="View demo gallery"
+                    href="#demo-video"
+                    className="px-8 py-4 bg-white/10 hover:bg-white/15 backdrop-blur text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 border border-white/10 group"
+                    aria-label="Watch a 60 second demo video"
                   >
-                    <span className="material-icons text-primary" aria-hidden="true">
+                    <span className="material-icons text-white/80 group-hover:text-white" aria-hidden="true">
                       play_circle
                     </span>
-                    View Demo
+                    Watch 60s Demo →
                   </Link>
                 </div>
 
-                <div className="mt-12 flex items-center gap-4 text-sm text-slate-500">
-                  <div className="flex -space-x-3">
-                    <div className="flex items-center justify-center font-bold text-xs text-white w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-blue-500 to-purple-500 z-30 shadow-sm">JD</div>
-                    <div className="flex items-center justify-center font-bold text-xs text-white w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-purple-500 to-pink-500 z-20 shadow-sm">SM</div>
-                    <div className="flex items-center justify-center font-bold text-xs text-white w-10 h-10 rounded-full border-2 border-background-dark bg-gradient-to-br from-pink-500 to-orange-500 z-10 shadow-sm">RK</div>
-                  </div>
-                  <p>Trusted by 2,000+ Event Photographers</p>
-                </div>
+                {/* Testimonial quote */}
+                <blockquote className="mt-10 glass-panel rounded-xl p-5 max-w-lg">
+                  <p className="text-sm text-slate-300 leading-relaxed italic">
+                    &ldquo;We delivered 800 guest photos in under 10 minutes after the event. Our clients were stunned.&rdquo;
+                  </p>
+                  <footer className="text-xs text-slate-500 mt-2 font-medium">
+                    — <cite className="not-italic">Rajesh Kumar, Wedding Photographer</cite>
+                  </footer>
+                </blockquote>
               </div>
 
-              {/* Hero gallery grids — infinite scroll marquee columns.
-                  Each column's tiles are rendered 2× for seamless looping.
-                  Columns alternate scroll direction (up/down/up) at different
-                  speeds for organic visual depth. Pure CSS — no client JS. */}
+              {/* Hero right side — scrolling photo grid with product mockup overlay */}
               <div className="relative w-full lg:h-[600px]" style={{ perspective: '1200px' }} aria-hidden="true">
                 
                 {/* Desktop 3D Scrolling Grid */}
@@ -251,7 +260,6 @@ export default function Home() {
                           className="hero-scroll-col flex flex-col gap-4"
                           style={{ animation: `${direction} ${durations[colIdx]} linear infinite` }}
                         >
-                          {/* Render tiles twice for seamless loop */}
                           {[0, 1].map((setIdx) =>
                             col.map((tile) => (
                               <div
@@ -283,6 +291,50 @@ export default function Home() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Product mockup overlay — face-search flow */}
+                <div className="hidden lg:flex absolute inset-0 z-20 items-center justify-center pointer-events-none">
+                  <div className="relative bg-background-dark/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-primary/10 p-6 w-[280px]">
+                    {/* Phone mockup: selfie upload → matched results */}
+                    <div className="text-center mb-4">
+                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-3">
+                        <span className="material-icons text-3xl text-primary" aria-hidden="true">face_retouching_natural</span>
+                      </div>
+                      <p className="text-xs font-semibold text-white">Guest takes a selfie</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">AI matches their face instantly</p>
+                    </div>
+                    <div className="flex items-center justify-center gap-1 mb-3">
+                      <span className="material-icons text-xs text-primary animate-pulse" aria-hidden="true">arrow_downward</span>
+                      <span className="text-[10px] text-primary font-mono">~5 sec</span>
+                      <span className="material-icons text-xs text-primary animate-pulse" aria-hidden="true">arrow_downward</span>
+                    </div>
+                    {/* Result grid mini preview */}
+                    <div className="grid grid-cols-3 gap-1.5 rounded-lg overflow-hidden">
+                      {HERO_GRID.flat().slice(0, 6).map((tile) => (
+                        <div key={`mockup-${tile.file}`} className="relative aspect-square rounded-md overflow-hidden bg-slate-800">
+                          <Image src={heroImageSrc(tile.file)} alt="" fill sizes="60px" className="object-cover" loading="lazy" />
+                          <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-emerald-500 border border-white/20 flex items-center justify-center">
+                            <span className="material-icons text-[6px] text-white" aria-hidden="true">check</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-center text-[10px] text-slate-400 mt-3 font-medium">6 photos found — tap to download</p>
+                  </div>
+                </div>
+
+                {/* Demo video placeholder */}
+                <div id="demo-video" className="hidden lg:flex absolute bottom-4 right-4 z-30">
+                  <div className="bg-background-dark/90 backdrop-blur border border-white/10 rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-xl">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <span className="material-icons text-primary text-sm" aria-hidden="true">play_arrow</span>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-white">Demo Video</p>
+                      <p className="text-[9px] text-slate-500">Coming soon · 60s walkthrough</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Mobile Scrolling Grid */}
