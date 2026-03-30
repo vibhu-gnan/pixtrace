@@ -363,16 +363,40 @@ export default function Home() {
                         Organize thousands of event photos into beautiful albums effortlessly. Create curated collections that highlight the best moments from weddings, corporate events, and parties.
                       </p>
                     </div>
-                    <div className="w-full h-48 rounded-xl bg-background-dark/50 border border-white/5 relative overflow-hidden flex items-center justify-center px-8">
-                      <div className="grid grid-cols-4 gap-2 w-full max-w-md opacity-75">
-                        <div className="h-20 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-2"></div>
-                        <div className="h-20 bg-slate-700/50 rounded border border-slate-600/50 w-full transform -translate-y-2"></div>
-                        <div className="h-20 bg-primary/20 rounded border border-primary/50 w-full transform translate-y-4 shadow-[0_0_15px_rgba(43,108,238,0.3)]"></div>
-                        <div className="h-20 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-1"></div>
-                        <div className="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-2"></div>
-                        <div className="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform -translate-y-2"></div>
-                        <div className="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-4"></div>
-                        <div className="h-16 bg-slate-700/50 rounded border border-slate-600/50 w-full transform translate-y-1"></div>
+                    <div className="w-full h-48 rounded-xl bg-background-dark/50 border border-white/5 relative overflow-hidden hero-scroll-mask">
+                      <div className="absolute inset-0 flex gap-2 px-4 py-2">
+                        {[
+                          { files: ['hero-01.jpg', 'hero-05.jpg'], dir: 'heroScrollUp', speed: '18s' },
+                          { files: ['hero-02.jpg', 'hero-06.jpg'], dir: 'heroScrollDown', speed: '22s' },
+                          { files: ['hero-04.jpg', 'hero-07.jpg'], dir: 'heroScrollUp', speed: '16s' },
+                          { files: ['hero-03.jpg', 'hero-05.jpg'], dir: 'heroScrollDown', speed: '20s' },
+                        ].map((col, colIdx) => (
+                          <div key={colIdx} className="overflow-hidden" style={{ flex: '1 1 0%', minWidth: 0 }}>
+                            <div
+                              className="hero-scroll-col flex flex-col gap-2"
+                              style={{ animation: `${col.dir} ${col.speed} linear infinite` }}
+                            >
+                              {[0, 1].map((setIdx) =>
+                                col.files.map((file) => (
+                                  <div
+                                    key={`${file}-feat-${setIdx}`}
+                                    className="relative shrink-0 h-28 rounded-lg overflow-hidden bg-slate-800"
+                                  >
+                                    <Image
+                                      src={heroImageSrc(file)}
+                                      alt=""
+                                      fill
+                                      sizes="120px"
+                                      className="object-cover"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/20 pointer-events-none" />
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
