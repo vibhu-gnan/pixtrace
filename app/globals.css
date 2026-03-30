@@ -153,6 +153,17 @@ body {
   mask-composite: intersect;
 }
 
+/* Animated progress bar for face-search mockup */
+@keyframes heroProgressShimmer {
+  0%   { opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.hero-progress-bar {
+  animation: heroProgressShimmer 2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-slideshow-img,
   .skeleton-enter {
@@ -162,6 +173,9 @@ body {
     animation: none !important;
   }
   .hero-scroll-col {
+    animation: none !important;
+  }
+  .hero-progress-bar {
     animation: none !important;
   }
 }

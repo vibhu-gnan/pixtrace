@@ -162,45 +162,45 @@ export default function Home() {
 
         <main>
           {/* Hero Section */}
-          <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden" aria-labelledby="hero-heading">
+          <section className="relative pt-28 pb-16 lg:pt-36 lg:pb-24 overflow-hidden" aria-labelledby="hero-heading">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/20 rounded-full blur-[120px] -z-10 opacity-40 pointer-events-none"></div>
 
-            <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
-              <div className="relative z-10 max-w-2xl">
+            <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-10 items-center">
+              <div className="relative z-10 max-w-xl">
                 {/* Announcement Badge — face recognition USP */}
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-primary mb-6">
-                  <span className="relative flex h-2 w-2" aria-label="Live indicator">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-primary mb-5">
+                  <span className="relative flex h-2 w-2" aria-label="Live feature indicator">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                   </span>
                   ⚡ Face recognition delivery — results in under 5 seconds
                 </div>
 
                 {/* Audience qualifier */}
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">
                   For Wedding &amp; Event Photographers
                 </p>
 
-                <h1 id="hero-heading" className="text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 leading-[1.1]">
+                <h1 id="hero-heading" className="text-4xl lg:text-5xl font-bold tracking-tight text-white mb-4 leading-[1.15]">
                   Your Guests Find Their Photos in Seconds{' '}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">
                     — Not Days.
                   </span>
                 </h1>
 
-                <p className="text-lg text-slate-400 mb-4 max-w-lg leading-relaxed">
+                <p className="text-base text-slate-400 mb-3 max-w-lg leading-relaxed">
                   Upload your event photos once. Pixtrace&apos;s face recognition automatically finds and delivers every guest&apos;s photos to them — no manual sorting, no tagging, no follow-up.
                 </p>
 
-                {/* Pain point urgency line */}
-                <p className="text-sm text-slate-500 mb-8 max-w-lg leading-relaxed italic border-l-2 border-primary/40 pl-4">
-                  Most photographers spend 3–5 hours after every event sorting and sending photos. Pixtrace does it in minutes.
+                {/* Pain point urgency line — bold, prominent */}
+                <p className="text-sm text-slate-300 mb-6 max-w-lg leading-relaxed font-medium">
+                  Most photographers spend 3–5 hours after every event sorting and sending photos. <span className="text-primary">Pixtrace does it in minutes.</span>
                 </p>
 
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     href="/pricing"
-                    className="px-8 py-4 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg transition-all shadow-[0_0_30px_-10px_rgba(43,108,238,0.6)] flex items-center justify-center gap-2 group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark"
+                    className="px-7 py-3.5 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg transition-all shadow-[0_0_30px_-10px_rgba(43,108,238,0.6)] flex items-center justify-center gap-2 group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background-dark"
                     aria-label="Try Pixtrace free — no credit card required"
                   >
                     Try It Free — No Credit Card
@@ -214,7 +214,7 @@ export default function Home() {
 
                   <Link
                     href="#demo-video"
-                    className="px-8 py-4 bg-white/10 hover:bg-white/15 backdrop-blur text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 border border-white/10 group"
+                    className="px-7 py-3.5 bg-white/10 hover:bg-white/15 backdrop-blur text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 border border-white/10 group"
                     aria-label="Watch a 60 second demo video"
                   >
                     <span className="material-icons text-white/80 group-hover:text-white" aria-hidden="true">
@@ -224,115 +224,95 @@ export default function Home() {
                   </Link>
                 </div>
 
-                {/* Testimonial quote */}
-                <blockquote className="mt-10 glass-panel rounded-xl p-5 max-w-lg">
-                  <p className="text-sm text-slate-300 leading-relaxed italic">
-                    &ldquo;We delivered 800 guest photos in under 10 minutes after the event. Our clients were stunned.&rdquo;
-                  </p>
-                  <footer className="text-xs text-slate-500 mt-2 font-medium">
-                    — <cite className="not-italic">Rajesh Kumar, Wedding Photographer</cite>
-                  </footer>
+                {/* Testimonial quote — enriched with avatar, location, event */}
+                <blockquote className="mt-8 flex items-start gap-3 max-w-lg">
+                  <div className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-md">
+                    RK
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      &ldquo;We delivered 800 guest photos in under 10 minutes after the event. Our clients were stunned.&rdquo;
+                    </p>
+                    <footer className="text-xs text-slate-500 mt-1.5 font-medium">
+                      — <cite className="not-italic">Rajesh Kumar, Photographer · Gurugram Wedding, Feb 2025</cite>
+                    </footer>
+                  </div>
                 </blockquote>
               </div>
 
-              {/* Hero right side — scrolling photo grid with product mockup overlay */}
-              <div className="relative w-full lg:h-[600px]" style={{ perspective: '1200px' }} aria-hidden="true">
-                
-                {/* Desktop 3D Scrolling Grid */}
-                <div 
-                  className="hidden lg:flex absolute inset-0 gap-4 opacity-90 hero-scroll-mask"
-                  style={{ 
-                    transform: 'rotateX(6deg) rotateY(-12deg) scale(0.90)',
-                    transformOrigin: 'center center',
-                    transformStyle: 'preserve-3d',
-                  }}
-                >
-                  {HERO_GRID.map((col, colIdx) => {
-                    const direction = colIdx % 2 === 0 ? 'heroScrollUp' : 'heroScrollDown';
-                    const durations = ['25s', '30s', '22s'];
-                    return (
-                      <div 
-                        key={colIdx} 
-                        className="overflow-hidden"
-                        style={{ flex: '1 1 0%', minWidth: 0 }}
-                      >
-                        <div 
-                          className="hero-scroll-col flex flex-col gap-4"
-                          style={{ animation: `${direction} ${durations[colIdx]} linear infinite` }}
-                        >
-                          {[0, 1].map((setIdx) =>
-                            col.map((tile) => (
-                              <div
-                                key={`${tile.file}-${setIdx}`}
-                                className={`relative shrink-0 rounded-xl overflow-hidden group bg-slate-900 ${tile.h} ${tile.badge ? 'border border-primary/30 shadow-[0_0_30px_rgba(43,108,238,0.2)]' : ''}`}
-                              >
-                                <Image
-                                  src={heroImageSrc(tile.file)}
-                                  alt=""
-                                  fill
-                                  sizes={tile.sizes}
-                                  className={`object-cover ${tile.badge ? '' : 'transition-transform duration-500 group-hover:scale-105'}`}
-                                  priority={setIdx === 0 && tile.priority}
-                                  loading={setIdx === 0 && tile.priority ? undefined : 'lazy'}
-                                />
-                                {tile.overlay && <div className={`absolute inset-0 bg-gradient-to-br ${tile.overlay} pointer-events-none`} />}
-                                {tile.badge && (
-                                  <>
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-emerald-900/15 pointer-events-none" />
-                                    <div className="absolute bottom-4 left-4 bg-background-dark/80 backdrop-blur px-3 py-1 rounded text-xs text-primary font-mono border border-primary/20">
-                                      {tile.badge}
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            ))
-                          )}
+              {/* Hero right side — Product mockup: face-search flow UI */}
+              <div className="relative w-full" aria-hidden="true">
+
+                {/* Desktop: standalone face-search product mockup */}
+                <div className="hidden lg:block">
+                  <div className="relative mx-auto w-full max-w-md">
+                    {/* Ambient glow behind the card */}
+                    <div className="absolute -inset-4 bg-primary/10 rounded-3xl blur-2xl opacity-60 pointer-events-none"></div>
+
+                    <div className="relative bg-background-dark/70 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden">
+                      {/* Top bar */}
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                        <div className="flex items-center gap-2">
+                          <span className="material-icons text-primary text-lg" aria-hidden="true">photo_camera</span>
+                          <span className="text-xs font-semibold text-white">Pixtrace Face Search</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-medium">Live</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
 
-                {/* Product mockup overlay — face-search flow */}
-                <div className="hidden lg:flex absolute inset-0 z-20 items-center justify-center pointer-events-none">
-                  <div className="relative bg-background-dark/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-primary/10 p-6 w-[280px]">
-                    {/* Phone mockup: selfie upload → matched results */}
-                    <div className="text-center mb-4">
-                      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/15 mb-3">
-                        <span className="material-icons text-3xl text-primary" aria-hidden="true">face_retouching_natural</span>
-                      </div>
-                      <p className="text-xs font-semibold text-white">Guest takes a selfie</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">AI matches their face instantly</p>
-                    </div>
-                    <div className="flex items-center justify-center gap-1 mb-3">
-                      <span className="material-icons text-xs text-primary animate-pulse" aria-hidden="true">arrow_downward</span>
-                      <span className="text-[10px] text-primary font-mono">~5 sec</span>
-                      <span className="material-icons text-xs text-primary animate-pulse" aria-hidden="true">arrow_downward</span>
-                    </div>
-                    {/* Result grid mini preview */}
-                    <div className="grid grid-cols-3 gap-1.5 rounded-lg overflow-hidden">
-                      {HERO_GRID.flat().slice(0, 6).map((tile) => (
-                        <div key={`mockup-${tile.file}`} className="relative aspect-square rounded-md overflow-hidden bg-slate-800">
-                          <Image src={heroImageSrc(tile.file)} alt="" fill sizes="60px" className="object-cover" loading="lazy" />
-                          <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-emerald-500 border border-white/20 flex items-center justify-center">
-                            <span className="material-icons text-[6px] text-white" aria-hidden="true">check</span>
+                      {/* Step 1: Selfie upload */}
+                      <div className="px-5 py-4 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border-2 border-dashed border-white/15 flex flex-col items-center justify-center shrink-0">
+                            <span className="material-icons text-2xl text-primary/70" aria-hidden="true">face_retouching_natural</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">Step 1: Guest takes a selfie</p>
+                            <p className="text-xs text-slate-500 mt-0.5">Or uploads any photo of their face</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-center text-[10px] text-slate-400 mt-3 font-medium">6 photos found — tap to download</p>
-                  </div>
-                </div>
+                      </div>
 
-                {/* Demo video placeholder */}
-                <div id="demo-video" className="hidden lg:flex absolute bottom-4 right-4 z-30">
-                  <div className="bg-background-dark/90 backdrop-blur border border-white/10 rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-xl">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="material-icons text-primary text-sm" aria-hidden="true">play_arrow</span>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-white">Demo Video</p>
-                      <p className="text-[9px] text-slate-500">Coming soon · 60s walkthrough</p>
+                      {/* Processing indicator */}
+                      <div className="px-5 py-3 border-b border-white/5 flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <span className="material-icons text-sm text-primary animate-pulse" aria-hidden="true">arrow_downward</span>
+                        </div>
+                        <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
+                          <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-primary to-blue-400 hero-progress-bar"></div>
+                        </div>
+                        <span className="text-[11px] text-primary font-mono font-semibold">~5 sec</span>
+                      </div>
+
+                      {/* Step 2: Matched results */}
+                      <div className="px-5 pt-4 pb-2">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-semibold text-white">Step 2: Matched photos</p>
+                          <span className="text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full font-medium">6 found</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {HERO_GRID.flat().slice(0, 6).map((tile, i) => (
+                            <div key={`mockup-${tile.file}`} className="relative aspect-[4/5] rounded-lg overflow-hidden bg-slate-800 group">
+                              <Image src={heroImageSrc(tile.file)} alt="" fill sizes="120px" className="object-cover transition-transform duration-300 group-hover:scale-105" loading={i < 2 ? undefined : 'lazy'} priority={i < 2} />
+                              <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-background-dark flex items-center justify-center">
+                                <span className="material-icons text-[8px] text-white" aria-hidden="true">check</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Bottom action */}
+                      <div className="px-5 py-3 mt-1 border-t border-white/5">
+                        <div className="w-full py-2 rounded-lg bg-primary/15 text-center text-xs font-semibold text-primary">
+                          Download All Photos →
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -381,6 +361,19 @@ export default function Home() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* Demo video placeholder */}
+                <div id="demo-video" className="hidden lg:flex mt-4 justify-center">
+                  <div className="bg-background-dark/90 backdrop-blur border border-white/10 rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-xl">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <span className="material-icons text-primary text-sm" aria-hidden="true">play_arrow</span>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold text-white">Demo Video</p>
+                      <p className="text-[9px] text-slate-500">Coming soon · 60s walkthrough</p>
+                    </div>
                   </div>
                 </div>
 
