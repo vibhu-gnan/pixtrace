@@ -141,6 +141,18 @@ body {
   );
 }
 
+/* Vignette mask — fades all 4 edges for smooth blending into bg */
+.hero-vignette-mask {
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, black 10%, black 85%, transparent 100%);
+  -webkit-mask-composite: destination-in;
+  mask-image:
+    linear-gradient(to right, transparent 0%, black 12%, black 88%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, black 10%, black 85%, transparent 100%);
+  mask-composite: intersect;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-slideshow-img,
   .skeleton-enter {

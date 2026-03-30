@@ -363,7 +363,7 @@ export default function Home() {
                         Organize thousands of event photos into beautiful albums effortlessly. Create curated collections that highlight the best moments from weddings, corporate events, and parties.
                       </p>
                     </div>
-                    <div className="w-full h-48 rounded-xl bg-background-dark/50 border border-white/5 relative overflow-hidden hero-scroll-mask">
+                    <div className="w-full h-48 rounded-xl bg-background-dark/50 border border-white/5 relative overflow-hidden hero-vignette-mask">
                       <div className="absolute inset-0 flex gap-2 px-4 py-2">
                         {[
                           { files: ['hero-01.jpg', 'hero-05.jpg'], dir: 'heroScrollUp', speed: '18s' },
