@@ -640,7 +640,9 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
           className="fixed inset-0 z-50 flex items-center justify-center focus:outline-none"
           style={{ touchAction: 'none' }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+          aria-describedby={undefined}
         >
+          <Dialog.Title className="sr-only">Photo viewer</Dialog.Title>
           {/* Top-right buttons */}
           <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
             {allowDownload && (
