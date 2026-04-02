@@ -26,6 +26,9 @@ export interface FaceSearchResults {
   searchTimeMs: number;
 }
 
+const POLL_INTERVAL_MS = 5000;  // 5s between polls
+const MAX_POLL_ATTEMPTS = 40;   // 40 × 5s = 3m20s max wait
+
 export function useFaceSearch(eventHash: string, accessToken?: string | null) {
   const [state, setState] = useState<FaceSearchState>('idle');
   const [results, setResults] = useState<FaceSearchResults | null>(null);
@@ -34,7 +37,7 @@ export function useFaceSearch(eventHash: string, accessToken?: string | null) {
   const abortRef = useRef<AbortController | null>(null);
 
   const search = useCallback(async (selfieBlob: Blob, albumId?: string) => {
-    // Cancel any in-flight search
+    // Cancel any in-flight search or poll
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -44,53 +47,100 @@ export function useFaceSearch(eventHash: string, accessToken?: string | null) {
     setErrorCode(null);
 
     try {
+      // --- Step 1: Submit selfie and get a job_id ---
       const formData = new FormData();
       formData.append('selfie', selfieBlob, 'selfie.jpg');
       formData.append('eventHash', eventHash);
       if (albumId) formData.append('albumId', albumId);
 
       const headers: Record<string, string> = {};
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const resp = await fetch('/api/face/search', {
+      const submitResp = await fetch('/api/face/search', {
         method: 'POST',
         body: formData,
         headers,
         signal: controller.signal,
       });
 
-      // Bail if aborted after fetch completed (new search started)
       if (controller.signal.aborted) return;
 
-      const data = await resp.json();
-
+      const submitData = await submitResp.json();
       if (controller.signal.aborted) return;
 
-      if (!resp.ok) {
-        const code = data.error || '';
+      if (!submitResp.ok) {
+        const code = submitData.error || '';
         setErrorCode(code);
-        if (code === 'no_face_detected') {
-          setError('No face detected. Try with better lighting.');
-        } else if (code === 'low_quality_selfie') {
-          setError('Face quality too low. Try with better lighting.');
-        } else {
-          setError(data.message || data.error || 'Search failed. Please try again.');
-        }
+        setError(submitData.message || submitData.error || 'Search failed. Please try again.');
         setState('error');
         return;
       }
 
-      const searchResults: FaceSearchResults = {
-        tier1: data.tier1 || [],
-        tier2: data.tier2 || [],
-        totalMatches: data.total_matches || 0,
-        searchTimeMs: data.search_time_ms || 0,
-      };
+      const jobId: string = submitData.job_id;
+      if (!jobId) {
+        setError('Search failed. Please try again.');
+        setState('error');
+        return;
+      }
 
-      setResults(searchResults);
-      setState(searchResults.totalMatches > 0 ? 'results' : 'no_results');
+      // --- Step 2: Poll until completed, failed, or timed out ---
+      for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+        // Wait before polling (the cron picks up jobs every ~60s)
+        await new Promise<void>(resolve => {
+          const t = setTimeout(resolve, POLL_INTERVAL_MS);
+          controller.signal.addEventListener('abort', () => { clearTimeout(t); resolve(); });
+        });
+
+        if (controller.signal.aborted) return;
+
+        const pollResp = await fetch(`/api/face/poll/${jobId}`, {
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) return;
+
+        const pollData = await pollResp.json();
+        if (controller.signal.aborted) return;
+
+        if (!pollResp.ok) {
+          setError('Search failed. Please try again.');
+          setState('error');
+          return;
+        }
+
+        if (pollData.status === 'completed') {
+          const searchResults: FaceSearchResults = {
+            tier1: pollData.tier1 || [],
+            tier2: pollData.tier2 || [],
+            totalMatches: pollData.total_matches || 0,
+            searchTimeMs: 0,
+          };
+          setResults(searchResults);
+          setState(searchResults.totalMatches > 0 ? 'results' : 'no_results');
+          return;
+        }
+
+        if (pollData.status === 'failed') {
+          const code = pollData.error || '';
+          setErrorCode(code);
+          if (code === 'no_face_detected') {
+            setError('No face detected. Try with better lighting.');
+          } else if (code === 'low_quality_selfie' || code === 'invalid_embedding') {
+            setError('Face quality too low. Try with better lighting.');
+          } else {
+            setError(pollData.message || 'Search failed. Please try again.');
+          }
+          setState('error');
+          return;
+        }
+
+        // status === 'pending' or 'processing' — keep polling
+      }
+
+      // Exceeded max polls (~3 min)
+      setError('Search is taking longer than expected. Please try again.');
+      setState('error');
+
     } catch (err) {
       if ((err as Error).name === 'AbortError') return; // Intentional cancel
       setError('Connection failed. Please try again.');
@@ -108,13 +158,13 @@ export function useFaceSearch(eventHash: string, accessToken?: string | null) {
     setErrorCode(null);
   }, []);
 
-  // Cleanup on unmount — abort any in-flight request
+  // Cleanup on unmount — abort any in-flight request or poll
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
   }, []);
 
   /** True if the error was caused by a bad selfie (retry should re-open camera) */
-  const isSelfieQualityError = errorCode === 'no_face_detected' || errorCode === 'low_quality_selfie';
+  const isSelfieQualityError = errorCode === 'no_face_detected' || errorCode === 'low_quality_selfie' || errorCode === 'invalid_embedding';
 
   return { state, results, error, isSelfieQualityError, search, reset };
 }

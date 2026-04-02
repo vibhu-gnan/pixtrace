@@ -37,7 +37,7 @@ gpu_image = (
     )
 )
 
-# CPU image — lightweight for single selfie embedding (no Supabase, no GPU runtime)
+# CPU image — selfie embedding + async job processing (includes Supabase for cron)
 cpu_image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
@@ -49,6 +49,7 @@ cpu_image = (
         "retina-face>=0.0.17",
         "insightface>=0.7.3",
         "onnxruntime>=1.17",
+        "supabase>=2.0",
         "fastapi[standard]",
     )
 )
@@ -578,3 +579,367 @@ class SelfieEmbedder:
             "confidence": best_face["confidence"],
             "face_count": len(faces),
         })
+
+
+# ---------------------------------------------------------------------------
+# Async face search job processing — cron-driven, no Vercel timeout risk
+# ---------------------------------------------------------------------------
+
+# Module-level recognizer cache — persists across invocations in same container.
+_cron_recognizer = None
+
+
+def _get_cron_recognizer():
+    """Lazy-load the InsightFace recognition model for the cron container."""
+    global _cron_recognizer
+    if _cron_recognizer is not None:
+        return _cron_recognizer
+
+    from insightface.model_zoo import get_model
+
+    model_path = "/models/w600k_r50.onnx"
+    if not os.path.exists(model_path):
+        raise RuntimeError(
+            "Model not found at /models/w600k_r50.onnx — deploy SelfieEmbedder "
+            "first (it downloads the model to the shared volume on first run)."
+        )
+
+    recognizer = get_model(model_path)
+    recognizer.prepare(ctx_id=-1)  # CPU-only
+    print("[cron] InsightFace model loaded.")
+    _cron_recognizer = recognizer
+    return _cron_recognizer
+
+
+def _parse_embedding_py(raw):
+    """Parse pgvector string '[0.1,0.2,...]' or list to list[float]."""
+    if isinstance(raw, list):
+        return [float(v) for v in raw]
+    if isinstance(raw, str):
+        try:
+            import json as _json
+            parsed = _json.loads(raw)
+            return [float(v) for v in parsed]
+        except Exception:
+            pass
+    return []
+
+
+def _build_prototype_py(embeddings):
+    """Compute L2-normalized mean of a list of embeddings."""
+    import numpy as np
+    if not embeddings:
+        return []
+    arr = np.array(embeddings, dtype=np.float32)
+    mean = arr.mean(axis=0)
+    norm = float(np.linalg.norm(mean))
+    if norm < 1e-10:
+        return mean.tolist()
+    return (mean / norm).tolist()
+
+
+def _run_face_search_py(supabase, selfie_embedding, event_id):
+    """
+    Python port of lib/face/search-algorithm.ts runFaceSearch.
+    Returns {tier1: [{media_id, score}], tier2: [...], prototype: [...]}
+    """
+    TIER_1_THRESHOLD = 0.40
+    TIER_2_THRESHOLD = 0.29
+    REFINEMENT_CYCLES = 3
+    MAX_CANDIDATES = 200
+
+    def to_pgvector(emb):
+        return f'[{",".join(str(v) for v in emb)}]'
+
+    def search(query_emb):
+        result = supabase.rpc("search_face_embeddings", {
+            "query_embedding": to_pgvector(query_emb),
+            "target_event_id": event_id,
+            "similarity_threshold": TIER_2_THRESHOLD,
+            "max_results": MAX_CANDIDATES,
+        }).execute()
+        return result.data or []
+
+    # Step A: initial search with selfie embedding
+    initial = search(selfie_embedding)
+
+    tier1_face_ids = set()
+    tier1_embeddings = []
+    all_scores = {}  # face_id → {media_id, score}
+
+    for face in initial:
+        fid = face["face_id"]
+        score = face["combined_score"]
+        all_scores[fid] = {"media_id": face["media_id"], "score": score}
+        if score >= TIER_1_THRESHOLD:
+            tier1_face_ids.add(fid)
+            emb = _parse_embedding_py(face.get("embedding"))
+            if emb:
+                tier1_embeddings.append(emb)
+
+    current_proto = selfie_embedding
+
+    # Step B: iterative refinement
+    if tier1_embeddings:
+        for _ in range(REFINEMENT_CYCLES):
+            current_proto = _build_prototype_py(tier1_embeddings)
+            proto_results = search(current_proto)
+
+            added = 0
+            for face in proto_results:
+                fid = face["face_id"]
+                score = face["combined_score"]
+                if fid not in all_scores or score > all_scores[fid]["score"]:
+                    all_scores[fid] = {"media_id": face["media_id"], "score": score}
+                if fid not in tier1_face_ids and score >= TIER_1_THRESHOLD:
+                    tier1_face_ids.add(fid)
+                    emb = _parse_embedding_py(face.get("embedding"))
+                    if emb:
+                        tier1_embeddings.append(emb)
+                    added += 1
+
+            if added == 0:
+                break  # converged
+
+    # Step C: final wide search with best prototype
+    if current_proto is not selfie_embedding:
+        for face in search(current_proto):
+            fid = face["face_id"]
+            score = face["combined_score"]
+            if fid not in all_scores or score > all_scores[fid]["score"]:
+                all_scores[fid] = {"media_id": face["media_id"], "score": score}
+
+    # Step D: deduplicate by media_id (keep highest score)
+    media_scores = {}  # media_id → {score, is_tier1}
+    for fid, data in all_scores.items():
+        mid = data["media_id"]
+        score = data["score"]
+        is_tier1 = fid in tier1_face_ids
+        existing = media_scores.get(mid)
+        if not existing or score > existing["score"]:
+            media_scores[mid] = {
+                "score": score,
+                "is_tier1": is_tier1 or (existing or {}).get("is_tier1", False),
+            }
+
+    tier1 = []
+    tier2 = []
+    for mid, data in media_scores.items():
+        item = {"media_id": mid, "score": round(data["score"] * 1000) / 1000}
+        if data["is_tier1"]:
+            tier1.append(item)
+        else:
+            tier2.append(item)
+
+    tier1.sort(key=lambda x: x["score"], reverse=True)
+    tier2.sort(key=lambda x: x["score"], reverse=True)
+
+    return {"tier1": tier1, "tier2": tier2, "prototype": current_proto}
+
+
+def _send_alert_email(subject, body):
+    """
+    Send an alert email via Resend (https://resend.com).
+    Requires RESEND_API_KEY and ALERT_EMAIL in Modal secrets.
+    Silently skips if not configured.
+    """
+    import urllib.request
+    import json as _json
+
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    alert_email = os.environ.get("ALERT_EMAIL", "")
+    if not api_key or not alert_email:
+        print(f"[alert] Email not configured. Subject: {subject}\n{body}")
+        return
+
+    payload = _json.dumps({
+        "from": "alerts@pixtrace.in",
+        "to": [alert_email],
+        "subject": subject,
+        "text": body,
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except Exception as e:
+        print(f"[alert] Failed to send email: {e}")
+
+
+@app.function(
+    image=cpu_image,
+    cpu=2,
+    memory=2048,
+    timeout=300,           # 5 min: enough for cold start (60s) + up to 5 jobs × 30s each
+    scaledown_window=120,  # stay warm between 60s cron runs to avoid cold starts
+    volumes={"/models": model_volume},
+    secrets=[modal.Secret.from_name("pixtrace-env")],
+    schedule=modal.Period(seconds=60),
+)
+def process_face_search_jobs():
+    """
+    Cron: runs every 60 seconds.
+    1. Cleans up expired jobs.
+    2. Detects and fails stuck jobs.
+    3. Claims up to 5 pending jobs and processes them:
+       selfie embed → pgvector search → write results → save face profile.
+    4. Sends alert email on failure if RESEND_API_KEY is configured.
+    """
+    import base64
+    import math
+    from datetime import datetime, timezone, timedelta
+    from supabase import create_client
+
+    supabase = create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+    )
+    now = datetime.now(timezone.utc)
+
+    # 1. Delete expired jobs (>2h old)
+    supabase.table("face_search_jobs").delete().lt(
+        "expires_at", now.isoformat()
+    ).execute()
+
+    # 2. Fail jobs stuck in 'processing' for >10 minutes (crashed containers)
+    stuck_cutoff = (now - timedelta(minutes=10)).isoformat()
+    supabase.table("face_search_jobs").update({
+        "status": "failed",
+        "error": "Processing timed out — Modal container may have crashed. Please try again.",
+        "completed_at": now.isoformat(),
+    }).eq("status", "processing").lt("started_at", stuck_cutoff).execute()
+
+    # 3. Fetch up to 5 pending jobs (FIFO)
+    resp = supabase.table("face_search_jobs").select(
+        "id, event_id, album_id, selfie_data, "
+        "auth_user_id, auth_user_email, auth_user_name"
+    ).eq("status", "pending").order("created_at").limit(5).execute()
+
+    jobs = resp.data or []
+    if not jobs:
+        return  # Nothing to do — exit fast (< 1s compute)
+
+    recognizer = _get_cron_recognizer()
+
+    for job in jobs:
+        job_id = job["id"]
+
+        # Atomically claim: pending → processing (prevents duplicate processing)
+        claim = supabase.table("face_search_jobs").update({
+            "status": "processing",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", job_id).eq("status", "pending").execute()
+
+        if not claim.data:
+            continue  # Another cron run already claimed this job
+
+        try:
+            selfie_data = job.get("selfie_data")
+            if not selfie_data:
+                raise ValueError("selfie_data is missing from job record")
+
+            image_bytes = base64.b64decode(selfie_data)
+
+            # Embed selfie
+            faces = _process_single_image(recognizer, image_bytes)
+
+            if not faces:
+                supabase.table("face_search_jobs").update({
+                    "status": "failed",
+                    "error": "no_face_detected",
+                    "selfie_data": None,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", job_id).execute()
+                continue
+
+            # Pick the largest face
+            best = max(
+                faces,
+                key=lambda f: (f["bbox"][2] - f["bbox"][0]) * (f["bbox"][3] - f["bbox"][1]),
+            )
+            embedding = best["embedding"]
+
+            if not embedding or len(embedding) != 512 or any(
+                math.isnan(v) or math.isinf(v) for v in embedding
+            ):
+                supabase.table("face_search_jobs").update({
+                    "status": "failed",
+                    "error": "invalid_embedding",
+                    "selfie_data": None,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", job_id).execute()
+                continue
+
+            # Run pgvector search
+            search_result = _run_face_search_py(supabase, embedding, job["event_id"])
+
+            # Save face profile for recall feature (authenticated users only)
+            auth_user_id = job.get("auth_user_id")
+            prototype = search_result.get("prototype")
+            total_matches = len(search_result["tier1"]) + len(search_result["tier2"])
+
+            if auth_user_id and prototype and total_matches > 0:
+                try:
+                    gu_resp = supabase.table("gallery_users").upsert({
+                        "auth_id": auth_user_id,
+                        "email": job.get("auth_user_email") or "unknown",
+                        "name": job.get("auth_user_name"),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }, on_conflict="auth_id").select("id").execute()
+
+                    if gu_resp.data:
+                        gu_id = gu_resp.data[0]["id"]
+                        pg_vec = f'[{",".join(str(v) for v in prototype)}]'
+                        supabase.table("face_search_profiles").upsert({
+                            "gallery_user_id": gu_id,
+                            "event_id": job["event_id"],
+                            "prototype_embedding": pg_vec,
+                            "match_count": total_matches,
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        }, on_conflict="gallery_user_id,event_id").execute()
+                except Exception as e:
+                    # Non-critical: face profile saving failure must not fail the search
+                    print(f"[cron] Failed to save face profile for job {job_id}: {e}")
+
+            # Store result; clear selfie_data to free storage
+            supabase.table("face_search_jobs").update({
+                "status": "completed",
+                "result": {"tier1": search_result["tier1"], "tier2": search_result["tier2"]},
+                "selfie_data": None,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", job_id).execute()
+
+            print(
+                f"[cron] Job {job_id} completed: "
+                f"{len(search_result['tier1'])} tier1, {len(search_result['tier2'])} tier2"
+            )
+
+        except Exception as e:
+            error_msg = str(e)[:500]
+            print(f"[cron] Job {job_id} failed: {error_msg}")
+
+            supabase.table("face_search_jobs").update({
+                "status": "failed",
+                "error": error_msg,
+                "selfie_data": None,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", job_id).execute()
+
+            _send_alert_email(
+                subject="[PIXTRACE] Face search job failed",
+                body=(
+                    f"Job ID:  {job_id}\n"
+                    f"Event:   {job.get('event_id')}\n"
+                    f"Error:   {error_msg}\n\n"
+                    f"Check Modal logs for details."
+                ),
+            )

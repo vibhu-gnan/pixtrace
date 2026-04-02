@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPublicClient } from '@/lib/supabase/public';
 import { FACE_SEARCH } from '@/lib/face/constants';
-import { runFaceSearch } from '@/lib/face/search-algorithm';
-import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
+
+// Creates an async face search job and returns immediately.
+// Modal cron processes the job within ~60s and writes results to face_search_jobs.
+// Client polls /api/face/poll/[jobId] for status and results.
+// This keeps the route well within Vercel Free's 10s function limit.
 
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-
   try {
     const formData = await request.formData();
     const selfie = formData.get('selfie') as File | null;
@@ -21,7 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate selfie
     if (!selfie.type.startsWith('image/')) {
       return NextResponse.json(
         { error: 'Selfie must be an image' },
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve event_hash → event_id (must be public)
+    // Resolve event (must be public)
     const publicClient = getPublicClient();
     const { data: eventData } = await publicClient
       .from('events')
@@ -44,219 +44,59 @@ export async function POST(request: NextRequest) {
       .eq('is_public', true)
       .single();
 
-    const event = eventData as { id: string; name: string; is_public: boolean } | null;
-    if (!event) {
+    if (!eventData) {
       return NextResponse.json(
         { error: 'Event not found or not public' },
         { status: 404 },
       );
     }
 
-    // Convert selfie to base64 and send to Modal CPU endpoint for embedding
-    const embedSelfieUrl = process.env.MODAL_EMBED_SELFIE_CPU_URL || process.env.MODAL_EMBED_SELFIE_URL;
-    if (!embedSelfieUrl) {
-      return NextResponse.json(
-        { error: 'Face search service not configured' },
-        { status: 503 },
-      );
-    }
-
-    const selfieBuffer = await selfie.arrayBuffer();
-    const selfieBase64 = Buffer.from(selfieBuffer).toString('base64');
-
-    // 30s timeout — covers Modal cold starts without holding the function forever
-    const modalAbort = new AbortController();
-    const modalTimeout = setTimeout(() => modalAbort.abort(), 30000);
-
-    let embedResp: Response;
-    try {
-      embedResp = await fetch(embedSelfieUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_base64: selfieBase64,
-          secret: process.env.FACE_PROCESSING_SECRET,
-        }),
-        signal: modalAbort.signal,
-      });
-    } catch (err) {
-      clearTimeout(modalTimeout);
-      const isTimeout = (err as Error).name === 'AbortError';
-      console.error('Modal embed_selfie fetch failed:', isTimeout ? 'timeout (30s)' : err);
-      return NextResponse.json(
-        { error: isTimeout ? 'Face search timed out. Please try again.' : 'Face processing service unavailable' },
-        { status: isTimeout ? 504 : 503 },
-      );
-    }
-    clearTimeout(modalTimeout);
-
-    const embedResult = await embedResp.json().catch(() => null);
-
-    if (!embedResp.ok || !embedResult) {
-      console.error('Modal embed_selfie error:', embedResp.status, embedResult);
-      return NextResponse.json(
-        { error: 'Face processing service unavailable' },
-        { status: 503 },
-      );
-    }
-
-    // Handle all error responses from Modal
-    if (embedResult.error) {
-      const errorMap: Record<string, { error: string; message: string; status: number }> = {
-        no_face_detected: { error: 'no_face_detected', message: 'No face detected in your selfie. Please try again with better lighting and face the camera directly.', status: 422 },
-        invalid_image: { error: 'invalid_image', message: 'Could not process your photo. Please try taking a new selfie.', status: 422 },
-        invalid_embedding: { error: 'low_quality_selfie', message: 'Could not generate a valid face embedding. Please try again with better lighting.', status: 422 },
-        processing_failed: { error: 'processing_failed', message: 'Face processing failed. Please try again.', status: 500 },
-      };
-      const mapped = errorMap[embedResult.error] || { error: embedResult.error, message: embedResult.message || 'Unknown error', status: 500 };
-      return NextResponse.json(
-        { error: mapped.error, message: mapped.message },
-        { status: mapped.status },
-      );
-    }
-
-    if (embedResult.confidence < FACE_SEARCH.MIN_SELFIE_CONFIDENCE) {
-      return NextResponse.json(
-        { error: 'low_quality_selfie', confidence: embedResult.confidence, message: 'Face detection confidence is too low. Try better lighting.' },
-        { status: 422 },
-      );
-    }
-
-    const selfieEmbedding: number[] = embedResult.embedding;
-
-    // Validate embedding for NaN/Inf
-    if (!selfieEmbedding || selfieEmbedding.length !== 512 || selfieEmbedding.some((v: number) => !Number.isFinite(v))) {
-      console.error('Invalid embedding from Modal:', {
-        length: selfieEmbedding?.length,
-        hasNaN: selfieEmbedding?.some((v: number) => Number.isNaN(v)),
-        sample: selfieEmbedding?.slice(0, 5),
-      });
-      return NextResponse.json(
-        { error: 'low_quality_selfie', message: 'Could not generate a valid face embedding. Please try again with better lighting.' },
-        { status: 422 },
-      );
-    }
-
-    // Optionally extract auth user for profile saving
-    const authHeader = request.headers.get('Authorization');
+    // Extract auth user for face profile saving (optional — recall feature)
+    const adminClient = createAdminClient();
     let authUserId: string | null = null;
     let authUserEmail: string | null = null;
     let authUserName: string | null = null;
 
-    const adminClient = createAdminClient();
-
+    const authHeader = request.headers.get('Authorization');
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
-      const { data: { user: authUser } } = await adminClient.auth.getUser(token);
-      if (authUser) {
-        authUserId = authUser.id;
-        authUserEmail = authUser.email || null;
-        authUserName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || null;
+      const { data: { user } } = await adminClient.auth.getUser(token);
+      if (user) {
+        authUserId = user.id;
+        authUserEmail = user.email || null;
+        authUserName = user.user_metadata?.full_name || user.user_metadata?.name || null;
       }
     }
 
-    // Run 3-iteration refinement search
-    const { tier1, tier2, prototype } = await runFaceSearch(adminClient, selfieEmbedding, event.id);
+    // Convert selfie to base64 for storage
+    const selfieBuffer = await selfie.arrayBuffer();
+    const selfieBase64 = Buffer.from(selfieBuffer).toString('base64');
 
-    // Collect all matching media_ids
-    const allMatches = [...tier1, ...tier2];
+    // Create the job — Modal cron will pick it up within ~60s
+    const { data: job, error: insertError } = await adminClient
+      .from('face_search_jobs')
+      .insert({
+        event_id: (eventData as { id: string }).id,
+        album_id: albumId || null,
+        selfie_data: selfieBase64,
+        auth_user_id: authUserId,
+        auth_user_email: authUserEmail,
+        auth_user_name: authUserName,
+      })
+      .select('id')
+      .single();
 
-    // Save face profile if user is authenticated and search produced results
-    if (authUserId && prototype && allMatches.length > 0) {
-      try {
-        const { data: galleryUser } = await adminClient
-          .from('gallery_users')
-          .upsert(
-            {
-              auth_id: authUserId,
-              email: authUserEmail || 'unknown',
-              name: authUserName,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'auth_id' }
-          )
-          .select('id')
-          .single();
-
-        if (galleryUser) {
-          const pgVector = `[${prototype.join(',')}]`;
-          await adminClient
-            .from('face_search_profiles')
-            .upsert(
-              {
-                gallery_user_id: galleryUser.id,
-                event_id: event.id,
-                prototype_embedding: pgVector,
-                match_count: allMatches.length,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'gallery_user_id,event_id' }
-            );
-        }
-      } catch (err) {
-        // Non-critical: log but don't fail the search
-        console.error('Failed to save face profile:', err);
-      }
+    if (insertError || !job) {
+      console.error('Failed to create face search job:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to create search job' },
+        { status: 500 },
+      );
     }
-
-    if (allMatches.length === 0) {
-      return NextResponse.json({
-        tier1: [],
-        tier2: [],
-        total_matches: 0,
-        search_time_ms: Date.now() - startTime,
-      });
-    }
-
-    // Fetch media details (album filter pushed to SQL to avoid fetching unnecessary rows)
-    const mediaIds = allMatches.map(m => m.mediaId);
-    let mediaQuery = adminClient
-      .from('media')
-      .select('id, album_id, r2_key, preview_r2_key, width, height')
-      .in('id', mediaIds);
-
-    if (albumId) {
-      mediaQuery = mediaQuery.eq('album_id', albumId);
-    }
-
-    const { data: filteredMedia } = await mediaQuery;
-
-    if (!filteredMedia) {
-      return NextResponse.json({
-        tier1: [],
-        tier2: [],
-        total_matches: 0,
-        search_time_ms: Date.now() - startTime,
-      });
-    }
-
-    const mediaMap = new Map(filteredMedia.map(m => [m.id, m]));
-
-    // Build response with URLs
-    const buildResult = async (match: typeof allMatches[0]) => {
-      const m = mediaMap.get(match.mediaId);
-      if (!m) return null;
-      return {
-        media_id: m.id,
-        album_id: m.album_id,
-        r2_key: m.r2_key,
-        preview_url: await getPreviewUrl(m.r2_key, m.preview_r2_key),
-        original_url: await getOriginalUrl(m.r2_key),
-        width: m.width,
-        height: m.height,
-        score: Math.round(match.score * 1000) / 1000,
-        tier: match.tier,
-      };
-    };
-
-    const tier1Results = (await Promise.all(tier1.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult))).filter(Boolean);
-    const tier2Results = (await Promise.all(tier2.filter(m => m.score >= FACE_SEARCH.DISPLAY_THRESHOLD).map(buildResult))).filter(Boolean);
 
     return NextResponse.json({
-      tier1: tier1Results,
-      tier2: tier2Results,
-      total_matches: tier1Results.length + tier2Results.length,
-      search_time_ms: Date.now() - startTime,
+      job_id: job.id,
+      status: 'pending',
     });
   } catch (error) {
     console.error('Face search error:', error);
