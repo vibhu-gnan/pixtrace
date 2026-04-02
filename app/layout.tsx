@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pixtrace.in';
@@ -94,6 +95,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased bg-background-dark font-display text-slate-200">
         {children}
+        <Analytics />
         <script
           dangerouslySetInnerHTML={{
             __html: `
