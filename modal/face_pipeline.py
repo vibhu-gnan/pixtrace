@@ -58,7 +58,7 @@ model_volume = modal.Volume.from_name("pixtrace-models", create_if_missing=True)
 # Constants (must match lib/face/constants.ts)
 # ---------------------------------------------------------------------------
 
-FACE_CROP_PADDING = 0.2
+FACE_CROP_PADDING = 0.3
 ALIGNED_FACE_SIZE = 112
 APPLY_FINAL_ROT_180 = True
 EMBEDDING_DIM = 512
@@ -132,12 +132,17 @@ def detect_faces(detector, img_bgr):
     faces = []
     for face in raw:
         x1, y1, x2, y2 = face.bbox
-        kps = face.kps  # shape (5, 2): left_eye, right_eye, nose, mouth_left, mouth_right
+        kps = face.kps  # shape (5, 2)
+        # Swap eye labels to match Streamlit face_engine.py convention:
+        # kps[0] → "right_eye", kps[1] → "left_eye". This keeps the
+        # alignment angle near 0° for upright faces so warpAffine does
+        # minimal interpolation; the heavy rotation is handled by the
+        # lossless ROTATE_180 pixel flip afterward.
         faces.append({
             "facial_area": [int(x1), int(y1), int(x2), int(y2)],
             "landmarks": {
-                "left_eye":   (float(kps[0][0]), float(kps[0][1])),
-                "right_eye":  (float(kps[1][0]), float(kps[1][1])),
+                "right_eye":  (float(kps[0][0]), float(kps[0][1])),
+                "left_eye":   (float(kps[1][0]), float(kps[1][1])),
                 "nose":       (float(kps[2][0]), float(kps[2][1])),
                 "mouth_left": (float(kps[3][0]), float(kps[3][1])),
                 "mouth_right":(float(kps[4][0]), float(kps[4][1])),
@@ -207,11 +212,9 @@ def generate_embedding(model, aligned_face_bgr):
     import numpy as np
     import cv2
 
-    # InsightFace expects RGB
+    # InsightFace expects RGB uint8 (matching Streamlit face_engine.py)
     face_rgb = cv2.cvtColor(aligned_face_bgr, cv2.COLOR_BGR2RGB)
-    face_rgb = np.asarray(face_rgb, dtype=np.float32)
 
-    # model.get_feat expects (H, W, C) or batch
     embedding = model.get_feat(face_rgb)
     embedding = np.squeeze(embedding)
 
@@ -576,10 +579,8 @@ class SelfieEmbedder:
         if len(faces) == 0:
             return {"error": "no_face_detected", "face_count": 0}
 
-        # Pick the largest face (by bounding box area)
-        best_face = max(faces, key=lambda f: (
-            (f["bbox"][2] - f["bbox"][0]) * (f["bbox"][3] - f["bbox"][1])
-        ))
+        # Pick the highest-confidence face (matching Streamlit face_engine.py)
+        best_face = max(faces, key=lambda f: f["confidence"])
 
         # Validate embedding for NaN/Inf
         import math
@@ -897,11 +898,8 @@ def process_face_search_jobs():
                 }).eq("id", job_id).execute()
                 continue
 
-            # Pick the largest face
-            best = max(
-                faces,
-                key=lambda f: (f["bbox"][2] - f["bbox"][0]) * (f["bbox"][3] - f["bbox"][1]),
-            )
+            # Pick the highest-confidence face (matching Streamlit face_engine.py)
+            best = max(faces, key=lambda f: f["confidence"])
             embedding = best["embedding"]
 
             if not embedding or len(embedding) != 512 or any(

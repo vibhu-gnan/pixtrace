@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useCallback } from 'react';
-import { updateEventPermissions, updateEventPhotoOrder, getFaceProcessingProgress } from '@/actions/events';
+import { updateEventPermissions, updateEventPhotoOrder, getFaceProcessingProgress, reprocessFaceEmbeddings } from '@/actions/events';
 import type { FaceProcessingProgress } from '@/actions/events';
 
 // ─── Reusable UI Components ──────────────────────────────────
@@ -104,6 +104,8 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
     const [isPhotoOrderPending, startPhotoOrderTransition] = useTransition();
     const [isFaceSearchPending, startFaceSearchTransition] = useTransition();
     const [isFaceScoresPending, startFaceScoresTransition] = useTransition();
+    const [isReprocessPending, startReprocessTransition] = useTransition();
+    const [reprocessConfirm, setReprocessConfirm] = useState(false);
 
     // Optimistic updates could be added, but simple transition is fine for settings
 
@@ -195,6 +197,22 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                 console.error(err);
                 setShowFaceScores(prevVal);
                 setError('Failed to update face score display settings');
+            }
+        });
+    };
+
+    const handleReprocess = () => {
+        setReprocessConfirm(false);
+        setError(null);
+        startReprocessTransition(async () => {
+            const result = await reprocessFaceEmbeddings(eventId);
+            if (result.error) {
+                setError(result.error);
+            } else {
+                // Reset progress display — polling will pick up the fresh pending jobs
+                setFaceProgress(null);
+                const progress = await getFaceProcessingProgress(eventId);
+                setFaceProgress(progress);
             }
         });
     };
@@ -373,6 +391,62 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                             <p className="text-sm text-gray-500">
                                 No photos have been queued for face processing yet. Photos will be processed when uploaded or when the processing pipeline runs.
                             </p>
+                        </div>
+                    )}
+
+                    {/* Recalculate Embeddings */}
+                    {faceSearchEnabled && (
+                        <div className="mt-4">
+                            {!reprocessConfirm ? (
+                                <button
+                                    onClick={() => setReprocessConfirm(true)}
+                                    disabled={isReprocessPending || isFaceSearchPending}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isReprocessPending ? (
+                                        <>
+                                            <svg className="animate-spin w-4 h-4 text-brand-500" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                            </svg>
+                                            Resetting queue...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                                <path d="M3 3v5h5" />
+                                            </svg>
+                                            Recalculate embeddings
+                                        </>
+                                    )}
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 shrink-0">
+                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                        <line x1="12" y1="9" x2="12" y2="13" />
+                                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                                    </svg>
+                                    <span className="text-sm text-amber-800 flex-1">
+                                        This will delete all existing embeddings and requeue all {faceProgress?.total ?? ''} photos. Continue?
+                                    </span>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button
+                                            onClick={() => setReprocessConfirm(false)}
+                                            className="px-3 py-1 text-xs rounded-md text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleReprocess}
+                                            className="px-3 py-1 text-xs rounded-md text-white bg-amber-600 hover:bg-amber-700 transition-colors font-medium"
+                                        >
+                                            Confirm
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

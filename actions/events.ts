@@ -921,3 +921,80 @@ export async function getFaceProcessingProgress(eventId: string): Promise<FacePr
 
   return { total, completed, failed, noFaces, pending, processing };
 }
+
+/**
+ * Wipe all face embeddings for an event and reset every processing job back
+ * to pending so Modal re-runs the pipeline with the current model weights.
+ * Fires /api/face/trigger non-blocking after the reset.
+ */
+export async function reprocessFaceEmbeddings(eventId: string): Promise<{ success?: boolean; error?: string }> {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const supabase = createAdminClient();
+
+  // Verify ownership
+  const { data: event } = await supabase
+    .from('events')
+    .select('id')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return { error: 'Event not found' };
+
+  // 1. Delete all existing embeddings — forces fresh re-embed
+  const { error: deleteError } = await supabase
+    .from('face_embeddings')
+    .delete()
+    .eq('event_id', eventId);
+
+  if (deleteError) {
+    console.error('Failed to delete face embeddings:', deleteError);
+    return { error: 'Failed to clear existing embeddings' };
+  }
+
+  // 2. Reset every job for this event back to pending
+  const { error: resetError } = await supabase
+    .from('face_processing_jobs')
+    .update({
+      status: 'pending',
+      attempt_count: 0,
+      faces_found: null,
+      error_message: null,
+      started_at: null,
+      completed_at: null,
+      next_retry_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('event_id', eventId);
+
+  if (resetError) {
+    console.error('Failed to reset face processing jobs:', resetError);
+    return { error: 'Failed to reset processing queue' };
+  }
+
+  // 3. Fire trigger (non-blocking — same pattern as updateEventPermissions)
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  if (baseUrl) {
+    fetch(`${baseUrl}/api/face/trigger`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
+      },
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          console.error('Face trigger failed after reprocess:', resp.status, await resp.text().catch(() => ''));
+        }
+      })
+      .catch((err) => {
+        console.error('Face trigger error after reprocess:', err);
+      });
+  }
+
+  return { success: true };
+}
