@@ -8,6 +8,7 @@ import { nanoid } from 'nanoid';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { getOrganizerPlanLimits, canCreateEvent, hasFeature, decrementStorageUsed } from '@/lib/plans/limits';
 import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
+import { runTrigger } from '@/lib/face/run-trigger';
 
 export interface EventData {
   id: string;
@@ -627,33 +628,6 @@ export async function updateEventPermissions(eventId: string, payload: {
     return { error: 'Failed to update permissions' };
   }
 
-  // When face search is enabled, trigger processing of ALL pending jobs.
-  // This is non-blocking: we fire the trigger and don't wait for it to complete.
-  // The trigger route itself loops through all batches and handles Modal cold starts.
-  if (payload.faceSearchEnabled === true) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-    if (baseUrl) {
-      fetch(`${baseUrl}/api/face/trigger`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
-        },
-      })
-        .then(async (resp) => {
-          if (!resp.ok) {
-            console.error('Face trigger failed:', resp.status, await resp.text().catch(() => ''));
-          } else {
-            const data = await resp.json().catch(() => null);
-            console.log('Face trigger result:', data);
-          }
-        })
-        .catch((err) => {
-          console.error('Face trigger error:', err);
-        });
-    }
-  }
-
   // Get event_hash to revalidate public gallery
   const { data: evt } = await supabase
     .from('events')
@@ -974,6 +948,13 @@ export async function reprocessFaceEmbeddings(eventId: string): Promise<{ succes
     return { error: 'Failed to reset processing queue' };
   }
 
+  // Immediately kick off processing for the reset jobs
+  try {
+    await runTrigger();
+  } catch (err) {
+    console.error('reprocessFaceEmbeddings: trigger error (non-fatal):', err);
+  }
+
   return { success: true };
 }
 
@@ -1001,31 +982,11 @@ export async function triggerFaceProcessing(
   if (!event) return { error: 'Event not found' };
   if (!event.face_search_enabled) return { error: 'Face search is not enabled for this event' };
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-
-  if (!baseUrl) return { error: 'App URL not configured' };
-
   try {
-    const resp = await fetch(`${baseUrl}/api/face/trigger`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
-      },
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '');
-      console.error('triggerFaceProcessing: trigger failed', resp.status, text);
-      return { error: `Processing trigger failed (${resp.status})` };
-    }
-
-    const data = await resp.json().catch(() => null);
-    return { dispatched: data?.dispatched ?? 0 };
+    const result = await runTrigger();
+    return { dispatched: result.dispatched };
   } catch (err) {
-    console.error('triggerFaceProcessing: fetch error', err);
+    console.error('triggerFaceProcessing error:', err);
     return { error: 'Could not reach processing server' };
   }
 }
