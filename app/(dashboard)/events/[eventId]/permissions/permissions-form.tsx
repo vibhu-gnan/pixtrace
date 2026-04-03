@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect, useCallback } from 'react';
-import { updateEventPermissions, updateEventPhotoOrder, getFaceProcessingProgress, reprocessFaceEmbeddings } from '@/actions/events';
+import { updateEventPermissions, updateEventPhotoOrder, getFaceProcessingProgress, reprocessFaceEmbeddings, triggerFaceProcessing } from '@/actions/events';
 import type { FaceProcessingProgress } from '@/actions/events';
 
 // ─── Reusable UI Components ──────────────────────────────────
@@ -106,6 +106,8 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
     const [isFaceScoresPending, startFaceScoresTransition] = useTransition();
     const [isReprocessPending, startReprocessTransition] = useTransition();
     const [reprocessConfirm, setReprocessConfirm] = useState(false);
+    const [isTriggerPending, startTriggerTransition] = useTransition();
+    const [triggerResult, setTriggerResult] = useState<{ dispatched?: number; error?: string } | null>(null);
 
     // Optimistic updates could be added, but simple transition is fine for settings
 
@@ -166,20 +168,39 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
         const prevVal = faceSearchEnabled;
         setFaceSearchEnabled(checked);
         setError(null);
+        setTriggerResult(null);
 
         startFaceSearchTransition(async () => {
             try {
                 const result = await updateEventPermissions(eventId, { faceSearchEnabled: checked });
                 if (result.error) throw new Error(result.error);
-                // Fetch progress immediately after enabling
                 if (checked) {
                     const progress = await getFaceProcessingProgress(eventId);
                     setFaceProgress(progress);
+                    // Explicitly trigger from client so Vercel doesn't kill the background fetch
+                    if (progress && progress.pending > 0) {
+                        const trigResult = await triggerFaceProcessing(eventId);
+                        setTriggerResult(trigResult);
+                    }
                 }
             } catch (err) {
                 console.error(err);
                 setFaceSearchEnabled(prevVal);
                 setError('Failed to update face search settings');
+            }
+        });
+    };
+
+    const handleTriggerProcessing = () => {
+        setTriggerResult(null);
+        setError(null);
+        startTriggerTransition(async () => {
+            const result = await triggerFaceProcessing(eventId);
+            setTriggerResult(result);
+            if (!result.error) {
+                // Refresh progress after trigger
+                const progress = await getFaceProcessingProgress(eventId);
+                setFaceProgress(progress);
             }
         });
     };
@@ -373,10 +394,40 @@ export default function PermissionsForm({ eventId, initialAllowDownload, initial
                                 )}
                             </div>
                             {/* Status message */}
-                            {(faceProgress.pending > 0 || faceProgress.processing > 0) && (
+                            {faceProgress.processing > 0 && (
                                 <p className="mt-2 text-xs text-gray-400">
                                     Processing photos... This page updates automatically.
                                 </p>
+                            )}
+                            {faceProgress.pending > 0 && faceProgress.processing === 0 && (
+                                <div className="mt-2 flex items-center gap-3 flex-wrap">
+                                    <p className="text-xs text-amber-600">
+                                        {faceProgress.pending} photo{faceProgress.pending !== 1 ? 's' : ''} queued — not yet picked up by the processor.
+                                    </p>
+                                    <button
+                                        onClick={handleTriggerProcessing}
+                                        disabled={isTriggerPending || isFaceSearchPending}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-white bg-brand-500 hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isTriggerPending ? (
+                                            <>
+                                                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                                </svg>
+                                                Triggering...
+                                            </>
+                                        ) : 'Process Now'}
+                                    </button>
+                                </div>
+                            )}
+                            {triggerResult && !triggerResult.error && triggerResult.dispatched !== undefined && (
+                                <p className="mt-1 text-xs text-green-600">
+                                    Dispatched {triggerResult.dispatched} photo{triggerResult.dispatched !== 1 ? 's' : ''} to processor.
+                                </p>
+                            )}
+                            {triggerResult?.error && (
+                                <p className="mt-1 text-xs text-red-500">{triggerResult.error}</p>
                             )}
                             {faceProgress.pending === 0 && faceProgress.processing === 0 && (
                                 <p className="mt-2 text-xs text-green-600">

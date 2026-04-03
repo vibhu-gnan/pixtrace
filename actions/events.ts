@@ -974,27 +974,58 @@ export async function reprocessFaceEmbeddings(eventId: string): Promise<{ succes
     return { error: 'Failed to reset processing queue' };
   }
 
-  // 3. Fire trigger (non-blocking — same pattern as updateEventPermissions)
+  return { success: true };
+}
+
+/**
+ * Explicitly triggers face processing for queued jobs.
+ * Called from the client (not server-side fire-and-forget) so Vercel
+ * doesn't kill the background fetch before it completes.
+ */
+export async function triggerFaceProcessing(
+  eventId: string,
+): Promise<{ dispatched?: number; error?: string }> {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const supabase = createAdminClient();
+
+  // Verify organizer owns this event
+  const { data: event } = await supabase
+    .from('events')
+    .select('id, face_search_enabled')
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id)
+    .single();
+
+  if (!event) return { error: 'Event not found' };
+  if (!event.face_search_enabled) return { error: 'Face search is not enabled for this event' };
+
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-  if (baseUrl) {
-    fetch(`${baseUrl}/api/face/trigger`, {
+
+  if (!baseUrl) return { error: 'App URL not configured' };
+
+  try {
+    const resp = await fetch(`${baseUrl}/api/face/trigger`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Face-Secret': process.env.FACE_PROCESSING_SECRET || '',
       },
-    })
-      .then(async (resp) => {
-        if (!resp.ok) {
-          console.error('Face trigger failed after reprocess:', resp.status, await resp.text().catch(() => ''));
-        }
-      })
-      .catch((err) => {
-        console.error('Face trigger error after reprocess:', err);
-      });
-  }
+    });
 
-  return { success: true };
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      console.error('triggerFaceProcessing: trigger failed', resp.status, text);
+      return { error: `Processing trigger failed (${resp.status})` };
+    }
+
+    const data = await resp.json().catch(() => null);
+    return { dispatched: data?.dispatched ?? 0 };
+  } catch (err) {
+    console.error('triggerFaceProcessing: fetch error', err);
+    return { error: 'Could not reach processing server' };
+  }
 }
