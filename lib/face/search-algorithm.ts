@@ -100,13 +100,10 @@ async function searchFaces(
 /**
  * 3-Iteration Refinement Face Search Algorithm
  *
- * Adapted from the prototype in refined_search_v2.py.
- * Uses pgvector RPC calls instead of FAISS.
- *
- * Steps:
- * 1. Initial search with selfie embedding → collect Tier 1 (score >= 0.40)
+ * Matches face_engine.py search_gallery() logic exactly:
+ * 1. Initial search with selfie embedding → collect Tier 1 (combined_score >= 0.44)
  * 2. Build prototype from Tier 1 embeddings, re-search, expand Tier 1 (up to 3 cycles)
- * 3. Final wide search with prototype → collect Tier 2 (score >= 0.29)
+ * 3. Final search with refined prototype → collect Tier 2 (combined_score >= 0.50, not in Tier 1)
  * 4. Deduplicate by media_id (keep highest score per photo)
  */
 export async function runFaceSearch(
@@ -121,107 +118,123 @@ export async function runFaceSearch(
     MAX_CANDIDATES,
   } = FACE_SEARCH;
 
+  // Use a low SQL-level pre-filter to fetch candidates; real filtering happens in JS
+  const SQL_PREFILTER = 0.20;
+
   // --- Step A: Initial search with selfie embedding ---
   const initialResults = await searchFaces(
     supabase,
     selfieEmbedding,
     eventId,
-    TIER_2_THRESHOLD, // Get all candidates above Tier 2 threshold
+    SQL_PREFILTER,
     MAX_CANDIDATES,
   );
 
-  // Collect Tier 1 faces
+  // Collect Tier 1 faces (combined_score >= TIER_1_THRESHOLD against selfie)
   const tier1FaceIds = new Set<string>();
   const tier1Embeddings: number[][] = [];
-  const allScores = new Map<string, { mediaId: string; score: number }>(); // face_id → best score
+
+  // Track tier1 candidates with their initial scores
+  const tier1Candidates: { faceId: string; mediaId: string; score: number }[] = [];
 
   for (const face of initialResults) {
-    allScores.set(face.face_id, { mediaId: face.media_id, score: face.combined_score });
     if (face.combined_score >= TIER_1_THRESHOLD) {
       tier1FaceIds.add(face.face_id);
       tier1Embeddings.push(face.embedding);
+      tier1Candidates.push({
+        faceId: face.face_id,
+        mediaId: face.media_id,
+        score: face.combined_score,
+      });
     }
   }
 
   // --- Step B: Iterative prototype refinement ---
+  // Mirrors face_engine.py: expand tier1 set using prototype re-scoring
   let currentProto = selfieEmbedding;
 
   if (tier1Embeddings.length > 0) {
     for (let cycle = 0; cycle < REFINEMENT_CYCLES; cycle++) {
-      // Build prototype from current Tier 1
       currentProto = buildPrototype(tier1Embeddings);
 
-      // Re-search with prototype
       const protoResults = await searchFaces(
         supabase,
         currentProto,
         eventId,
-        TIER_2_THRESHOLD,
+        SQL_PREFILTER,
         MAX_CANDIDATES,
       );
 
       let added = 0;
       for (const face of protoResults) {
-        // Update best score
-        const existing = allScores.get(face.face_id);
-        if (!existing || face.combined_score > existing.score) {
-          allScores.set(face.face_id, { mediaId: face.media_id, score: face.combined_score });
-        }
-
-        // Expand Tier 1
         if (!tier1FaceIds.has(face.face_id) && face.combined_score >= TIER_1_THRESHOLD) {
           tier1FaceIds.add(face.face_id);
           tier1Embeddings.push(face.embedding);
+          tier1Candidates.push({
+            faceId: face.face_id,
+            mediaId: face.media_id,
+            score: face.combined_score,
+          });
           added++;
         }
       }
 
-      if (added === 0) break; // Converged — no new high-confidence faces
+      if (added === 0) break; // Converged
     }
   }
 
-  // --- Step C: Final wide search with best prototype ---
+  // --- Step C: Final search with refined prototype → Tier 2 ---
+  // Matches face_engine.py: tier2 = prototype matches >= TIER_2_THRESHOLD, NOT in tier1
+  const tier2Candidates: { faceId: string; mediaId: string; score: number }[] = [];
+
   if (currentProto !== selfieEmbedding) {
     const finalResults = await searchFaces(
       supabase,
       currentProto,
       eventId,
-      TIER_2_THRESHOLD,
+      SQL_PREFILTER,
       MAX_CANDIDATES,
     );
 
     for (const face of finalResults) {
-      const existing = allScores.get(face.face_id);
-      if (!existing || face.combined_score > existing.score) {
-        allScores.set(face.face_id, { mediaId: face.media_id, score: face.combined_score });
+      if (!tier1FaceIds.has(face.face_id) && face.combined_score >= TIER_2_THRESHOLD) {
+        tier2Candidates.push({
+          faceId: face.face_id,
+          mediaId: face.media_id,
+          score: face.combined_score,
+        });
       }
     }
   }
 
   // --- Step D: Deduplicate by media_id (keep highest score per photo) ---
-  const mediaScores = new Map<string, { score: number; isTier1: boolean }>();
-
-  for (const [faceId, { mediaId, score }] of allScores) {
-    const isTier1 = tier1FaceIds.has(faceId);
-    const existing = mediaScores.get(mediaId);
-    if (!existing || score > existing.score) {
-      mediaScores.set(mediaId, { score, isTier1: isTier1 || (existing?.isTier1 ?? false) });
+  const tier1MediaScores = new Map<string, number>();
+  for (const c of tier1Candidates) {
+    const existing = tier1MediaScores.get(c.mediaId);
+    if (!existing || c.score > existing) {
+      tier1MediaScores.set(c.mediaId, c.score);
     }
   }
 
-  // Split into tier1 and tier2
+  const tier2MediaScores = new Map<string, number>();
+  for (const c of tier2Candidates) {
+    if (tier1MediaScores.has(c.mediaId)) continue; // Already in tier1
+    const existing = tier2MediaScores.get(c.mediaId);
+    if (!existing || c.score > existing) {
+      tier2MediaScores.set(c.mediaId, c.score);
+    }
+  }
+
   const tier1: FaceMatch[] = [];
-  const tier2: FaceMatch[] = [];
-
-  for (const [mediaId, { score, isTier1 }] of mediaScores) {
-    if (isTier1) {
-      tier1.push({ mediaId, score, tier: 1 });
-    } else {
-      tier2.push({ mediaId, score, tier: 2 });
-    }
+  for (const [mediaId, score] of tier1MediaScores) {
+    tier1.push({ mediaId, score, tier: 1 });
   }
 
-  // Sort by score descending
+  const tier2: FaceMatch[] = [];
+  for (const [mediaId, score] of tier2MediaScores) {
+    tier2.push({ mediaId, score, tier: 2 });
+  }
+
   tier1.sort((a, b) => b.score - a.score);
   tier2.sort((a, b) => b.score - a.score);
 

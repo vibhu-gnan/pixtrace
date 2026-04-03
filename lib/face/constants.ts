@@ -8,11 +8,11 @@ export const FACE_SEARCH = {
   W_L2: 0.20,
   /** Exponential decay factor for L2 term */
   GAMMA: 0.5,
-  /** Tier 1 threshold — high confidence, used for prototype building */
-  TIER_1_THRESHOLD: 0.40,
-  /** Tier 2 threshold — wider net for borderline matches (used internally for prototype building) */
-  TIER_2_THRESHOLD: 0.29,
-  /** Display threshold — minimum score to show a photo in gallery results */
+  /** Tier 1 threshold — high confidence, used for prototype building (matches face_engine.py) */
+  TIER_1_THRESHOLD: 0.44,
+  /** Tier 2 threshold — matches scored against refined prototype (matches face_engine.py) */
+  TIER_2_THRESHOLD: 0.50,
+  /** Display threshold — minimum combined score to show a photo in gallery results */
   DISPLAY_THRESHOLD: 0.33,
   /** Maximum refinement cycles for prototype iteration */
   REFINEMENT_CYCLES: 3,

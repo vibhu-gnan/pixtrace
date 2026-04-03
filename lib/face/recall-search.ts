@@ -19,12 +19,16 @@ export async function runRecallSearch(
 ): Promise<{ tier1: RecallMatch[]; tier2: RecallMatch[] }> {
   const { TIER_1_THRESHOLD, TIER_2_THRESHOLD, MAX_CANDIDATES } = FACE_SEARCH;
 
+  // SQL pre-filter is on cosine similarity, not combined_score.
+  // Use a loose value so we don't miss tier1 (0.44) or tier2 (0.50) candidates.
+  const SQL_PREFILTER = 0.20;
+
   const pgVector = `[${prototypeEmbedding.join(',')}]`;
 
   const { data, error } = await supabase.rpc('search_face_embeddings_lite', {
     query_embedding: pgVector,
     target_event_id: eventId,
-    similarity_threshold: TIER_2_THRESHOLD,
+    similarity_threshold: SQL_PREFILTER,
     max_results: MAX_CANDIDATES,
   });
 
@@ -37,7 +41,11 @@ export async function runRecallSearch(
 
   for (const row of data || []) {
     const score = row.combined_score as number;
-    const isTier1 = score >= TIER_1_THRESHOLD;
+    // Recall uses pre-refined prototype (matching face_engine.py):
+    //   tier1 = score >= TIER_2_THRESHOLD (0.50) — high-confidence prototype matches
+    //   tier2 = score >= TIER_1_THRESHOLD (0.44) — additional prototype finds
+    if (score < TIER_1_THRESHOLD) continue;
+    const isTier1 = score >= TIER_2_THRESHOLD;
     const existing = mediaScores.get(row.media_id);
     if (!existing || score > existing.score) {
       mediaScores.set(row.media_id, {
