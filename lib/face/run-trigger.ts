@@ -71,7 +71,7 @@ export async function runTrigger(): Promise<TriggerResult> {
             media_items: items,
             secret: process.env.FACE_PROCESSING_SECRET,
           }),
-          signal: AbortSignal.timeout(30_000), // 30s — just confirm Modal accepted
+          signal: AbortSignal.timeout(55_000), // 55s — accommodates Modal cold starts (can take 40-50s)
         });
 
         if (!resp.ok) {
