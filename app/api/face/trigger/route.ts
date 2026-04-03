@@ -6,10 +6,10 @@ import crypto from 'crypto';
 
 export const maxDuration = 60; // 1 min — trigger only dispatches; Modal updates Supabase directly
 
-export async function POST(request: NextRequest) {
+function verifyAuth(request: NextRequest): boolean {
   // Accept two auth methods:
-  //   1. X-Face-Secret header — used by manual/external callers
-  //   2. Authorization: Bearer <CRON_SECRET> — used by Vercel cron scheduler
+  //   1. X-Face-Secret header — used by manual/external callers (POST)
+  //   2. Authorization: Bearer <CRON_SECRET> — used by Vercel cron scheduler (GET)
   const faceSecret = request.headers.get('X-Face-Secret') || '';
   const authHeader = request.headers.get('Authorization') || '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -27,9 +27,26 @@ export async function POST(request: NextRequest) {
     bearerToken.length === expectedCronSecret.length &&
     crypto.timingSafeEqual(Buffer.from(bearerToken), Buffer.from(expectedCronSecret));
 
-  if (!isValidFaceSecret && !isValidCronSecret) {
+  return !!(isValidFaceSecret || isValidCronSecret);
+}
+
+// GET — called by Vercel cron every 5 minutes
+export async function GET(request: NextRequest) {
+  if (!verifyAuth(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+  return runTrigger();
+}
+
+// POST — called manually or from external tools
+export async function POST(request: NextRequest) {
+  if (!verifyAuth(request)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  return runTrigger();
+}
+
+async function runTrigger() {
 
   const processGalleryUrl = process.env.MODAL_PROCESS_GALLERY_URL;
   if (!processGalleryUrl) {
@@ -141,3 +158,4 @@ export async function POST(request: NextRequest) {
     errors: allErrors.length > 0 ? allErrors : undefined,
   });
 }
+
