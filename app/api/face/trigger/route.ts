@@ -4,18 +4,30 @@ import { FACE_SEARCH } from '@/lib/face/constants';
 import { getSignedR2Url } from '@/lib/storage/r2-client';
 import crypto from 'crypto';
 
-export const maxDuration = 300; // 5 min — Modal cold starts can take 2+ min
+export const maxDuration = 60; // 1 min — trigger only dispatches; Modal updates Supabase directly
 
 export async function POST(request: NextRequest) {
-  // Verify shared secret (timing-safe comparison)
-  const secret = request.headers.get('X-Face-Secret') || '';
-  const expected = process.env.FACE_PROCESSING_SECRET || '';
-  if (!expected || !secret) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-  const secretBuf = Buffer.from(secret);
-  const expectedBuf = Buffer.from(expected);
-  if (secretBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(secretBuf, expectedBuf)) {
+  // Accept two auth methods:
+  //   1. X-Face-Secret header — used by manual/external callers
+  //   2. Authorization: Bearer <CRON_SECRET> — used by Vercel cron scheduler
+  const faceSecret = request.headers.get('X-Face-Secret') || '';
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+  const expectedFaceSecret = process.env.FACE_PROCESSING_SECRET || '';
+  const expectedCronSecret = process.env.CRON_SECRET || '';
+
+  const isValidFaceSecret =
+    expectedFaceSecret &&
+    faceSecret.length === expectedFaceSecret.length &&
+    crypto.timingSafeEqual(Buffer.from(faceSecret), Buffer.from(expectedFaceSecret));
+
+  const isValidCronSecret =
+    expectedCronSecret &&
+    bearerToken.length === expectedCronSecret.length &&
+    crypto.timingSafeEqual(Buffer.from(bearerToken), Buffer.from(expectedCronSecret));
+
+  if (!isValidFaceSecret && !isValidCronSecret) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -71,6 +83,9 @@ export async function POST(request: NextRequest) {
 
     for (const [eventId, items] of batches) {
       try {
+        // Fire-and-forget: Modal processes the batch and updates Supabase directly.
+        // We use a short timeout just to confirm Modal accepted the request.
+        // This avoids Cloudflare's 100s proxy timeout killing the trigger.
         const resp = await fetch(processGalleryUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -79,14 +94,14 @@ export async function POST(request: NextRequest) {
             media_items: items,
             secret: process.env.FACE_PROCESSING_SECRET,
           }),
-          signal: AbortSignal.timeout(240_000), // 4 min timeout per batch (Modal cold start)
+          signal: AbortSignal.timeout(30_000), // 30s — just confirm Modal accepted
         });
 
         if (!resp.ok) {
           const errText = await resp.text().catch(() => 'unknown');
           allErrors.push(`Modal error for event ${eventId}: ${resp.status} ${errText}`);
 
-          // Reset jobs to failed with backoff
+          // Reset jobs to failed with backoff so they retry next trigger
           const failedMediaIds = items.map(i => i.media_id);
           const retryAt = new Date(Date.now() + FACE_SEARCH.RETRY_BASE_DELAY_S * 1000).toISOString();
           await supabase

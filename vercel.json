@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/storage-cleanup",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/face/trigger",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
