@@ -145,7 +145,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
     return (
         <>
             {/* Masonry grid */}
-            <div className="flex gap-1" style={{ alignItems: 'flex-start' }}>
+            <div className="flex gap-1 bg-white" style={{ alignItems: 'flex-start' }}>
                 {columnArrays.map((col, colIdx) => (
                     <div key={colIdx} className="flex-1 flex flex-col gap-1">
                         {col.map((item) => (
