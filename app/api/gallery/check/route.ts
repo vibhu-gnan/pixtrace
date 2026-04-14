@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { getPublicClient } from '@/lib/supabase/public';
 
 /**
  * GET /api/gallery/check?hash=xxx
  *
  * Heartbeat: checks if a gallery is still public.
  * Edge-cached for 5 min so 2K concurrent viewers share 1 DB query.
- * Uses admin client (no cookie parsing needed for a public check).
+ * Uses public (anon) client so RLS enforces is_public=true as a defense-in-depth layer.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        const supabase = createAdminClient();
+        const supabase = getPublicClient();
         const { data: event } = await supabase
             .from('events')
             .select('id')

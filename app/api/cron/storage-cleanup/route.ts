@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { verifySecret } from '@/lib/security/verify-secret';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { sendEmail } from '@/lib/email/resend';
 import { storageWarningSubject, storageWarningHtml } from '@/lib/email/templates/storage-warning';
@@ -27,7 +28,8 @@ async function handler(request: NextRequest) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 503 });
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!verifySecret(bearerToken, cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

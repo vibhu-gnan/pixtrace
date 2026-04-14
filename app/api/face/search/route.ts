@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPublicClient } from '@/lib/supabase/public';
 import { FACE_SEARCH } from '@/lib/face/constants';
@@ -8,7 +9,70 @@ import { FACE_SEARCH } from '@/lib/face/constants';
 // Client polls /api/face/poll/[jobId] for status and results.
 // This keeps the route well within Vercel Free's 10s function limit.
 
+// ── IP-based sliding window rate limiter ─────────────────────────────────────
+// Prevents GPU cost abuse on the face search endpoint.
+// Same pattern as app/api/import/drive/route.ts.
+const searchTimestamps = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_SEARCHES_PER_WINDOW = 3;
+const MAX_RATE_LIMIT_ENTRIES = 5000;
+
 export async function POST(request: NextRequest) {
+  const adminClient = createAdminClient();
+
+  // ── Resolve auth user first — authenticated users bypass rate limiting ───────
+  // Organizers pass their Supabase JWT; we verify it here once and reuse the
+  // result below for face profile saving, so there's no extra DB round-trip.
+  let authUserId: string | null = null;
+  let authUserEmail: string | null = null;
+  let authUserName: string | null = null;
+  let isAuthenticated = false;
+
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const { data: { user } } = await adminClient.auth.getUser(token);
+    if (user) {
+      authUserId = user.id;
+      authUserEmail = user.email || null;
+      authUserName = user.user_metadata?.full_name || user.user_metadata?.name || null;
+      isAuthenticated = true;
+    }
+  }
+
+  // ── Rate limit check (anonymous requests only) ───────────────────────────────
+  // Authenticated organizers/users are exempt — they have a verified account
+  // and are not the abuse vector this is defending against.
+  if (!isAuthenticated) {
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = (forwarded ? forwarded.split(',')[0].trim() : null)
+      ?? request.headers.get('x-real-ip')
+      ?? 'unknown';
+
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    const recentTimestamps = (searchTimestamps.get(ip) ?? []).filter(t => t > windowStart);
+
+    if (recentTimestamps.length >= MAX_SEARCHES_PER_WINDOW) {
+      return NextResponse.json(
+        { error: 'Too many face searches. Please wait a few minutes.' },
+        { status: 429, headers: { 'Retry-After': '300' } },
+      );
+    }
+
+    recentTimestamps.push(now);
+    searchTimestamps.set(ip, recentTimestamps);
+
+    // Evict stale entries to prevent unbounded map growth
+    if (searchTimestamps.size > MAX_RATE_LIMIT_ENTRIES) {
+      for (const [key, timestamps] of searchTimestamps) {
+        if (timestamps.every(t => t <= windowStart)) {
+          searchTimestamps.delete(key);
+        }
+      }
+    }
+  }
+
   try {
     const formData = await request.formData();
     const selfie = formData.get('selfie') as File | null;
@@ -51,26 +115,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract auth user for face profile saving (optional — recall feature)
-    const adminClient = createAdminClient();
-    let authUserId: string | null = null;
-    let authUserEmail: string | null = null;
-    let authUserName: string | null = null;
-
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      const { data: { user } } = await adminClient.auth.getUser(token);
-      if (user) {
-        authUserId = user.id;
-        authUserEmail = user.email || null;
-        authUserName = user.user_metadata?.full_name || user.user_metadata?.name || null;
-      }
-    }
-
     // Convert selfie to base64 for storage
     const selfieBuffer = await selfie.arrayBuffer();
     const selfieBase64 = Buffer.from(selfieBuffer).toString('base64');
+
+    // Generate a poll token — clients must supply this when polling (IDOR prevention)
+    const pollToken = crypto.randomBytes(32).toString('base64url');
 
     // Create the job — Modal cron will pick it up within ~60s
     const { data: job, error: insertError } = await adminClient
@@ -82,6 +132,7 @@ export async function POST(request: NextRequest) {
         auth_user_id: authUserId,
         auth_user_email: authUserEmail,
         auth_user_name: authUserName,
+        poll_token: pollToken,
       })
       .select('id')
       .single();
@@ -96,6 +147,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       job_id: job.id,
+      poll_token: pollToken,
       status: 'pending',
     });
   } catch (error) {

@@ -77,7 +77,8 @@ export function useFaceSearch(eventHash: string, accessToken?: string | null) {
       }
 
       const jobId: string = submitData.job_id;
-      if (!jobId) {
+      const pollToken: string = submitData.poll_token;
+      if (!jobId || !pollToken) {
         setError('Search failed. Please try again.');
         setState('error');
         return;
@@ -93,7 +94,7 @@ export function useFaceSearch(eventHash: string, accessToken?: string | null) {
 
         if (controller.signal.aborted) return;
 
-        const pollResp = await fetch(`/api/face/poll/${jobId}`, {
+        const pollResp = await fetch(`/api/face/poll/${jobId}?token=${encodeURIComponent(pollToken)}`, {
           signal: controller.signal,
         });
 

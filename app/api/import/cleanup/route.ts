@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { verifySecret } from '@/lib/security/verify-secret';
 
 /**
  * Stale job cleanup endpoint.
@@ -11,7 +12,7 @@ export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-cleanup-secret');
   const expected = process.env.FACE_PROCESSING_SECRET;
 
-  if (!secret || !expected || secret !== expected) {
+  if (!verifySecret(secret, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

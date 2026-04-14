@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { verifySecret } from '@/lib/security/verify-secret';
 import { FACE_SEARCH } from '@/lib/face/constants';
 import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 
@@ -18,15 +19,26 @@ export async function GET(
       return NextResponse.json({ error: 'Missing jobId' }, { status: 400 });
     }
 
+    // Require poll token to prevent IDOR — anyone with a job UUID can't read results
+    const pollToken = _request.nextUrl.searchParams.get('token');
+    if (!pollToken) {
+      return NextResponse.json({ error: 'Missing poll token' }, { status: 400 });
+    }
+
     const adminClient = createAdminClient();
 
     const { data: job, error } = await adminClient
       .from('face_search_jobs')
-      .select('id, status, result, error, created_at, started_at, completed_at, event_id, album_id')
+      .select('id, status, result, error, created_at, started_at, completed_at, event_id, album_id, poll_token')
       .eq('id', jobId)
       .single();
 
     if (error || !job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    // Verify token in constant time — return 404 (not 403) to avoid confirming job existence
+    if (!verifySecret(pollToken, job.poll_token)) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
@@ -38,7 +50,7 @@ export async function GET(
       if (ageMs > STUCK_PENDING_MINUTES * 60 * 1000) {
         await adminClient
           .from('face_search_jobs')
-          .update({ status: 'failed', error: 'Job timed out waiting to be picked up' })
+          .update({ status: 'failed', error: 'Job timed out waiting to be picked up', selfie_data: null })
           .eq('id', jobId)
           .eq('status', 'pending');
         return NextResponse.json({
@@ -54,7 +66,7 @@ export async function GET(
       if (ageMs > STUCK_PROCESSING_MINUTES * 60 * 1000) {
         await adminClient
           .from('face_search_jobs')
-          .update({ status: 'failed', error: 'Job stuck in processing' })
+          .update({ status: 'failed', error: 'Job stuck in processing', selfie_data: null })
           .eq('id', jobId)
           .eq('status', 'processing');
         return NextResponse.json({
