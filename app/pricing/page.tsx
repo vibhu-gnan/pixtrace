@@ -6,6 +6,8 @@ import Navigation from '@/components/Navigation';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import type { PricingPlan } from '@/types';
 
+type BillingInterval = 'monthly' | 'yearly';
+
 const pricingPlans: PricingPlan[] = [
   {
     id: 'free',
@@ -128,10 +130,15 @@ const comparisonFeatures = [
   },
 ];
 
-function PricingCard({ plan }: { plan: PricingPlan }) {
+function PricingCard({ plan, billing }: { plan: PricingPlan; billing: BillingInterval }) {
   const ctaHref = plan.id === 'enterprise'
     ? '/enterprise'
     : `/sign-up?plan=${plan.id}`;
+
+  const isYearly = billing === 'yearly';
+  const monthlyPrice = plan.price;
+  const yearlyMonthlyPrice = Math.round(monthlyPrice * 0.85);
+  const yearlyTotal = yearlyMonthlyPrice * 12;
 
   return (
     <div
@@ -161,22 +168,32 @@ function PricingCard({ plan }: { plan: PricingPlan }) {
       </div>
 
       <div className="mb-8">
-        <div className="flex items-baseline gap-1">
-          {plan.price > 0 ? (
-            <>
+        {plan.price > 0 ? (
+          <div>
+            <div className="flex items-baseline gap-1">
+              {isYearly && (
+                <span className="text-slate-500 line-through text-xl mr-1">
+                  ₹{monthlyPrice.toLocaleString()}
+                </span>
+              )}
               <span className={`font-bold ${plan.highlighted ? 'text-4xl' : 'text-3xl'} text-white`}>
-                {plan.currency}{plan.price.toLocaleString()}
+                {plan.currency}{(isYearly ? yearlyMonthlyPrice : monthlyPrice).toLocaleString()}
               </span>
               <span className={plan.highlighted ? 'text-blue-200/60' : 'text-slate-500'}>
-                /{plan.interval}
+                /month
               </span>
-            </>
-          ) : plan.id === 'free' ? (
-            <span className="text-3xl font-bold text-white">₹0</span>
-          ) : (
-            <span className="text-3xl font-bold text-white">Custom</span>
-          )}
-        </div>
+            </div>
+            {isYearly && (
+              <p className="text-sm text-emerald-400 mt-1">
+                Billed ₹{yearlyTotal.toLocaleString()}/year · Save 15%
+              </p>
+            )}
+          </div>
+        ) : plan.id === 'free' ? (
+          <span className="text-3xl font-bold text-white">₹0</span>
+        ) : (
+          <span className="text-3xl font-bold text-white">Custom</span>
+        )}
       </div>
 
       <ul className="space-y-4 mb-8 flex-grow">
@@ -359,11 +376,13 @@ function CustomSolutionCTA() {
 }
 
 export default function PricingPage() {
+  const [billing, setBilling] = useState<BillingInterval>('monthly');
+
   return (
     <ErrorBoundary>
       <div className="bg-background-light dark:bg-background-dark font-display text-slate-800 dark:text-slate-200 antialiased overflow-x-hidden">
         <Navigation />
-        
+
         {/* Ambient Background Glows */}
         <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
           <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] opacity-40"></div>
@@ -372,7 +391,7 @@ export default function PricingPage() {
 
         <main className="relative z-10 flex-grow pt-28 pb-20 px-4 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="text-center max-w-3xl mx-auto mb-10">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight leading-tight">
               Simple, transparent pricing for{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-300">
@@ -384,10 +403,43 @@ export default function PricingPage() {
             </p>
           </div>
 
+          {/* Billing Toggle */}
+          <div className="flex justify-center mb-12">
+            <div className="relative flex items-center bg-slate-800/60 border border-slate-700/50 rounded-full p-1 gap-1">
+              <button
+                onClick={() => setBilling('monthly')}
+                className={`relative px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                  billing === 'monthly'
+                    ? 'bg-primary text-white shadow-md shadow-primary/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBilling('yearly')}
+                className={`relative px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                  billing === 'yearly'
+                    ? 'bg-primary text-white shadow-md shadow-primary/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Yearly
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                  billing === 'yearly'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-emerald-500/20 text-emerald-400'
+                }`}>
+                  Save 15%
+                </span>
+              </button>
+            </div>
+          </div>
+
           {/* Pricing Cards Grid */}
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-24 px-2 sm:px-0 relative">
             {pricingPlans.map((plan) => (
-              <PricingCard key={plan.id} plan={plan} />
+              <PricingCard key={plan.id} plan={plan} billing={billing} />
             ))}
           </div>
 
