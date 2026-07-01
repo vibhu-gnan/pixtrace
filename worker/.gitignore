@@ -1,0 +1,7 @@
+# Local worker — never commit secrets, venv, logs, or caches
+.env
+.venv/
+__pycache__/
+*.pyc
+*.log
+*.log.*

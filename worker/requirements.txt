@@ -1,0 +1,23 @@
+# PIXTRACE local face worker dependencies
+#
+# GPU note: onnxruntime-gpu + the nvidia-*-cu12 wheels below give full CUDA
+# acceleration on an NVIDIA card with NO manual CUDA Toolkit install — the
+# runtime ships as pip wheels and the worker loads them via ort.preload_dlls().
+# The worker auto-falls back to CPU if CUDA can't initialise, so a CPU-only
+# machine still works (the nvidia-*-cu12 wheels just go unused there).
+
+insightface==0.7.3
+onnxruntime-gpu>=1.21          # 1.21+ required for preload_dlls() GPU support
+opencv-python-headless==4.9.0.80
+numpy>=1.26,<2.0
+Pillow>=10.0
+boto3>=1.34
+supabase>=2.0
+python-dotenv>=1.0
+
+# CUDA 12 + cuDNN 9 runtime (self-contained, no system CUDA install needed).
+# Remove these on a CPU-only machine to save ~2 GB of downloads.
+nvidia-cudnn-cu12>=9.0,<10
+nvidia-cuda-runtime-cu12
+nvidia-cublas-cu12
+nvidia-cufft-cu12

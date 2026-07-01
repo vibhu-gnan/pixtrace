@@ -1,4 +1,13 @@
-/** Face search configuration — matches the proven prototype values */
+/**
+ * Face search configuration — matches the proven prototype values.
+ *
+ * NOTE: the live selfie-search algorithm runs in the Python worker
+ * (worker/face_worker.py `run_face_search`), which is the source of truth. It now
+ * uses the Streamlit Mode A "softmax" sweep-best config: a softmax-weighted
+ * prototype (PROTO_TAU=1.0) with a 0.50 seed/refinement threshold over 3 cycles.
+ * The TIER_*_THRESHOLD values below drive the TS recall path (lib/face/recall-search.ts),
+ * which re-searches a *saved* prototype and keeps the looser 0.44 display floor.
+ */
 export const FACE_SEARCH = {
   /** InsightFace w600k_r50 embedding dimension */
   EMBEDDING_DIM: 512,
