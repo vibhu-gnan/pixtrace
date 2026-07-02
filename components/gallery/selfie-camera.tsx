@@ -7,12 +7,32 @@ interface SelfieCameraProps {
   onClose: () => void;
 }
 
+// iOS in-app webviews (WhatsApp, Instagram, Facebook, etc.) block getUserMedia
+// entirely — the live camera can never work there, only the upload fallback.
+function detectInAppBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!isIOS) return false;
+  // Real Safari UA contains "Safari" and "Version/"; in-app webviews omit these
+  // or add an app token (FBAN/FBAV/Instagram/Line/etc.).
+  const inAppToken = /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Snapchat|LinkedIn|MicroMessenger|GSA)/i.test(ua);
+  const isRealSafari = /Safari/.test(ua) && /Version\//.test(ua);
+  return inAppToken || !isRealSafari;
+}
+
 export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isInApp, setIsInApp] = useState(false);
+
+  useEffect(() => {
+    setIsInApp(detectInAppBrowser());
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
@@ -27,11 +47,11 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
       }
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
-        setCameraError('Camera permission denied. Please allow camera access in your browser settings.');
+        setCameraError("Can't access the camera. Upload a photo of your face instead — a clear selfie from your library works just as well.");
       } else if (err.name === 'NotFoundError') {
-        setCameraError('No camera found on this device.');
+        setCameraError('No camera found. Upload a photo of your face instead.');
       } else {
-        setCameraError('Unable to access camera. Please try again.');
+        setCameraError('Camera unavailable. Upload a photo of your face instead.');
       }
     }
   }, []);
@@ -87,11 +107,17 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
       {cameraError ? (
         <div className="text-center py-8">
           <div className="text-sm text-gray-400 mb-4">{cameraError}</div>
+          {isInApp && (
+            <div className="text-xs text-amber-300/80 mb-4 px-4">
+              You&apos;re viewing this inside another app. For the live camera, tap the
+              &nbsp;•••&nbsp; menu and choose &ldquo;Open in Safari&rdquo;.
+            </div>
+          )}
           <label className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium text-white cursor-pointer"
             style={{ background: 'rgba(255,255,255,0.12)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
             Upload a Selfie
-            <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleFileUpload} />
+            <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
           </label>
         </div>
       ) : (
@@ -137,7 +163,7 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
           {/* Upload fallback */}
           <label className="text-xs text-gray-500 underline cursor-pointer">
             Or upload a photo
-            <input type="file" accept="image/*" capture="user" className="hidden" onChange={handleFileUpload} />
+            <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
           </label>
         </>
       )}
