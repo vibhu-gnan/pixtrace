@@ -97,15 +97,15 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
   }, []);
 
   useEffect(() => {
-    const ios = detectIOS();
-    setIsIOS(ios);
+    setIsIOS(detectIOS());
     setIsInApp(detectInAppBrowser());
     setBrowserName(iosBrowserName());
-    // Auto-start only where a gesture isn't required (non-iOS). iOS waits
-    // for the user to tap "Enable Camera".
-    if (!ios) startCamera();
+    // Never request the camera automatically. Both iOS Safari and Android
+    // Chrome treat a getUserMedia call that isn't bound to a user gesture as
+    // abusive and can silently auto-block it. So every platform waits for the
+    // explicit "Enable Camera" tap, which reliably surfaces the real prompt.
     return stopCamera;
-  }, [startCamera, stopCamera]);
+  }, [stopCamera]);
 
   // Attach the live stream to the <video> once it's actually mounted (phase
   // becomes 'live'). Doing this in startCamera failed because the element
