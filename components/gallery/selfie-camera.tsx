@@ -14,16 +14,34 @@ function detectIOS(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// iOS in-app webviews (WhatsApp, Instagram, Facebook, etc.) block getUserMedia
-// entirely — the live camera can never work there, only the upload fallback.
+// True iOS in-app webviews (WhatsApp, Instagram, Facebook, Google App, etc.)
+// block getUserMedia entirely — the live camera can never work there, only the
+// upload fallback. Standalone third-party browsers (Chrome/Firefox/Edge/Opera)
+// DO support the camera on iOS and must NOT be treated as in-app.
 function detectInAppBrowser(): boolean {
   if (!detectIOS()) return false;
   const ua = navigator.userAgent || '';
-  // Real Safari UA contains "Safari" and "Version/"; in-app webviews omit these
-  // or add an app token (FBAN/FBAV/Instagram/Line/etc.).
-  const inAppToken = /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Snapchat|LinkedIn|MicroMessenger|GSA)/i.test(ua);
-  const isRealSafari = /Safari/.test(ua) && /Version\//.test(ua);
-  return inAppToken || !isRealSafari;
+  // Known app webviews that genuinely can't open the camera.
+  const inAppToken = /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Snapchat|Pinterest|LinkedIn|MicroMessenger|GSA)/i.test(ua);
+  if (inAppToken) return true;
+  // Legit iOS browsers that support getUserMedia — Safari (Version/ + Safari),
+  // Chrome (CriOS), Firefox (FxiOS), Edge (EdgiOS), Opera (OPiOS).
+  const isKnownBrowser =
+    /(CriOS|FxiOS|EdgiOS|OPiOS)/.test(ua) ||
+    (/Safari/.test(ua) && /Version\//.test(ua));
+  // Anything left is an unlabeled WKWebView — assume it can't do live camera.
+  return !isKnownBrowser;
+}
+
+// Human-friendly name of the current iOS browser, for reset instructions.
+function iosBrowserName(): string {
+  if (typeof navigator === 'undefined') return 'your browser';
+  const ua = navigator.userAgent || '';
+  if (/CriOS/.test(ua)) return 'Chrome';
+  if (/FxiOS/.test(ua)) return 'Firefox';
+  if (/EdgiOS/.test(ua)) return 'Edge';
+  if (/OPiOS/.test(ua)) return 'Opera';
+  return 'Safari';
 }
 
 type Phase = 'idle' | 'live' | 'error';
@@ -38,6 +56,7 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
   const [denied, setDenied] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isInApp, setIsInApp] = useState(false);
+  const [browserName, setBrowserName] = useState('Safari');
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -82,6 +101,7 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
     const ios = detectIOS();
     setIsIOS(ios);
     setIsInApp(detectInAppBrowser());
+    setBrowserName(iosBrowserName());
     // Auto-start only where a gesture isn't required (non-iOS). iOS waits
     // for the user to tap "Enable Camera".
     if (!ios) startCamera();
@@ -165,9 +185,20 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
 
           {denied && isIOS && !isInApp && (
             <div className="text-xs text-gray-400 mb-4 px-2 text-left inline-block max-w-[320px]">
-              To turn it on: tap the <span className="text-white font-medium">&ldquo;ᴀA&rdquo;</span> icon
-              in the address bar → <span className="text-white font-medium">Website Settings</span> →
-              <span className="text-white font-medium"> Camera → Allow</span>, then reload.
+              {browserName === 'Safari' ? (
+                <>
+                  To turn it on: tap the <span className="text-white font-medium">&ldquo;ᴀA&rdquo;</span> icon
+                  in the address bar → <span className="text-white font-medium">Website Settings</span> →
+                  <span className="text-white font-medium"> Camera → Allow</span>, then reload.
+                </>
+              ) : (
+                <>
+                  To turn it on: open <span className="text-white font-medium">iPhone/iPad Settings →
+                  {' '}{browserName} → Camera</span> and allow access, then reload this page. You can also
+                  tap the <span className="text-white font-medium">•••</span> / address-bar icon in
+                  {' '}{browserName} to check site permissions.
+                </>
+              )}
               <br className="mb-1" />
               Still blocked? Check <span className="text-white font-medium">Settings → Screen Time →
               Content &amp; Privacy Restrictions → Camera</span> is allowed.
