@@ -15,6 +15,7 @@ import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
 import { useFaceProfile } from '@/lib/face/use-face-profile';
 import { useFaceSearch } from '@/lib/face/use-face-search';
 import type { FaceSearchResult } from '@/lib/face/use-face-search';
+import { recomputeDecisions, type EmbeddingMap } from '@/lib/face/client-rerank';
 
 // Matches at or above this combined score are treated as "definitely you" and shown in
 // "Mine" automatically. Matches below it (the band the worker still returned) go through
@@ -74,10 +75,14 @@ export function GalleryPageClient({
     const [faceSearchActive, setFaceSearchActive] = useState(false);
     const faceSearchActiveRef = useRef(false);
     const selfieBlobRef = useRef<Blob | null>(null);
-    // Review decisions on sub-FINAL_THRESHOLD matches. In-memory only (cleared on refresh).
-    const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set()); // kept → shown in Mine
-    const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());   // dropped → hidden from Mine
+    // Review decisions on sub-FINAL_THRESHOLD matches — the user's *explicit* choices.
+    // In-memory only (cleared on refresh). The algorithm folds in auto-resolutions below.
+    const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set()); // "This is me"
+    const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());   // "Not me"
     const [reviewOpen, setReviewOpen] = useState(false);
+    // Per-media face embeddings for the matched photos, fetched once per result set so we
+    // can re-rank the review queue on-device (see lib/face/client-rerank.ts). Null until loaded.
+    const [embMap, setEmbMap] = useState<EmbeddingMap | null>(null);
 
     // Auth + face profile state
     const { user, accessToken, loading: authLoading } = useGalleryAuth();
@@ -131,9 +136,10 @@ export function GalleryPageClient({
         if (recallResults && recallResults.totalMatches > 0) {
             const allResults = [...recallResults.tier1, ...recallResults.tier2];
             setFaceSearchResults(allResults);
-            // New result set — clear any prior review decisions.
+            // New result set — clear any prior review decisions + cached embeddings.
             setConfirmedIds(new Set());
             setRejectedIds(new Set());
+            setEmbMap(null);
             setReviewOpen(false);
             setFaceSearchActive(true);
             faceSearchActiveRef.current = true;
@@ -144,13 +150,54 @@ export function GalleryPageClient({
         }
     }, [recallResults]);
 
-    // Photos below FINAL_THRESHOLD the user hasn't decided on yet — the review queue.
+    // ── Fetch matched photos' face embeddings once per result set → enables on-device
+    //    re-ranking of the review queue. Best-effort: if it fails, review stays fully manual. ──
+    useEffect(() => {
+        if (!faceSearchResults || faceSearchResults.length === 0) return;
+        const mediaIds = faceSearchResults.map(r => r.media_id);
+        const controller = new AbortController();
+        (async () => {
+            try {
+                const resp = await fetch('/api/face/candidate-embeddings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eventHash, mediaIds }),
+                    signal: controller.signal,
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!controller.signal.aborted && data?.embeddings) {
+                    setEmbMap(data.embeddings as EmbeddingMap);
+                }
+            } catch { /* offline / aborted — review just stays manual */ }
+        })();
+        return () => controller.abort();
+    }, [faceSearchResults, eventHash]);
+
+    // ── Fold the user's explicit confirm/reject decisions together with the algorithm's
+    //    auto-resolutions. Recomputed from scratch (idempotent) whenever a decision or the
+    //    embeddings change, so the review queue shrinks as the prototype sharpens. ──
+    const { kept, dropped, autoKeptCount } = useMemo(() => {
+        if (!faceSearchResults) {
+            return { kept: confirmedIds, dropped: rejectedIds, autoKeptCount: 0 };
+        }
+        return recomputeDecisions({
+            results: faceSearchResults,
+            embMap,
+            userKept: confirmedIds,
+            userDropped: rejectedIds,
+            finalThreshold: FINAL_THRESHOLD,
+        });
+    }, [faceSearchResults, embMap, confirmedIds, rejectedIds]);
+
+    // Photos below FINAL_THRESHOLD that are still undecided (after auto-resolution) — the
+    // review queue the human actually sees, highest-confidence first.
     const reviewCandidates = useMemo(() => {
         if (!faceSearchResults) return [] as FaceSearchResult[];
         return faceSearchResults
-            .filter(r => r.score < FINAL_THRESHOLD && !confirmedIds.has(r.media_id) && !rejectedIds.has(r.media_id))
+            .filter(r => r.score < FINAL_THRESHOLD && !kept.has(r.media_id) && !dropped.has(r.media_id))
             .sort((a, b) => b.score - a.score); // highest-confidence first
-    }, [faceSearchResults, confirmedIds, rejectedIds]);
+    }, [faceSearchResults, kept, dropped]);
 
     // Derive display media: face search results or normal gallery
     const displayMedia = useMemo(() => {
@@ -160,8 +207,8 @@ export function GalleryPageClient({
         // the user confirmed; never show ones they rejected. Undecided review-band photos
         // stay out of the grid until the user acts on them in the review modal.
         const shown = faceSearchResults.filter(r =>
-            !rejectedIds.has(r.media_id) &&
-            (r.score >= FINAL_THRESHOLD || confirmedIds.has(r.media_id))
+            !dropped.has(r.media_id) &&
+            (r.score >= FINAL_THRESHOLD || kept.has(r.media_id))
         );
         const sorted = shown.sort((a, b) => b.score - a.score);
         let mapped: GalleryMediaItem[] = sorted.map(r => ({
@@ -182,16 +229,17 @@ export function GalleryPageClient({
             mapped = mapped.filter(m => m.album_id === activeAlbum);
         }
         return mapped;
-    }, [faceSearchActive, faceSearchResults, media, activeAlbum, albums, confirmedIds, rejectedIds]);
+    }, [faceSearchActive, faceSearchResults, media, activeAlbum, albums, kept, dropped]);
 
     // ── Background search completion → cache results (user taps pill to activate) ──
     useEffect(() => {
         if (searchState === 'results' && searchResults && searchResults.totalMatches > 0) {
             const allResults = [...searchResults.tier1, ...searchResults.tier2];
             setFaceSearchResults(allResults);
-            // New result set — clear any prior review decisions.
+            // New result set — clear any prior review decisions + cached embeddings.
             setConfirmedIds(new Set());
             setRejectedIds(new Set());
+            setEmbMap(null);
             setReviewOpen(false);
         }
     }, [searchState, searchResults]);
@@ -269,6 +317,7 @@ export function GalleryPageClient({
         setFaceSearchResults(null);
         setConfirmedIds(new Set());
         setRejectedIds(new Set());
+        setEmbMap(null);
         setReviewOpen(false);
         resetSearch();
         setSelfieModalOpen(true);
@@ -757,7 +806,11 @@ export function GalleryPageClient({
                                 <p className="text-sm font-semibold text-gray-900 leading-tight">
                                     Review {reviewCandidates.length} more photo{reviewCandidates.length === 1 ? '' : 's'} that might be you
                                 </p>
-                                <p className="text-[11px] text-gray-500 leading-tight">Tap to confirm which ones are yours</p>
+                                <p className="text-[11px] text-gray-500 leading-tight">
+                                    {autoKeptCount > 0
+                                        ? `${autoKeptCount} auto-added from your picks · tap to confirm the rest`
+                                        : 'Tap to confirm which ones are yours'}
+                                </p>
                             </div>
                         </div>
                         <span className="flex-shrink-0 text-xs font-semibold text-indigo-600 px-3 py-1.5 rounded-full bg-white/70">Review</span>

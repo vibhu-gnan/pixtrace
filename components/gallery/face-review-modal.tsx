@@ -16,9 +16,9 @@ interface FaceReviewModalProps {
  * One-at-a-time review of lower-confidence face matches.
  * The user swipes/taps "This is me" (keep) or "Not me" (drop) through each candidate.
  *
- * `candidates` is the parent's live list of *undecided* photos — each decision removes
- * that id from the parent's set, so the list shrinks under us. We hold a local index and
- * always render the candidate at that index; when it runs past the end we close.
+ * `candidates` is the parent's live list of *undecided* photos. Each decision removes that
+ * id from the parent's set — and the parent may auto-resolve others as its face prototype
+ * sharpens — so we always render the head (`candidates[0]`) and close once it's empty.
  */
 export function FaceReviewModal({
   candidates,
@@ -27,28 +27,25 @@ export function FaceReviewModal({
   onClose,
   showScore = false,
 }: FaceReviewModalProps) {
-  // Snapshot the candidate order once so decisions don't reshuffle the deck mid-review.
-  const deckRef = useRef<FaceSearchResult[]>(candidates);
-  const [index, setIndex] = useState(0);
-  const total = deckRef.current.length;
-  const current = deckRef.current[index];
+  // Consume the live queue head. The parent removes each decided photo from `candidates`
+  // and also auto-resolves others as the prototype sharpens, so `candidates[0]` is always
+  // the next photo genuinely needing a human — the deck shrinks (sometimes by more than one)
+  // as we go, and stale/auto-matched photos never appear.
+  const current = candidates[0];
+  const remaining = candidates.length;
 
   const handleConfirm = useCallback(() => {
-    if (!current) return;
-    onConfirm(current.media_id);
-    setIndex((i) => i + 1);
+    if (current) onConfirm(current.media_id);
   }, [current, onConfirm]);
 
   const handleReject = useCallback(() => {
-    if (!current) return;
-    onReject(current.media_id);
-    setIndex((i) => i + 1);
+    if (current) onReject(current.media_id);
   }, [current, onReject]);
 
-  // Ran off the end of the deck → done reviewing.
+  // Queue emptied (everything decided or auto-resolved) → done reviewing.
   useEffect(() => {
-    if (index >= deckRef.current.length) onClose();
-  }, [index, onClose]);
+    if (candidates.length === 0) onClose();
+  }, [candidates.length, onClose]);
 
   // Keyboard: →/Enter = keep, ← = drop, Esc = close
   useEffect(() => {
@@ -92,7 +89,7 @@ export function FaceReviewModal({
           <div>
             <h2 className="text-lg font-semibold text-white">Is this you?</h2>
             <p className="text-xs text-white/50 leading-tight">
-              {index + 1} of {total} to review
+              {remaining} photo{remaining === 1 ? '' : 's'} left to review
             </p>
           </div>
           <button
