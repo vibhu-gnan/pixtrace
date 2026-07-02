@@ -78,12 +78,11 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
       });
       streamRef.current = stream;
+      // Don't touch videoRef here — the <video> only mounts once phase is
+      // 'live', so it isn't in the DOM yet. A separate effect attaches the
+      // stream after the element mounts.
+      setCameraReady(false);
       setPhase('live');
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraReady(true);
-      }
     } catch (err: any) {
       if (err?.name === 'NotAllowedError') {
         setDenied(true);
@@ -107,6 +106,33 @@ export function SelfieCamera({ onCapture, onClose }: SelfieCameraProps) {
     if (!ios) startCamera();
     return stopCamera;
   }, [startCamera, stopCamera]);
+
+  // Attach the live stream to the <video> once it's actually mounted (phase
+  // becomes 'live'). Doing this in startCamera failed because the element
+  // isn't in the DOM at that point, leaving the viewfinder stuck on a spinner.
+  useEffect(() => {
+    if (phase !== 'live') return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+
+    video.srcObject = stream;
+    let cancelled = false;
+    const markReady = () => { if (!cancelled) setCameraReady(true); };
+    // 'playing' is the most reliable signal the frames are flowing on iOS.
+    video.addEventListener('playing', markReady, { once: true });
+    // play() can reject on iOS if not fully gesture-bound; the stream is still
+    // live, so fall back to loadedmetadata to reveal the viewfinder.
+    video.play().catch(() => {
+      if (video.readyState >= 2) markReady();
+    });
+    if (video.readyState >= 3) markReady();
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener('playing', markReady);
+    };
+  }, [phase]);
 
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
