@@ -90,6 +90,10 @@ export function GalleryPageClient({
     const hasMoreRef = useRef(initialMedia.length < totalCount);
     const mediaRef = useRef<GalleryMediaItem[]>(initialMedia);
     const activeAlbumRef = useRef<string | null>(null);
+    // Album the paginated `media` list currently holds. Used to distinguish a real
+    // album change (needs a refetch) from a face-search toggle (must NOT refetch,
+    // or it wipes already-loaded pages and strands the user on the first page).
+    const lastFetchedAlbumRef = useRef<string | null>(validInitialAlbum);
     const loadMoreRef = useRef<(() => void) | null>(null);
     const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const consecutiveEmptyLoads = useRef(0); // Guard against infinite retry loops
@@ -294,6 +298,14 @@ export function GalleryPageClient({
             }
             window.history.replaceState({}, '', url.toString());
         }
+        // Only reset/refetch the paginated media when the album ACTUALLY changed.
+        // Merely toggling face search off lands here with the same album — in that
+        // case keep the already-loaded pages intact (previously this reset to the
+        // first page and, with the observer stale, left infinite scroll dead).
+        if (activeAlbum === lastFetchedAlbumRef.current) {
+            return;
+        }
+        lastFetchedAlbumRef.current = activeAlbum;
         // Cancel any pending retry from the previous album
         if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
         consecutiveEmptyLoads.current = 0;
@@ -691,15 +703,16 @@ export function GalleryPageClient({
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.
                     This ensures loading fires while the user is still viewing images,
-                    not after they've scrolled past into empty space. */}
-                {!faceSearchActive && (
-                    <div
-                        ref={sentinelRef}
-                        className="absolute bottom-0 left-0 w-full pointer-events-none"
-                        style={{ height: '1px' }}
-                        aria-hidden="true"
-                    />
-                )}
+                    not after they've scrolled past into empty space.
+                    Kept ALWAYS mounted so the IntersectionObserver keeps a stable
+                    node across the ALL/Mine toggle — loadMore() no-ops while face
+                    search is active, so there's no cost to leaving it in the DOM. */}
+                <div
+                    ref={sentinelRef}
+                    className="absolute bottom-0 left-0 w-full pointer-events-none"
+                    style={{ height: '1px' }}
+                    aria-hidden="true"
+                />
             </div>
 
             {/* ── Error / End ──────────────────────────────────── */}
