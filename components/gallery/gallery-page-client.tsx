@@ -8,12 +8,18 @@ import type { GalleryMediaItem } from '@/actions/gallery';
 
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
+import { FaceReviewModal } from './face-review-modal';
 import { FaceSearchToggle } from './face-search-toggle';
 import { FaceSearchStatusPill } from './face-search-status-pill';
 import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
 import { useFaceProfile } from '@/lib/face/use-face-profile';
 import { useFaceSearch } from '@/lib/face/use-face-search';
 import type { FaceSearchResult } from '@/lib/face/use-face-search';
+
+// Matches at or above this combined score are treated as "definitely you" and shown in
+// "Mine" automatically. Matches below it (the band the worker still returned) go through
+// the one-at-a-time review modal so the user can keep or drop each one. Fixed for all faces.
+const FINAL_THRESHOLD = 0.666;
 
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
@@ -68,6 +74,10 @@ export function GalleryPageClient({
     const [faceSearchActive, setFaceSearchActive] = useState(false);
     const faceSearchActiveRef = useRef(false);
     const selfieBlobRef = useRef<Blob | null>(null);
+    // Review decisions on sub-FINAL_THRESHOLD matches. In-memory only (cleared on refresh).
+    const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set()); // kept → shown in Mine
+    const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());   // dropped → hidden from Mine
+    const [reviewOpen, setReviewOpen] = useState(false);
 
     // Auth + face profile state
     const { user, accessToken, loading: authLoading } = useGalleryAuth();
@@ -121,6 +131,10 @@ export function GalleryPageClient({
         if (recallResults && recallResults.totalMatches > 0) {
             const allResults = [...recallResults.tier1, ...recallResults.tier2];
             setFaceSearchResults(allResults);
+            // New result set — clear any prior review decisions.
+            setConfirmedIds(new Set());
+            setRejectedIds(new Set());
+            setReviewOpen(false);
             setFaceSearchActive(true);
             faceSearchActiveRef.current = true;
             if (!albumOnly) setActiveAlbum(null);
@@ -130,11 +144,26 @@ export function GalleryPageClient({
         }
     }, [recallResults]);
 
+    // Photos below FINAL_THRESHOLD the user hasn't decided on yet — the review queue.
+    const reviewCandidates = useMemo(() => {
+        if (!faceSearchResults) return [] as FaceSearchResult[];
+        return faceSearchResults
+            .filter(r => r.score < FINAL_THRESHOLD && !confirmedIds.has(r.media_id) && !rejectedIds.has(r.media_id))
+            .sort((a, b) => b.score - a.score); // highest-confidence first
+    }, [faceSearchResults, confirmedIds, rejectedIds]);
+
     // Derive display media: face search results or normal gallery
     const displayMedia = useMemo(() => {
         if (!faceSearchActive || !faceSearchResults) return media;
         const albumMap = new Map(albums.map(a => [a.id, a.name]));
-        const sorted = [...faceSearchResults].sort((a, b) => b.score - a.score);
+        // Show in "Mine" only the confident matches (>= FINAL_THRESHOLD) plus review photos
+        // the user confirmed; never show ones they rejected. Undecided review-band photos
+        // stay out of the grid until the user acts on them in the review modal.
+        const shown = faceSearchResults.filter(r =>
+            !rejectedIds.has(r.media_id) &&
+            (r.score >= FINAL_THRESHOLD || confirmedIds.has(r.media_id))
+        );
+        const sorted = shown.sort((a, b) => b.score - a.score);
         let mapped: GalleryMediaItem[] = sorted.map(r => ({
             id: r.media_id,
             album_id: r.album_id,
@@ -153,13 +182,17 @@ export function GalleryPageClient({
             mapped = mapped.filter(m => m.album_id === activeAlbum);
         }
         return mapped;
-    }, [faceSearchActive, faceSearchResults, media, activeAlbum, albums]);
+    }, [faceSearchActive, faceSearchResults, media, activeAlbum, albums, confirmedIds, rejectedIds]);
 
     // ── Background search completion → cache results (user taps pill to activate) ──
     useEffect(() => {
         if (searchState === 'results' && searchResults && searchResults.totalMatches > 0) {
             const allResults = [...searchResults.tier1, ...searchResults.tier2];
             setFaceSearchResults(allResults);
+            // New result set — clear any prior review decisions.
+            setConfirmedIds(new Set());
+            setRejectedIds(new Set());
+            setReviewOpen(false);
         }
     }, [searchState, searchResults]);
 
@@ -234,6 +267,9 @@ export function GalleryPageClient({
         setFaceSearchActive(false);
         faceSearchActiveRef.current = false;
         setFaceSearchResults(null);
+        setConfirmedIds(new Set());
+        setRejectedIds(new Set());
+        setReviewOpen(false);
         resetSearch();
         setSelfieModalOpen(true);
     }, [resetSearch]);
@@ -696,6 +732,40 @@ export function GalleryPageClient({
                 </div>
             </div>
 
+            {/* ── Review prompt (Mine mode, lower-confidence matches pending) ── */}
+            <AnimatePresence>
+            {faceSearchActive && reviewCandidates.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+                >
+                    <button
+                        onClick={() => setReviewOpen(true)}
+                        className="w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-colors"
+                        style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(139,92,246,0.10))', border: '1px solid rgba(99,102,241,0.25)' }}
+                    >
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                                </svg>
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-900 leading-tight">
+                                    Review {reviewCandidates.length} more photo{reviewCandidates.length === 1 ? '' : 's'} that might be you
+                                </p>
+                                <p className="text-[11px] text-gray-500 leading-tight">Tap to confirm which ones are yours</p>
+                            </div>
+                        </div>
+                        <span className="flex-shrink-0 text-xs font-semibold text-indigo-600 px-3 py-1.5 rounded-full bg-white/70">Review</span>
+                    </button>
+                </motion.div>
+            )}
+            </AnimatePresence>
+
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className={`pt-1 relative${faceSearchActive ? ' pb-16' : ''}`}>
                 <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} showFaceScores={showFaceScores} />
@@ -806,6 +876,17 @@ export function GalleryPageClient({
                 <FaceSearchModal
                     onSelfieConfirmed={handleSelfieConfirmed}
                     onClose={() => setSelfieModalOpen(false)}
+                />
+            )}
+
+            {/* Review Modal — one-at-a-time confirm/reject of sub-threshold matches */}
+            {reviewOpen && reviewCandidates.length > 0 && (
+                <FaceReviewModal
+                    candidates={reviewCandidates}
+                    showScore={showFaceScores}
+                    onConfirm={(id) => setConfirmedIds(prev => new Set(prev).add(id))}
+                    onReject={(id) => setRejectedIds(prev => new Set(prev).add(id))}
+                    onClose={() => setReviewOpen(false)}
                 />
             )}
 
