@@ -781,19 +781,26 @@ export function GalleryPageClient({
                 </div>
             </div>
 
-            {/* ── Review prompt (Mine mode, lower-confidence matches pending) ── */}
+            {/* ── Review prompt (Mine mode, lower-confidence matches pending) ──
+                Sticky bar that rides directly under the event-name header (top-14 == the
+                header's h-14) and stays put until every pending photo is reviewed, so the
+                prompt is always reachable while scrolling. z-20 keeps it below the header
+                (z-30) and its share dropdown (z-40) but above the grid. Opacity-only
+                animation — a translate transform would break position: sticky. */}
             <AnimatePresence>
             {faceSearchActive && reviewCandidates.length > 0 && (
                 <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
+                    key="review-bar"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3"
+                    className="sticky top-14 z-20 bg-white border-b border-gray-200"
                 >
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
                     <button
                         onClick={() => setReviewOpen(true)}
-                        className="w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-colors"
+                        className="w-full flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-left transition-colors"
                         style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(139,92,246,0.10))', border: '1px solid rgba(99,102,241,0.25)' }}
                     >
                         <div className="flex items-center gap-3 min-w-0">
@@ -815,6 +822,7 @@ export function GalleryPageClient({
                         </div>
                         <span className="flex-shrink-0 text-xs font-semibold text-indigo-600 px-3 py-1.5 rounded-full bg-white/70">Review</span>
                     </button>
+                    </div>
                 </motion.div>
             )}
             </AnimatePresence>
