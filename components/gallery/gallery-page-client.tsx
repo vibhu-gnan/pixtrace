@@ -781,14 +781,16 @@ export function GalleryPageClient({
                 </div>
             </div>
 
-            {/* ── Review prompt (Mine mode, lower-confidence matches pending) ──
+            {/* ── Review prompt (lower-confidence matches pending) ──
                 Sticky bar that rides directly under the event-name header (top-14 == the
                 header's h-14) and stays put until every pending photo is reviewed, so the
-                prompt is always reachable while scrolling. z-20 keeps it below the header
-                (z-30) and its share dropdown (z-40) but above the grid. Opacity-only
-                animation — a translate transform would break position: sticky. */}
+                prompt is always reachable while scrolling. Shown in BOTH All and Mine views
+                so it also signals "face search finished — your review is needed" without
+                having to toggle. z-20 keeps it below the header (z-30) and its share
+                dropdown (z-40) but above the grid. Opacity-only animation — a translate
+                transform would break position: sticky. */}
             <AnimatePresence>
-            {faceSearchActive && reviewCandidates.length > 0 && (
+            {reviewCandidates.length > 0 && (
                 <motion.div
                     key="review-bar"
                     initial={{ opacity: 0 }}
@@ -811,7 +813,7 @@ export function GalleryPageClient({
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-semibold text-gray-900 leading-tight">
-                                    Review {reviewCandidates.length} more photo{reviewCandidates.length === 1 ? '' : 's'} that might be you
+                                    Review {reviewCandidates.length} photo{reviewCandidates.length === 1 ? '' : 's'} that might be you
                                 </p>
                                 <p className="text-[11px] text-gray-500 leading-tight">
                                     {autoKeptCount > 0
