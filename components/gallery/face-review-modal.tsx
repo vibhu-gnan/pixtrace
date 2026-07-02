@@ -61,7 +61,7 @@ export function FaceReviewModal({
   if (!current) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
       {/* Backdrop */}
       <div
         className="absolute inset-0"
@@ -69,18 +69,17 @@ export function FaceReviewModal({
         onClick={onClose}
       />
 
-      {/* Sheet */}
+      {/* Sheet — bottom sheet on mobile, centered dialog on desktop */}
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl animate-in slide-in-from-bottom duration-300"
+        className="relative w-full max-w-lg sm:max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl animate-in slide-in-from-bottom sm:zoom-in-95 sm:fade-in duration-300"
         style={{
           background: 'linear-gradient(160deg, rgba(40,40,55,0.98), rgba(12,12,18,0.99))',
           backdropFilter: 'blur(48px) saturate(160%)',
           border: '1px solid rgba(255,255,255,0.1)',
-          borderBottom: 'none',
         }}
       >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
+        {/* Handle — drag affordance on mobile only */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 rounded-full bg-white/20" />
         </div>
 
@@ -110,7 +109,7 @@ export function FaceReviewModal({
           <div className="flex flex-col items-center gap-4">
             <ReviewImage key={current.media_id} candidate={current} showScore={showScore} />
 
-            <div className="flex gap-3 w-full max-w-[360px]">
+            <div className="flex gap-3 w-full max-w-[360px] sm:max-w-[440px]">
               <button
                 onClick={handleReject}
                 className="flex-1 py-3.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-colors"
@@ -158,13 +157,15 @@ function ReviewImage({ candidate, showScore }: { candidate: FaceSearchResult; sh
   };
 
   return (
-    <div className="relative w-full max-w-[360px] aspect-[3/4] rounded-2xl overflow-hidden bg-black/30">
+    // Hug the image's natural shape (portrait or landscape) — cap height so tall photos
+    // fit and let wide group shots use the full dialog width, no fixed-aspect black bars.
+    <div className="relative rounded-2xl overflow-hidden bg-black/30 max-w-full">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imgSrc}
         alt="Photo to review"
         onError={handleError}
-        className="w-full h-full object-contain"
+        className="block w-auto max-w-full max-h-[52vh] sm:max-h-[60vh] object-contain"
       />
       {showScore && (
         <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[11px] font-mono font-bold leading-none bg-black/60 text-white">
