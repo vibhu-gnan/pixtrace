@@ -87,10 +87,11 @@ APPLY_FINAL_ROT_180 = True
 EMBEDDING_DIM = 512
 L2_EPS = 1e-10
 
-# Prototype-refinement config — mirrors the Streamlit Mode A "softmax" sweep-best
-# result: softmax-weighted prototype, tau=1.0, threshold=0.50, 3 cycles
-# (AP=0.9707, Rank-1/5/10=100% on the eval set).
-TIER_1_THRESHOLD = 0.50   # seed pool + per-cycle expansion (raised from 0.44)
+# Prototype-refinement config. Keeps the softmax-weighted prototype from the
+# Streamlit Mode A sweep (the quality win), but uses PIXTRACE's proven 0.44 seed:
+# the sweep's 0.50 seed was too strict on real event selfies — a gallery person
+# scoring just under 0.50 vs the raw selfie got an empty seed and no refinement.
+TIER_1_THRESHOLD = 0.44   # seed pool + per-cycle expansion (0.50 starved recall live)
 TIER_2_THRESHOLD = 0.50   # extra matches scored vs the refined prototype
 REFINEMENT_CYCLES = 3
 PROTO_TAU = 1.0           # softmax temperature for prototype weighting (higher = softer/closer to plain mean)
