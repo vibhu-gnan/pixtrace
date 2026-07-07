@@ -6,6 +6,46 @@ import crypto from 'crypto';
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;
 
+// An event is stale/out-of-order if it's older than the last event already
+// applied to this subscription row. Protects against Razorpay retries and
+// out-of-order delivery clobbering newer state.
+function isEventStale(eventCreatedAt: number | undefined, lastEventAt: string | null | undefined): boolean {
+  if (!eventCreatedAt || !lastEventAt) return false;
+  return eventCreatedAt * 1000 <= new Date(lastEventAt).getTime();
+}
+
+function toIso(eventCreatedAt: number | undefined): string {
+  return eventCreatedAt ? new Date(eventCreatedAt * 1000).toISOString() : new Date().toISOString();
+}
+
+// Revert the organizer to the free plan unless another live subscription
+// (e.g. a reactivation created ahead of its start_at) already exists for them.
+async function revertOrganizerToFreeUnlessReactivated(
+  supabase: SupabaseClient,
+  sub: { id: string; organizer_id: string },
+) {
+  const { data: otherLiveSub } = await supabase
+    .from('subscriptions')
+    .select('id')
+    .eq('organizer_id', sub.organizer_id)
+    .neq('id', sub.id)
+    .in('status', ['active', 'authenticated', 'pending', 'halted'])
+    .limit(1)
+    .maybeSingle();
+
+  if (otherLiveSub) return;
+
+  await supabase
+    .from('organizers')
+    .update({ plan_id: 'free', updated_at: new Date().toISOString() })
+    .eq('id', sub.organizer_id);
+
+  // Downgraded to free — likely creates storage overage
+  await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
+    console.error('[Razorpay Webhook] Grace period check failed (revert-to-free):', err);
+  });
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get('x-razorpay-signature');
@@ -42,45 +82,67 @@ export async function POST(request: NextRequest) {
 
   console.log(`[Razorpay Webhook] ${event.event}`);
 
+  // Idempotency: skip if we've already processed this exact event delivery.
+  // Razorpay retries webhooks on non-2xx responses and delivery is not
+  // guaranteed to be exactly-once, so dedupe by the event id header.
+  const eventId = request.headers.get('x-razorpay-event-id');
+  if (eventId) {
+    const { error: dedupErr } = await supabase
+      .from('webhook_events')
+      .insert({ event_id: eventId, event_type: event.event });
+
+    if (dedupErr) {
+      if (dedupErr.code === '23505') {
+        console.log(`[Razorpay Webhook] Duplicate delivery of event ${eventId} (${event.event}) — skipping`);
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+      // Unexpected error recording the dedup row — fail open (still process
+      // the event) rather than dropping a legitimate webhook.
+      console.error('[Razorpay Webhook] Dedup insert failed:', dedupErr);
+    }
+  }
+
+  const eventCreatedAt: number | undefined = typeof event.created_at === 'number' ? event.created_at : undefined;
+
   try {
     switch (event.event) {
 
       // ── Subscription lifecycle ──────────────────────────────────────────────
       case 'subscription.authenticated':
-        await handleStatusUpdate(supabase, event.payload, 'authenticated');
+        await handleStatusUpdate(supabase, event.payload, 'authenticated', eventCreatedAt);
         break;
 
       case 'subscription.activated':
       case 'subscription.charged':
-        await handleSubscriptionCharged(supabase, event.payload);
+        await handleSubscriptionCharged(supabase, event.payload, eventCreatedAt);
         break;
 
       case 'subscription.updated':
-        await handleSubscriptionUpdated(supabase, event.payload);
+        await handleSubscriptionUpdated(supabase, event.payload, eventCreatedAt);
         break;
 
       case 'subscription.pending':
-        await handleStatusUpdate(supabase, event.payload, 'pending');
+        await handleStatusUpdate(supabase, event.payload, 'pending', eventCreatedAt);
         break;
 
       case 'subscription.halted':
-        await handleSubscriptionHalted(supabase, event.payload);
+        await handleSubscriptionHalted(supabase, event.payload, eventCreatedAt);
         break;
 
       case 'subscription.paused':
-        await handleStatusUpdate(supabase, event.payload, 'paused');
+        await handleStatusUpdate(supabase, event.payload, 'paused', eventCreatedAt);
         break;
 
       case 'subscription.resumed':
-        await handleSubscriptionResumed(supabase, event.payload);
+        await handleSubscriptionResumed(supabase, event.payload, eventCreatedAt);
         break;
 
       case 'subscription.cancelled':
-        await handleSubscriptionCancelled(supabase, event.payload);
+        await handleSubscriptionCancelled(supabase, event.payload, eventCreatedAt);
         break;
 
       case 'subscription.completed':
-        await handleSubscriptionCompleted(supabase, event.payload);
+        await handleSubscriptionCompleted(supabase, event.payload, eventCreatedAt);
         break;
 
       // ── Payment events ──────────────────────────────────────────────────────
@@ -163,7 +225,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ── Subscription: Activated / Charged ─────────────────────────────────────────
-async function handleSubscriptionCharged(supabase: SupabaseClient, payload: any) {
+async function handleSubscriptionCharged(supabase: SupabaseClient, payload: any, eventCreatedAt?: number) {
   const subEntity = payload.subscription?.entity;
   if (!subEntity?.id) return;
 
@@ -174,6 +236,11 @@ async function handleSubscriptionCharged(supabase: SupabaseClient, payload: any)
     .single();
 
   if (!sub) return;
+
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale charged event for subscription ${sub.id}`);
+    return;
+  }
 
   // Use Razorpay's timestamps when available, fall back to calculated
   const now = new Date();
@@ -191,6 +258,7 @@ async function handleSubscriptionCharged(supabase: SupabaseClient, payload: any)
       current_period_start: periodStart.toISOString(),
       current_period_end: periodEnd.toISOString(),
       grace_period_end: null,
+      last_event_at: toIso(eventCreatedAt),
       updated_at: now.toISOString(),
     })
     .eq('id', sub.id);
@@ -222,7 +290,7 @@ async function handleSubscriptionCharged(supabase: SupabaseClient, payload: any)
 }
 
 // ── Subscription: Updated (plan upgrade/downgrade) ─────────────────────────────
-async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any) {
+async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any, eventCreatedAt?: number) {
   const subEntity = payload.subscription?.entity;
   if (!subEntity?.id) return;
 
@@ -233,6 +301,11 @@ async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any)
     .single();
 
   if (!sub) return;
+
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale updated event for subscription ${sub.id}`);
+    return;
+  }
 
   // If the Razorpay plan changed, resolve the new plan_id from our plans table
   if (subEntity.plan_id) {
@@ -245,7 +318,12 @@ async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any)
     if (plan && plan.id !== sub.plan_id) {
       await supabase
         .from('subscriptions')
-        .update({ plan_id: plan.id, updated_at: new Date().toISOString() })
+        .update({
+          plan_id: plan.id,
+          pending_plan_id: null,
+          last_event_at: toIso(eventCreatedAt),
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', sub.id);
 
       await supabase
@@ -273,24 +351,49 @@ async function handleSubscriptionUpdated(supabase: SupabaseClient, payload: any)
 }
 
 // ── Subscription: Resumed ──────────────────────────────────────────────────────
-async function handleSubscriptionResumed(supabase: SupabaseClient, payload: any) {
+async function handleSubscriptionResumed(supabase: SupabaseClient, payload: any, eventCreatedAt?: number) {
   const razorpaySubId = payload.subscription?.entity?.id;
   if (!razorpaySubId) return;
+
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('id, last_event_at')
+    .eq('razorpay_subscription_id', razorpaySubId)
+    .single();
+
+  if (!sub) return;
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale resumed event for subscription ${sub.id}`);
+    return;
+  }
 
   await supabase
     .from('subscriptions')
     .update({
       status: 'active',
       grace_period_end: null,
+      last_event_at: toIso(eventCreatedAt),
       updated_at: new Date().toISOString(),
     })
-    .eq('razorpay_subscription_id', razorpaySubId);
+    .eq('id', sub.id);
 }
 
 // ── Subscription: Halted ───────────────────────────────────────────────────────
-async function handleSubscriptionHalted(supabase: SupabaseClient, payload: any) {
+async function handleSubscriptionHalted(supabase: SupabaseClient, payload: any, eventCreatedAt?: number) {
   const razorpaySubId = payload.subscription?.entity?.id;
   if (!razorpaySubId) return;
+
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('id, last_event_at')
+    .eq('razorpay_subscription_id', razorpaySubId)
+    .single();
+
+  if (!sub) return;
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale halted event for subscription ${sub.id}`);
+    return;
+  }
 
   const graceEnd = new Date();
   graceEnd.setDate(graceEnd.getDate() + 3);
@@ -300,13 +403,14 @@ async function handleSubscriptionHalted(supabase: SupabaseClient, payload: any) 
     .update({
       status: 'halted',
       grace_period_end: graceEnd.toISOString(),
+      last_event_at: toIso(eventCreatedAt),
       updated_at: new Date().toISOString(),
     })
-    .eq('razorpay_subscription_id', razorpaySubId);
+    .eq('id', sub.id);
 }
 
 // ── Subscription: Cancelled ────────────────────────────────────────────────────
-async function handleSubscriptionCancelled(supabase: SupabaseClient, payload: any) {
+async function handleSubscriptionCancelled(supabase: SupabaseClient, payload: any, eventCreatedAt?: number) {
   const razorpaySubId = payload.subscription?.entity?.id;
   if (!razorpaySubId) return;
 
@@ -317,32 +421,32 @@ async function handleSubscriptionCancelled(supabase: SupabaseClient, payload: an
     .single();
 
   if (!sub) return;
+
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale cancelled event for subscription ${sub.id}`);
+    return;
+  }
 
   await supabase
     .from('subscriptions')
     .update({
       status: 'cancelled',
       cancelled_at: new Date().toISOString(),
+      pending_plan_id: null,
+      last_event_at: toIso(eventCreatedAt),
       updated_at: new Date().toISOString(),
     })
     .eq('id', sub.id);
 
-  // Immediately revert to free unless scheduled to cancel at period end
-  if (!sub.cancel_at_period_end) {
-    await supabase
-      .from('organizers')
-      .update({ plan_id: 'free', updated_at: new Date().toISOString() })
-      .eq('id', sub.organizer_id);
-
-    // Downgraded to free — likely creates storage overage
-    await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
-      console.error('[Razorpay Webhook] Grace period check failed (cancelled):', err);
-    });
-  }
+  // Revert the organizer to free — this fires whether the cancellation was
+  // immediate or at-period-end (Razorpay only sends this event once the
+  // cancellation has actually taken effect), unless a reactivation
+  // subscription already exists for them.
+  await revertOrganizerToFreeUnlessReactivated(supabase, sub);
 }
 
 // ── Subscription: Completed (full fixed term ended) ────────────────────────────
-async function handleSubscriptionCompleted(supabase: SupabaseClient, payload: any) {
+async function handleSubscriptionCompleted(supabase: SupabaseClient, payload: any, eventCreatedAt?: number) {
   const razorpaySubId = payload.subscription?.entity?.id;
   if (!razorpaySubId) return;
 
@@ -354,35 +458,46 @@ async function handleSubscriptionCompleted(supabase: SupabaseClient, payload: an
 
   if (!sub) return;
 
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale completed event for subscription ${sub.id}`);
+    return;
+  }
+
   await supabase
     .from('subscriptions')
     .update({
       status: 'completed',
+      pending_plan_id: null,
+      last_event_at: toIso(eventCreatedAt),
       updated_at: new Date().toISOString(),
     })
     .eq('id', sub.id);
 
-  // Term ended naturally — revert to free
-  await supabase
-    .from('organizers')
-    .update({ plan_id: 'free', updated_at: new Date().toISOString() })
-    .eq('id', sub.organizer_id);
-
-  // Downgraded to free — likely creates storage overage
-  await checkAndSetGracePeriod(sub.organizer_id).catch((err) => {
-    console.error('[Razorpay Webhook] Grace period check failed (completed):', err);
-  });
+  // Term ended naturally — revert to free unless reactivated
+  await revertOrganizerToFreeUnlessReactivated(supabase, sub);
 }
 
 // ── Generic subscription status update ────────────────────────────────────────
-async function handleStatusUpdate(supabase: SupabaseClient, payload: any, status: string) {
+async function handleStatusUpdate(supabase: SupabaseClient, payload: any, status: string, eventCreatedAt?: number) {
   const razorpaySubId = payload.subscription?.entity?.id;
   if (!razorpaySubId) return;
 
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('id, last_event_at')
+    .eq('razorpay_subscription_id', razorpaySubId)
+    .single();
+
+  if (!sub) return;
+  if (isEventStale(eventCreatedAt, sub.last_event_at)) {
+    console.log(`[Razorpay Webhook] Ignoring stale ${status} event for subscription ${sub.id}`);
+    return;
+  }
+
   await supabase
     .from('subscriptions')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('razorpay_subscription_id', razorpaySubId);
+    .update({ status, last_event_at: toIso(eventCreatedAt), updated_at: new Date().toISOString() })
+    .eq('id', sub.id);
 }
 
 // ── Payment: Authorized / Captured / Failed ────────────────────────────────────

@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { getSubscriptionDetails } from '@/actions/billing';
+import { getSubscriptionDetails, getAllPlans } from '@/actions/billing';
 import { getOrganizerPlanLimits } from '@/lib/plans/limits';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { CancelSubscriptionButton } from './cancel-button';
+import { PlanCards } from './plan-cards';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -36,9 +36,10 @@ export default async function BillingPage() {
   const organizer = await getCurrentOrganizer();
   if (!organizer) redirect('/sign-in');
 
-  const [details, planLimits] = await Promise.all([
+  const [details, planLimits, allPlans] = await Promise.all([
     getSubscriptionDetails(),
     getOrganizerPlanLimits(organizer.id),
+    getAllPlans(),
   ]);
 
   if (!details) redirect('/sign-in');
@@ -71,16 +72,18 @@ export default async function BillingPage() {
               <p className="text-gray-500 mt-1">Free forever</p>
             )}
           </div>
-          {organizer.plan_id !== 'enterprise' && (
-            <Link
-              href="/pricing"
-              className="px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-medium hover:bg-brand-600 transition-colors"
-            >
-              {organizer.plan_id === 'free' ? 'Upgrade Plan' : 'Change Plan'}
-            </Link>
-          )}
         </div>
       </div>
+
+      {/* Plan Selection Cards */}
+      <PlanCards
+        plans={allPlans}
+        currentPlanId={organizer.plan_id}
+        currentPlanData={plan}
+        subscription={subscription}
+        storageUsedBytes={planLimits.storageUsedBytes}
+        eventCount={planLimits.eventCount}
+      />
 
       {/* Subscription Status */}
       {subscription && (
@@ -120,7 +123,7 @@ export default async function BillingPage() {
           {subscription.cancel_at_period_end && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-sm text-orange-600">
-                Your subscription will end on {formatDate(subscription.current_period_end)}. You&apos;ll be moved to the Free plan after that.
+                Your subscription will end on {formatDate(subscription.current_period_end)}. You&apos;ll be moved to the Free plan after that — re-subscribe to any plan above to keep your access.
               </p>
             </div>
           )}

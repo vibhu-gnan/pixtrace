@@ -5,14 +5,17 @@ import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { sendEmail } from '@/lib/email/resend';
 import { storageWarningSubject, storageWarningHtml } from '@/lib/email/templates/storage-warning';
 import { storageDeletedSubject, storageDeletedHtml } from '@/lib/email/templates/storage-deleted';
+import { checkAndSetGracePeriod } from '@/lib/plans/grace-period';
 import { captureError, captureWarning } from '@/lib/monitoring/sentry';
 
 /**
  * GET|POST /api/cron/storage-cleanup
  *
- * Runs daily via Vercel Cron (GET) or external cron (POST). Two phases:
+ * Runs daily via Vercel Cron (GET) or external cron (POST). Three phases:
  *   Phase 1: Send warning emails to organizers whose grace period expires within 1 day
  *   Phase 2: Delete oldest events for organizers whose grace period has expired
+ *   Phase 3: Reconcile organizers on a paid plan with no live subscription
+ *            (backstop for a missed/failed Razorpay cancellation webhook)
  *
  * Protected by CRON_SECRET (Bearer token in Authorization header).
  */
@@ -41,17 +44,23 @@ async function handler(request: NextRequest) {
   // ── Phase 2: Delete expired grace periods ─────────────────────────────
   const { organizersProcessed, eventsDeleted, errors } = await deleteExpiredContent(supabase);
 
+  // ── Phase 3: Reconcile orphaned paid-plan organizers ───────────────────
+  const { reverted: subscriptionsReverted, errors: reconcileErrors } = await reconcileExpiredSubscriptions(supabase);
+
+  const allErrors = [...errors, ...reconcileErrors];
+
   console.log(
-    `[StorageCleanup] Done. Warnings sent: ${warningsSent}, organizers cleaned: ${organizersProcessed}, events deleted: ${eventsDeleted}`,
+    `[StorageCleanup] Done. Warnings sent: ${warningsSent}, organizers cleaned: ${organizersProcessed}, events deleted: ${eventsDeleted}, subscriptions reconciled: ${subscriptionsReverted}`,
   );
 
   // Report any errors during cleanup to Sentry
-  if (errors.length > 0) {
-    captureWarning(`Storage cleanup completed with ${errors.length} errors`, {
-      errors,
+  if (allErrors.length > 0) {
+    captureWarning(`Storage cleanup completed with ${allErrors.length} errors`, {
+      errors: allErrors,
       warningsSent,
       organizersProcessed,
       eventsDeleted,
+      subscriptionsReverted,
     });
   }
 
@@ -59,8 +68,79 @@ async function handler(request: NextRequest) {
     warningsSent,
     organizersProcessed,
     eventsDeleted,
-    ...(errors.length > 0 && { errors }),
+    subscriptionsReverted,
+    ...(allErrors.length > 0 && { errors: allErrors }),
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 3: Reconcile organizers whose Razorpay subscription lapsed without
+// a corresponding cancellation webhook ever landing (retry exhaustion,
+// deploy-time gap before the pending_plan_id migration, etc.)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function reconcileExpiredSubscriptions(
+  supabase: SupabaseClient,
+): Promise<{ reverted: number; errors: string[] }> {
+  const { data: paidOrganizers, error: orgErr } = await supabase
+    .from('organizers')
+    .select('id')
+    .neq('plan_id', 'free');
+
+  if (orgErr) {
+    console.error('[StorageCleanup] Failed to fetch paid organizers:', orgErr);
+    return { reverted: 0, errors: [orgErr.message] };
+  }
+  if (!paidOrganizers || paidOrganizers.length === 0) {
+    return { reverted: 0, errors: [] };
+  }
+
+  // "Live" mirrors the statuses treated as an active/pending subscription
+  // elsewhere (webhook route, create route) — anything outside this set
+  // (cancelled, completed, created-but-never-authenticated, expired) means
+  // the organizer has nothing actually backing their paid plan_id.
+  const { data: liveSubs, error: subErr } = await supabase
+    .from('subscriptions')
+    .select('organizer_id')
+    .in('status', ['active', 'authenticated', 'pending', 'halted']);
+
+  if (subErr) {
+    console.error('[StorageCleanup] Failed to fetch live subscriptions:', subErr);
+    return { reverted: 0, errors: [subErr.message] };
+  }
+
+  const liveOrganizerIds = new Set((liveSubs || []).map((s) => s.organizer_id));
+  const orphaned = paidOrganizers.filter((o) => !liveOrganizerIds.has(o.id));
+
+  let reverted = 0;
+  const errors: string[] = [];
+
+  for (const org of orphaned) {
+    try {
+      const { error: revertErr } = await supabase
+        .from('organizers')
+        .update({ plan_id: 'free', updated_at: new Date().toISOString() })
+        .eq('id', org.id);
+
+      if (revertErr) {
+        errors.push(`Organizer ${org.id}: ${revertErr.message}`);
+        continue;
+      }
+
+      await checkAndSetGracePeriod(org.id).catch((err) => {
+        console.error(`[StorageCleanup] Grace period check failed for ${org.id}:`, err);
+      });
+
+      reverted++;
+      console.log(`[StorageCleanup] Reconciled: organizer ${org.id} had no live subscription — reverted to free`);
+    } catch (err) {
+      const msg = `Organizer ${org.id}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(`[StorageCleanup] ${msg}`);
+      errors.push(msg);
+    }
+  }
+
+  return { reverted, errors };
 }
 
 type SupabaseClient = ReturnType<typeof createAdminClient>;

@@ -112,6 +112,7 @@ export interface SubscriptionData {
   current_period_end: string | null;
   cancelled_at: string | null;
   cancel_at_period_end: boolean;
+  pending_plan_id: string | null;
   grace_period_end: string | null;
   created_at: string;
   updated_at: string;

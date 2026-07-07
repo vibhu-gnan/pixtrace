@@ -34,6 +34,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Plan not available for subscription' }, { status: 400 });
   }
 
+  // Look up the organizer's most recent live subscription. A cancel-pending
+  // sub is a reactivation case (allowed, with start_at deferred to its period
+  // end below); any other live sub blocks creation to avoid double-billing.
+  const { data: existingSub } = await supabase
+    .from('subscriptions')
+    .select('id, status, cancel_at_period_end, current_period_end')
+    .eq('organizer_id', organizer.id)
+    .in('status', ['active', 'authenticated', 'pending', 'halted'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingSub && !existingSub.cancel_at_period_end) {
+    return NextResponse.json(
+      { error: 'You already have an active subscription. Cancel it before starting a new one.' },
+      { status: 400 },
+    );
+  }
+
+  // Reactivation: the old subscription is cancel-pending but still paid
+  // through its period end. Defer the new subscription's start so it
+  // doesn't bill until the old one actually lapses (avoids double-charging
+  // the overlap).
+  const startAt = existingSub?.cancel_at_period_end && existingSub.current_period_end
+    ? Math.floor(new Date(existingSub.current_period_end).getTime() / 1000)
+    : undefined;
+
   try {
     let customerId = organizer.razorpay_customer_id;
     if (!customerId) {
@@ -56,18 +83,28 @@ export async function POST(request: NextRequest) {
       customer_id: customerId,
       total_count: 120,
       customer_notify: 0,
+      ...(startAt ? { start_at: startAt } : {}),
       notes: {
         organizer_id: organizer.id,
         plan_id: planId,
       },
     });
 
-    await supabase.from('subscriptions').insert({
+    const { error: insertErr } = await supabase.from('subscriptions').insert({
       organizer_id: organizer.id,
       plan_id: planId,
       razorpay_subscription_id: subscription.id,
       status: 'created',
     });
+
+    if (insertErr) {
+      // The Razorpay subscription exists but we couldn't record it — the
+      // verify step looks it up by razorpay_subscription_id, so letting
+      // checkout proceed here would let the user pay for a subscription we
+      // can never activate. Fail now instead.
+      console.error('[Subscription Create] Failed to save subscription row:', insertErr, subscription.id);
+      return NextResponse.json({ error: 'Failed to create subscription' }, { status: 500 });
+    }
 
     return NextResponse.json({
       subscriptionId: subscription.id,
