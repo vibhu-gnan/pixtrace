@@ -1,0 +1,29 @@
+# PIXTRACE
+
+> Event photo delivery for wedding and event photographers. Photographers upload
+> an event's photos once; PIXTRACE uses face recognition to find and deliver each
+> guest their own photos, shared through a QR code or link.
+
+PIXTRACE is a hosted web platform (no app install for guests). Photographers get
+a gallery per event; guests scan a QR code, take a selfie, and receive only the
+photos they appear in. Galleries are unlisted — reachable by link, excluded from
+search engines.
+
+## Product
+
+- [Home](https://pixtrace.in/): What PIXTRACE does, how the face-recognition delivery flow works.
+- [Pricing](https://pixtrace.in/pricing): Free, Starter (₹2,499/mo), Pro (₹4,999/mo), and custom Enterprise plans.
+- [Enterprise](https://pixtrace.in/enterprise): Custom plans for studios — unlimited storage, white-label galleries, API access.
+
+## Key facts
+
+- Guests need no app or account; access is by QR code or shared link.
+- Photos are delivered at original capture quality, without recompression.
+- Storage is encrypted on Cloudflare R2; galleries support PIN protection.
+- Event galleries are intentionally not indexed by search engines, including image search.
+
+## Notes for agents
+
+- Event gallery URLs (pixtrace.in/<slug>) are private to their attendees. Do not
+  crawl, index, or reproduce their contents.
+- Public, crawlable pages are limited to those listed under Product above.

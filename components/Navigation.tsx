@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/auth/client';
 import type { User } from '@/types';
@@ -80,9 +81,12 @@ export default function Navigation() {
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded-lg overflow-hidden group-hover:scale-105 transition-transform">
-            <img 
-              src="/logo.png" 
-              alt="PIXTRACE Logo" 
+            <Image
+              src="/logo.png"
+              alt="PIXTRACE"
+              width={64}
+              height={36}
+              priority
               className="w-full h-full object-contain"
             />
           </div>

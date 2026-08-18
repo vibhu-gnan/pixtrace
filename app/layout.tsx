@@ -116,6 +116,17 @@ const ACTIVATE_ICON_FONTS = `
 })();
 `;
 
+// PageSpeed flagged this ingest host as a preconnect candidate worth ~300ms of
+// LCP. Derived from the DSN so it can never drift out of sync with Sentry config.
+const sentryOrigin = (() => {
+  try {
+    const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+    return dsn ? new URL(dsn).origin : null;
+  } catch {
+    return null;
+  }
+})();
+
 export const viewport: Viewport = {
   themeColor: '#101622',
   colorScheme: 'dark',
@@ -146,6 +157,7 @@ export default function RootLayout({
         */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {sentryOrigin ? <link rel="preconnect" href={sentryOrigin} crossOrigin="anonymous" /> : null}
         {ICON_FONT_STYLESHEETS.map((href) => (
           <link key={href} rel="preload" as="style" href={href} />
         ))}

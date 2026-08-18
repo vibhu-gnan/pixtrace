@@ -3,6 +3,9 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   images: {
+    // AVIF first, WebP fallback. PageSpeed flagged ~80 KiB of avoidable bytes
+    // across the hero grid; these formats compress far better than the source JPEGs.
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",

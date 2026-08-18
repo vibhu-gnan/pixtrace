@@ -166,7 +166,7 @@ export default function Home() {
               <div className="relative z-10 max-w-xl">
                 {/* Announcement Badge — face recognition USP */}
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-primary mb-5">
-                  <span className="relative flex h-2 w-2" aria-label="Live feature indicator">
+                  <span className="relative flex h-2 w-2" aria-hidden="true">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                   </span>
@@ -665,8 +665,8 @@ export default function Home() {
                       src="/logo.png"
                       alt="PIXTRACE logo"
                       className="w-full h-full object-contain"
-                      width={24}
-                      height={24}
+                      width={48}
+                      height={27}
                     />
                   </div>
                   <span className="text-xl font-bold text-white">PIXTRACE</span>
@@ -710,7 +710,7 @@ export default function Home() {
               </div>
 
               <div>
-                <h4 className="text-white font-semibold mb-4">Product</h4>
+                <h3 className="text-white font-semibold mb-4">Product</h3>
                 <ul className="space-y-2 text-sm text-slate-400">
                   <li>
                     <Link className="hover:text-primary transition-colors" href="/#features">
@@ -726,7 +726,7 @@ export default function Home() {
               </div>
 
               <div>
-                <h4 className="text-white font-semibold mb-4">Company</h4>
+                <h3 className="text-white font-semibold mb-4">Company</h3>
                 <ul className="space-y-2 text-sm text-slate-400">
                   <li>
                     <a className="hover:text-primary transition-colors" href="mailto:vtrader2005@gmail.com">
@@ -737,7 +737,7 @@ export default function Home() {
               </div>
 
               <div>
-                <h4 className="text-white font-semibold mb-4">Support</h4>
+                <h3 className="text-white font-semibold mb-4">Support</h3>
                 <ul className="space-y-2 text-sm text-slate-400">
                   <li>
                     <a className="hover:text-primary transition-colors" href="mailto:vtrader2005@gmail.com">
