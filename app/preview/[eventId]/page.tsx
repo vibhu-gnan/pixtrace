@@ -8,20 +8,25 @@ type Props = {
     params: Promise<{ eventId: string }>;
 };
 
+// Organizer-only preview of a gallery — a duplicate of the public /<slug> page,
+// so it must never be indexed.
+const noIndex = { index: false, follow: false, nocache: true } as const;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     try {
         const { eventId } = await params;
         const organizer = await getCurrentOrganizer();
-        if (!organizer) return { title: 'Preview' };
+        if (!organizer) return { title: 'Preview', robots: noIndex };
 
         const event = await getEvent(eventId);
-        if (!event) return { title: 'Preview' };
+        if (!event) return { title: 'Preview', robots: noIndex };
 
         return {
             title: `Preview: ${event.name} | PIXTRACE`,
+            robots: noIndex,
         };
     } catch {
-        return { title: 'Preview | PIXTRACE' };
+        return { title: 'Preview | PIXTRACE', robots: noIndex };
     }
 }
 

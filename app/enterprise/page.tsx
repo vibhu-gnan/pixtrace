@@ -1,6 +1,23 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import Navigation from '@/components/Navigation';
 import { EnterpriseInquiryForm } from '@/components/enterprise/inquiry-form';
+
+export const metadata: Metadata = {
+  title: 'Enterprise Photo Gallery Plans for Studios',
+  description:
+    'Custom PIXTRACE plans for photography studios and large event teams — unlimited storage, white-label galleries, API access and dedicated support. Tell us your requirements.',
+  alternates: {
+    canonical: '/enterprise',
+  },
+  openGraph: {
+    title: 'PIXTRACE Enterprise - Custom Gallery Plans for Photography Studios',
+    description:
+      'Unlimited storage, white-label galleries, API access and dedicated support. Get a custom quote for your studio.',
+    url: '/enterprise',
+    type: 'website',
+  },
+};
 
 export default function EnterprisePage() {
   return (

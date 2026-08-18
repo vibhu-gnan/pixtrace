@@ -17,18 +17,33 @@ type Props = {
 // (generateMetadata + page component share one result)
 const getCachedGallery = cache((identifier: string) => getPublicGallery(identifier));
 
+/**
+ * Event galleries are "unlisted": reachable by anyone holding the link, invisible
+ * to search. Crucially the route stays crawlable in robots.txt — a blocked URL is
+ * one Google can never read this directive from, so it could still get indexed
+ * from an inbound link.
+ */
+const GALLERY_ROBOTS = {
+    index: false,
+    follow: false,
+    nocache: true,
+    noimageindex: true,
+    googleBot: { index: false, follow: false, noimageindex: true },
+} as const;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     try {
         const { slug } = await params;
 
         // Ignore if slug is a known static route or file (though Next.js routing handles most)
-        if (slug.includes('.')) return {};
+        if (slug.includes('.')) return { robots: GALLERY_ROBOTS };
 
         const { event, media, coverUrl: resolvedCoverUrl } = await getCachedGallery(slug);
 
         if (!event) {
             return {
                 title: 'Gallery Not Found',
+                robots: GALLERY_ROBOTS,
             };
         }
 
@@ -49,14 +64,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                 description: event.description || `View photos from ${event.name}`,
                 images: coverUrl ? [coverUrl] : [],
             },
-            alternates: {
-                canonical: `/${slug}`,
-            }
+            // Galleries are link-only: anyone with the URL can view, but search
+            // engines must not index the page or its photos. `noimageindex` is
+            // what keeps guest faces out of Google Image search. Social scrapers
+            // (WhatsApp/Instagram/Twitter) ignore these, so link previews still work.
+            robots: GALLERY_ROBOTS,
         };
     } catch (error) {
         // console.error('Error fetching metadata:', error);
         return {
             title: 'PIXTRACE Gallery',
+            robots: GALLERY_ROBOTS,
         };
     }
 }

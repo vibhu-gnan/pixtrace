@@ -1,3 +1,11 @@
+import type { Metadata } from 'next';
+
+// Placeholder landing page with no standalone value — keep it out of the index.
+export const metadata: Metadata = {
+  title: 'Gallery',
+  robots: { index: false, follow: false },
+};
+
 export default function GalleryIndexPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-8">

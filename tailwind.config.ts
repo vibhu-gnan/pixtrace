@@ -31,8 +31,8 @@ export default {
         },
       },
       fontFamily: {
-        display: ["Inter", "sans-serif"],
-        sans: ["Inter", "sans-serif"],
+        display: ["var(--font-inter)", "Inter", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "sans-serif"],
       },
       borderRadius: {
         DEFAULT: "0.375rem",

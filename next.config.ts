@@ -19,6 +19,24 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  async headers() {
+    // Belt-and-braces for the "unlisted gallery" rule. The page-level metadata
+    // already sends `noindex, noimageindex`, but a <meta> tag only protects an
+    // HTML document — it cannot protect the image bytes themselves. An
+    // X-Robots-Tag header travels with every response type, so a photo URL that
+    // somehow gets crawled directly is still excluded from Image Search.
+    const noIndex = {
+      key: "X-Robots-Tag",
+      value: "noindex, nofollow, noimageindex, noarchive",
+    };
+
+    return [
+      { source: "/gallery/:path*", headers: [noIndex] },
+      { source: "/api/proxy-image", headers: [noIndex] },
+      { source: "/api/download/:path*", headers: [noIndex] },
+      { source: "/preview/:path*", headers: [noIndex] },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

@@ -29,6 +29,20 @@ const getCachedGalleryWithFallback = cache(async (eventHash: string) => {
   return { ...result, isOwnerPreview: false };
 });
 
+/**
+ * Event galleries are "unlisted": reachable by anyone holding the link, invisible
+ * to search. `noimageindex` is what keeps guest photos out of Google Image search.
+ * Social scrapers (WhatsApp/Instagram/Twitter) ignore these, so the OG previews
+ * below still render when someone shares the link.
+ */
+const GALLERY_ROBOTS = {
+  index: false,
+  follow: false,
+  nocache: true,
+  noimageindex: true,
+  googleBot: { index: false, follow: false, noimageindex: true },
+} as const;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const { eventHash } = await params;
@@ -37,6 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!event) {
       return {
         title: 'Gallery Not Found',
+        robots: GALLERY_ROBOTS,
       };
     }
 
@@ -60,11 +75,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description: event.description || `View photos from ${event.name}`,
         images: ogImageUrl ? [ogImageUrl] : [],
       },
+      robots: GALLERY_ROBOTS,
     };
   } catch (error) {
     console.error('Error fetching metadata:', error);
     return {
       title: 'PIXTRACE Gallery',
+      robots: GALLERY_ROBOTS,
     };
   }
 }

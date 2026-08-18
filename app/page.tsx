@@ -110,12 +110,9 @@ function JsonLd() {
       priceCurrency: 'INR',
       offerCount: 4,
     },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      ratingCount: '2000',
-      bestRating: '5',
-    },
+    // NOTE: no `aggregateRating` — Google requires review markup to be backed by
+    // real reviews that are visible on this page. Re-add only when genuine
+    // ratings are rendered on-page, or the site risks a structured-data penalty.
   };
 
   const faqSchema = {
@@ -664,9 +661,9 @@ export default function Home() {
               <div className="col-span-2 lg:col-span-2">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-6 h-6 rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src="/logo.png"
-                      alt="PIXTRACE Logo"
+                      alt="PIXTRACE logo"
                       className="w-full h-full object-contain"
                       width={24}
                       height={24}
