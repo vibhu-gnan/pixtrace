@@ -897,11 +897,65 @@ export async function getFaceProcessingProgress(eventId: string): Promise<FacePr
 }
 
 /**
- * Wipe all face embeddings for an event and reset every processing job back
- * to pending so Modal re-runs the pipeline with the current model weights.
- * Fires /api/face/trigger non-blocking after the reset.
+ * Enqueue a pending job for every image that has none, returning how many were
+ * added. Photos uploaded before face search existed have no job row at all, so
+ * resetting jobs cannot reach them — only creating the missing rows can.
  */
-export async function reprocessFaceEmbeddings(eventId: string): Promise<{ success?: boolean; error?: string }> {
+async function enqueueMissingFaceJobs(
+  supabase: ReturnType<typeof createAdminClient>,
+  eventId: string,
+): Promise<number> {
+  // PostgREST caps a select at 1000 rows, so both sides must be paged or large
+  // events silently look like they are already fully enqueued.
+  const PAGE = 1000;
+
+  const readAll = async (
+    table: 'media' | 'face_processing_jobs',
+    column: 'id' | 'media_id',
+  ): Promise<string[]> => {
+    const ids: string[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let query = supabase.from(table).select(column).eq('event_id', eventId);
+      if (table === 'media') query = query.eq('media_type', 'image');
+
+      const { data, error } = await query.range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+
+      ids.push(...(data ?? []).map((row: Record<string, string>) => row[column]));
+      if (!data || data.length < PAGE) return ids;
+    }
+  };
+
+  const [imageIds, jobMediaIds] = await Promise.all([
+    readAll('media', 'id'),
+    readAll('face_processing_jobs', 'media_id'),
+  ]);
+
+  const alreadyQueued = new Set(jobMediaIds);
+  const missing = imageIds.filter((id) => !alreadyQueued.has(id));
+
+  for (let i = 0; i < missing.length; i += 100) {
+    const { error } = await supabase.from('face_processing_jobs').insert(
+      missing.slice(i, i + 100).map((mediaId) => ({
+        event_id: eventId,
+        media_id: mediaId,
+        status: 'pending',
+        attempt_count: 0,
+        max_attempts: 3,
+      })),
+    );
+    if (error) throw new Error(error.message);
+  }
+
+  return missing.length;
+}
+
+/**
+ * Wipe all face embeddings for an event, reset every processing job back to
+ * pending, and enqueue any image that never had a job, so the worker re-runs
+ * the pipeline over the whole gallery with the current model weights.
+ */
+export async function reprocessFaceEmbeddings(eventId: string): Promise<{ success?: boolean; error?: string; enqueued?: number }> {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };
 
@@ -948,6 +1002,15 @@ export async function reprocessFaceEmbeddings(eventId: string): Promise<{ succes
     return { error: 'Failed to reset processing queue' };
   }
 
+  // 3. Cover images the reset could not reach because they never had a job
+  let enqueued = 0;
+  try {
+    enqueued = await enqueueMissingFaceJobs(supabase, eventId);
+  } catch (err) {
+    console.error('Failed to enqueue missing face jobs:', err);
+    return { error: 'Failed to queue photos that were never processed' };
+  }
+
   // Immediately kick off processing for the reset jobs
   try {
     await runTrigger();
@@ -955,7 +1018,7 @@ export async function reprocessFaceEmbeddings(eventId: string): Promise<{ succes
     console.error('reprocessFaceEmbeddings: trigger error (non-fatal):', err);
   }
 
-  return { success: true };
+  return { success: true, enqueued };
 }
 
 /**
