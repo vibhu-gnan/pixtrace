@@ -38,6 +38,7 @@ import os
 import signal
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -75,6 +76,11 @@ GALLERY_POLL_INTERVAL = float(os.environ.get("GALLERY_POLL_INTERVAL", "15"))
 # Batch sizes — mirror lib/face/constants.ts
 GALLERY_BATCH_SIZE = int(os.environ.get("GALLERY_BATCH_SIZE", "50"))
 SEARCH_BATCH_SIZE = int(os.environ.get("SEARCH_BATCH_SIZE", "5"))
+
+# Gallery throughput is bound by R2 downloads and Supabase round trips, not the
+# GPU, so both run on a pool while inference stays on the main thread (ONNX
+# sessions are not safe to drive concurrently).
+IO_CONCURRENCY = int(os.environ.get("IO_CONCURRENCY", "8"))
 STUCK_JOB_TIMEOUT_MINUTES = 10
 
 # Force CPU even if a GPU is present (set WORKER_FORCE_CPU=1 to debug).
@@ -422,6 +428,35 @@ _detector = None
 _using_gpu = False
 
 
+def cuda_conv_works(ort) -> bool:
+    """CUDA can register as available yet fail on the first Conv, after which ORT
+    silently reruns everything on CPU while still looking GPU-backed. Prove a Conv
+    actually executes there before believing it."""
+    try:
+        from onnx import helper, TensorProto
+
+        x = helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 3, 32, 32])
+        y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, None)
+        w = helper.make_tensor("W", TensorProto.FLOAT, [8, 3, 3, 3],
+                               np.zeros(8 * 3 * 3 * 3, dtype=np.float32).tolist())
+        node = helper.make_node("Conv", ["X", "W"], ["Y"], kernel_shape=[3, 3], pads=[1, 1, 1, 1])
+        graph = helper.make_graph([node], "cuda_probe", [x], [y], initializer=[w])
+        model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+        model.ir_version = 9
+
+        opts = ort.SessionOptions()
+        opts.log_severity_level = 4
+        sess = ort.InferenceSession(
+            model.SerializeToString(), opts,
+            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+        )
+        sess.run(None, {"X": np.zeros((1, 3, 32, 32), dtype=np.float32)})
+        return sess.get_providers()[0] == "CUDAExecutionProvider"
+    except Exception as e:
+        log(f"CUDA probe failed ({str(e)[:200]}) — treating GPU as unavailable.")
+        return False
+
+
 def load_models():
     """Load InsightFace detector + recognizer once. Uses CUDA if available."""
     global _recognizer, _detector, _using_gpu
@@ -430,6 +465,24 @@ def load_models():
 
     import insightface
     from insightface.model_zoo import get_model
+
+    # cuDNN 9.26 split out sublibraries (cudnn_engines_tensor_ir) that resolve
+    # their own deps from the sibling nvidia/*/bin dirs, which preload_dlls()
+    # does not register — without this the cuDNN graph build fails with
+    # SUBLIBRARY_LOADING_FAILED and every Conv silently falls back to CPU.
+    if not FORCE_CPU:
+        try:
+            import nvidia
+
+            _nv_root = list(nvidia.__path__)[0]
+            for _pkg in os.listdir(_nv_root):
+                _bin = os.path.join(_nv_root, _pkg, "bin")
+                if os.path.isdir(_bin):
+                    os.add_dll_directory(_bin)
+                    os.environ["PATH"] = _bin + os.pathsep + os.environ["PATH"]
+        except Exception as e:
+            log(f"nvidia DLL dir setup failed (will try anyway): {e}")
+
     import onnxruntime as ort
 
     # onnxruntime-gpu ships without the CUDA/cuDNN runtime. When those are
@@ -443,7 +496,7 @@ def load_models():
             log(f"preload_dlls() failed (will try anyway): {e}")
 
     available = ort.get_available_providers()
-    if not FORCE_CPU and "CUDAExecutionProvider" in available:
+    if not FORCE_CPU and "CUDAExecutionProvider" in available and cuda_conv_works(ort):
         providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         ctx_id = 0
         _using_gpu = True
@@ -493,7 +546,15 @@ def get_r2():
             aws_access_key_id=R2_ACCESS_KEY_ID,
             aws_secret_access_key=R2_SECRET_ACCESS_KEY,
             region_name="auto",
-            config=BotoConfig(signature_version="s3v4", retries={"max_attempts": 3}),
+            config=BotoConfig(
+                signature_version="s3v4",
+                retries={"max_attempts": 3, "mode": "standard"},
+                # Without explicit timeouts a half-open connection parks a pool
+                # thread indefinitely instead of failing and being retried.
+                connect_timeout=15,
+                read_timeout=60,
+                max_pool_connections=max(IO_CONCURRENCY * 2, 10),
+            ),
         )
     return _s3
 
@@ -522,64 +583,70 @@ def process_gallery_batch(supabase: Client) -> int:
     recognizer, detector = load_models()
     log(f"[gallery] processing {len(jobs)} photo(s) ...")
 
-    processed = 0
-    for job in jobs:
-        media_id = job["media_id"]
-        media = media_by_id.get(media_id)
+    def persist(media_id: str, event_id: str, faces: list) -> None:
         now_iso = datetime.now(timezone.utc).isoformat()
+        face_count = len(faces)
 
-        if not media:
-            supabase.table("face_processing_jobs").update({
-                "status": "failed",
-                "error_message": "media row not found",
-                "updated_at": now_iso,
-            }).eq("media_id", media_id).execute()
-            continue
+        if face_count > 0:
+            rows = [to_native({
+                "media_id": media_id,
+                "event_id": event_id,
+                "face_index": f["face_index"],
+                "embedding": f["embedding"],
+                "confidence": f["confidence"],
+                "bbox_x1": f["bbox"][0],
+                "bbox_y1": f["bbox"][1],
+                "bbox_x2": f["bbox"][2],
+                "bbox_y2": f["bbox"][3],
+            }) for f in faces]
+            supabase.table("face_embeddings").insert(rows).execute()
 
-        try:
-            image_bytes = download_r2_object(media["r2_key"])
-            faces = process_single_image(recognizer, image_bytes, detector)
-            face_count = len(faces)
+        supabase.table("face_processing_jobs").update({
+            "status": "completed" if face_count > 0 else "no_faces",
+            "faces_found": face_count,
+            "completed_at": now_iso,
+            "updated_at": now_iso,
+        }).eq("media_id", media_id).execute()
+        supabase.table("media").update({"face_count": face_count}).eq("id", media_id).execute()
 
-            if face_count > 0:
-                rows = [to_native({
-                    "media_id": media_id,
-                    "event_id": media["event_id"],
-                    "face_index": f["face_index"],
-                    "embedding": f["embedding"],
-                    "confidence": f["confidence"],
-                    "bbox_x1": f["bbox"][0],
-                    "bbox_y1": f["bbox"][1],
-                    "bbox_x2": f["bbox"][2],
-                    "bbox_y2": f["bbox"][3],
-                }) for f in faces]
-                supabase.table("face_embeddings").insert(rows).execute()
-                supabase.table("face_processing_jobs").update({
-                    "status": "completed",
-                    "faces_found": face_count,
-                    "completed_at": now_iso,
-                    "updated_at": now_iso,
-                }).eq("media_id", media_id).execute()
-            else:
-                supabase.table("face_processing_jobs").update({
-                    "status": "no_faces",
-                    "faces_found": 0,
-                    "completed_at": now_iso,
-                    "updated_at": now_iso,
-                }).eq("media_id", media_id).execute()
+    def mark_failed(media_id: str, message: str) -> None:
+        supabase.table("face_processing_jobs").update({
+            "status": "failed",
+            "error_message": message[:500],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("media_id", media_id).execute()
 
-            supabase.table("media").update({"face_count": face_count}).eq("id", media_id).execute()
+    processed = 0
+    writes = []
+
+    with ThreadPoolExecutor(max_workers=IO_CONCURRENCY) as pool:
+        for job in jobs:
+            if job["media_id"] not in media_by_id:
+                writes.append(pool.submit(mark_failed, job["media_id"], "media row not found"))
+
+        downloads = {
+            pool.submit(download_r2_object, media_by_id[j["media_id"]]["r2_key"]): j["media_id"]
+            for j in jobs if j["media_id"] in media_by_id
+        }
+
+        for future in as_completed(downloads):
+            media_id = downloads[future]
+            try:
+                faces = process_single_image(recognizer, future.result(), detector)
+            except Exception as e:
+                log(f"  ! [gallery] {media_id} failed: {str(e)[:500]}")
+                writes.append(pool.submit(mark_failed, media_id, str(e)))
+                continue
+
+            writes.append(pool.submit(persist, media_id, media_by_id[media_id]["event_id"], faces))
             processed += 1
-            log(f"  [gallery] {media_id}: {face_count} face(s)")
+            log(f"  [gallery] {media_id}: {len(faces)} face(s)")
 
-        except Exception as e:
-            error_msg = str(e)[:500]
-            log(f"  ! [gallery] {media_id} failed: {error_msg}")
-            supabase.table("face_processing_jobs").update({
-                "status": "failed",
-                "error_message": error_msg,
-                "updated_at": now_iso,
-            }).eq("media_id", media_id).execute()
+        for write in as_completed(writes):
+            try:
+                write.result()
+            except Exception as e:
+                log(f"  ! [gallery] result write failed: {str(e)[:300]}")
 
     return processed
 
