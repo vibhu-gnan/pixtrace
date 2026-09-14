@@ -144,6 +144,22 @@ function refinedPrototype(
 }
 
 /**
+ * True when this media's matched face is the *same person* as one the user rejected,
+ * judged at the same bar used to call something a confident match. Confident matches
+ * are never shown for review, so without this a look-alike who scores above the
+ * threshold lands in "Mine" permanently no matter how often they are rejected.
+ */
+function isRejectedPerson(
+  faces: number[][],
+  proto: number[],
+  negatives: number[][],
+  threshold: number,
+): boolean {
+  const face = l2normalize(pickBestFace(faces, proto));
+  return negatives.some((negative) => combinedScore(face, negative) >= threshold);
+}
+
+/**
  * True when this media's most "you"-like face still resembles a face the user explicitly
  * rejected more than it resembles the prototype. At a large event the false positives are
  * a handful of genuinely similar-looking strangers, and one "Not me" identifies them by
@@ -246,8 +262,9 @@ export function recomputeDecisions({
   let autoDroppedCount = 0;
 
   for (let pass = 0; pass < MAX_PASSES; pass++) {
-    // Positives = confident matches + everything currently kept (user or auto).
-    const positiveIds = [...confidentIds, ...kept];
+    // Positives = confident matches + everything currently kept (user or auto), minus any
+    // evicted below: a look-alike left in here drags the prototype toward them.
+    const positiveIds = [...confidentIds.filter((id) => !dropped.has(id)), ...kept];
     const proto = refinedPrototype(positiveIds, scoreById, embMap, matchedFace);
     if (!proto) break; // no seed yet (no confident matches, no confirmations)
 
@@ -270,6 +287,21 @@ export function recomputeDecisions({
         dropped.add(r.media_id);
         autoDroppedCount++;
         changed = true;
+      }
+    }
+
+    // Confident matches skip review entirely, so rejections are the only signal that one
+    // of them is actually the look-alike standing next to the user all night.
+    if (negativeFaces.length > 0) {
+      for (const mediaId of confidentIds) {
+        if (dropped.has(mediaId) || userKept.has(mediaId)) continue;
+        const faces = embMap[mediaId];
+        if (!faces || faces.length === 0) continue;
+        if (isRejectedPerson(faces, proto, negativeFaces, finalThreshold)) {
+          dropped.add(mediaId);
+          autoDroppedCount++;
+          changed = true;
+        }
       }
     }
 
