@@ -26,7 +26,7 @@ Search — `worker/face_worker.py`:
 | `PROTO_MAX_FACES` | 40 | Ceiling so one cycle cannot flood the prototype. Rarely binds. |
 | `PROTO_MIN_FACES` | 5 | Fallback when nothing clears 0.55, so an all-borderline selfie still gets a prototype. |
 | `PROTO_TAU` | 1.0 | Softmax temperature. Note it barely separates scores — see below. |
-| `MAX_CANDIDATES` | 200 | Saturates on this gallery; see open issues. |
+| `MAX_CANDIDATES` | 200 | Always saturates, but harmlessly — rank 200 already scores ~0.32, well under the 0.44 bar. Raising it adds only rejects. |
 
 Review re-rank — `lib/face/client-rerank.ts`:
 
