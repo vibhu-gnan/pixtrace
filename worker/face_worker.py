@@ -109,6 +109,14 @@ PROTO_TAU = 1.0           # softmax temperature for prototype weighting (higher 
 MAX_CANDIDATES = 200
 SQL_PREFILTER = 0.20
 
+# Which faces are allowed to *shape* the prototype, as opposed to being returned as
+# results. Expansion used the seed bar for both, so every cycle folded in more
+# borderline faces and the prototype drifted toward the crowd. Softmax at tau=1.0
+# barely separates 0.44 from 0.80, so membership decides what the prototype becomes.
+PROTO_MIN_SCORE = 0.55   # only clear matches shape it
+PROTO_MAX_FACES = 40     # and only the strongest few, so one cycle cannot flood it
+PROTO_MIN_FACES = 5      # but never starve a selfie whose matches are all borderline
+
 
 def _fatal_config_check() -> None:
     missing = [
@@ -308,6 +316,20 @@ def build_prototype(embeddings, scores=None, tau=PROTO_TAU):
     return (proto / norm).tolist()
 
 
+def select_prototype_faces(embeddings, scores):
+    """Choose the faces the prototype is built from, strongest first.
+
+    Returned results stay as permissive as before; this only narrows what the
+    prototype learns from, so recall is unchanged while the prototype stops being
+    outvoted by the look-alikes that expansion admits.
+    """
+    ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+    picked = [i for i in ranked if scores[i] >= PROTO_MIN_SCORE][:PROTO_MAX_FACES]
+    if len(picked) < PROTO_MIN_FACES:
+        picked = ranked[:PROTO_MIN_FACES]
+    return [embeddings[i] for i in picked], [scores[i] for i in picked]
+
+
 def run_face_search(supabase: Client, selfie_embedding, event_id):
     """Two-tier prototype-refinement search with a softmax-weighted prototype.
 
@@ -374,7 +396,8 @@ def run_face_search(supabase: Client, selfie_embedding, event_id):
     current_proto = selfie_embedding
     for _ in range(REFINEMENT_CYCLES):
         cycles_run += 1
-        current_proto = build_prototype(tier1_embeddings, tier1_scores, PROTO_TAU)
+        proto_faces, proto_weights = select_prototype_faces(tier1_embeddings, tier1_scores)
+        current_proto = build_prototype(proto_faces, proto_weights, PROTO_TAU)
         proto_results = search(current_proto)
         proto_score = {f["face_id"]: f["combined_score"] for f in proto_results}
 
@@ -401,6 +424,7 @@ def run_face_search(supabase: Client, selfie_embedding, event_id):
     log(
         f"  [search] refine: {cycles_run}/{REFINEMENT_CYCLES} cycle(s), "
         f"seed {seed_count} -> {len(tier1_embeddings)} faces, added {growth}, "
+        f"prototype from {len(proto_faces)} faces, "
         f"candidates {len(initial)}/{MAX_CANDIDATES}"
     )
 
