@@ -81,6 +81,11 @@ SEARCH_BATCH_SIZE = int(os.environ.get("SEARCH_BATCH_SIZE", "5"))
 # GPU, so both run on a pool while inference stays on the main thread (ONNX
 # sessions are not safe to drive concurrently).
 IO_CONCURRENCY = int(os.environ.get("IO_CONCURRENCY", "8"))
+
+# Result writes share one Supabase HTTP client, which starts dropping
+# connections well below the download concurrency. The throughput win comes from
+# parallel downloads, so keep writes on a smaller pool of their own.
+DB_CONCURRENCY = int(os.environ.get("DB_CONCURRENCY", "4"))
 STUCK_JOB_TIMEOUT_MINUTES = 10
 
 # Force CPU even if a GPU is present (set WORKER_FORCE_CPU=1 to debug).
@@ -564,6 +569,19 @@ def download_r2_object(key: str) -> bytes:
     return resp["Body"].read()
 
 
+def retrying(fn, *args, attempts: int = 3):
+    """Retry a Supabase write with backoff. A dropped connection would otherwise
+    leave the job in `processing` until the 10-minute reclaim, so the photo gets
+    embedded twice and its results land ten minutes late."""
+    for attempt in range(attempts):
+        try:
+            return fn(*args)
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.5 * 2 ** attempt)
+
+
 # ── Queue 1: gallery embedding (replaces runTrigger + FacePipeline) ──────────
 def process_gallery_batch(supabase: Client) -> int:
     """Claim pending gallery jobs, embed faces, write to face_embeddings.
@@ -588,6 +606,10 @@ def process_gallery_batch(supabase: Client) -> int:
         face_count = len(faces)
 
         if face_count > 0:
+            # A job whose status write failed gets reclaimed and re-embedded, so
+            # inserting blind would leave this photo's faces counted twice.
+            supabase.table("face_embeddings").delete().eq("media_id", media_id).execute()
+
             rows = [to_native({
                 "media_id": media_id,
                 "event_id": event_id,
@@ -619,10 +641,11 @@ def process_gallery_batch(supabase: Client) -> int:
     processed = 0
     writes = []
 
-    with ThreadPoolExecutor(max_workers=IO_CONCURRENCY) as pool:
+    with ThreadPoolExecutor(max_workers=IO_CONCURRENCY) as pool, \
+            ThreadPoolExecutor(max_workers=DB_CONCURRENCY) as write_pool:
         for job in jobs:
             if job["media_id"] not in media_by_id:
-                writes.append(pool.submit(mark_failed, job["media_id"], "media row not found"))
+                writes.append(write_pool.submit(retrying, mark_failed, job["media_id"], "media row not found"))
 
         downloads = {
             pool.submit(download_r2_object, media_by_id[j["media_id"]]["r2_key"]): j["media_id"]
@@ -635,10 +658,10 @@ def process_gallery_batch(supabase: Client) -> int:
                 faces = process_single_image(recognizer, future.result(), detector)
             except Exception as e:
                 log(f"  ! [gallery] {media_id} failed: {str(e)[:500]}")
-                writes.append(pool.submit(mark_failed, media_id, str(e)))
+                writes.append(write_pool.submit(retrying, mark_failed, media_id, str(e)))
                 continue
 
-            writes.append(pool.submit(persist, media_id, media_by_id[media_id]["event_id"], faces))
+            writes.append(write_pool.submit(retrying, persist, media_id, media_by_id[media_id]["event_id"], faces))
             processed += 1
             log(f"  [gallery] {media_id}: {len(faces)} face(s)")
 
