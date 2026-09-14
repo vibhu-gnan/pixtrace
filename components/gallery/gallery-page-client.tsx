@@ -159,19 +159,35 @@ export function GalleryPageClient({
         if (!faceSearchResults || faceSearchResults.length === 0) return;
         const mediaIds = faceSearchResults.map(r => r.media_id);
         const controller = new AbortController();
+        const post = (boxesOnly: boolean) => fetch('/api/face/candidate-embeddings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventHash, mediaIds, boxesOnly }),
+            signal: controller.signal,
+        });
+
+        // Boxes are a fraction of the size and decide whether review can crop to a face,
+        // so let them land on their own instead of queueing behind the embeddings, which
+        // run to tens of megabytes on a large gallery and only feed the re-rank.
         (async () => {
             try {
-                const resp = await fetch('/api/face/candidate-embeddings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ eventHash, mediaIds }),
-                    signal: controller.signal,
-                });
+                const resp = await post(true);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!controller.signal.aborted && data?.boxes) {
+                    setBoxMap(data.boxes as Record<string, (number[] | null)[]>);
+                }
+            } catch { /* crops fall back to the full photo */ }
+        })();
+
+        (async () => {
+            try {
+                const resp = await post(false);
                 if (!resp.ok) return;
                 const data = await resp.json();
                 if (!controller.signal.aborted && data?.embeddings) {
                     setEmbMap(data.embeddings as EmbeddingMap);
-                    setBoxMap((data.boxes ?? null) as Record<string, (number[] | null)[]> | null);
+                    if (data.boxes) setBoxMap(data.boxes as Record<string, (number[] | null)[]>);
                 }
             } catch { /* offline / aborted — review just stays manual */ }
         })();

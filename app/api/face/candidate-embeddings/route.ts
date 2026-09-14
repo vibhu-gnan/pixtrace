@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const eventHash: string | null = body?.eventHash ?? null;
     const rawIds: unknown = body?.mediaIds;
+    // Crops need only the boxes, which are ~0.1MB and land in ~200ms, while the
+    // embeddings run to tens of MB. Fetching them together made the review UI wait
+    // seconds for data it did not need yet.
+    const boxesOnly: boolean = body?.boxesOnly === true;
 
     if (!eventHash || !Array.isArray(rawIds)) {
       return NextResponse.json({ error: 'Missing eventHash or mediaIds' }, { status: 400 });
@@ -54,7 +58,7 @@ export async function POST(request: NextRequest) {
     ).slice(0, MAX_MEDIA_IDS);
 
     if (mediaIds.length === 0) {
-      return NextResponse.json({ embeddings: {} });
+      return NextResponse.json({ embeddings: {}, boxes: {} });
     }
 
     // Resolve event (must be public) — mirrors app/api/face/search/route.ts.
@@ -76,11 +80,14 @@ export async function POST(request: NextRequest) {
     // re-ranker reads a missing embedding as "leave it for the human", so an unpaged
     // query quietly strands most of the review queue.
     const PAGE = 1000;
+    const columns = boxesOnly
+      ? 'media_id, bbox_x1, bbox_y1, bbox_x2, bbox_y2'
+      : 'media_id, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2';
     const rows: unknown[] = [];
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await adminClient
         .from('face_embeddings')
-        .select('media_id, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2')
+        .select(columns)
         .eq('event_id', (eventData as { id: string }).id)
         .in('media_id', mediaIds)
         .range(from, from + PAGE - 1);
@@ -114,8 +121,8 @@ export async function POST(request: NextRequest) {
     const embeddings: Record<string, number[][]> = {};
     const boxes: Record<string, (number[] | null)[]> = {};
     for (const row of rows || []) {
-      const vec = parseVector((row as { embedding: unknown }).embedding);
-      if (!vec) continue;
+      const vec = boxesOnly ? null : parseVector((row as { embedding: unknown }).embedding);
+      if (!boxesOnly && !vec) continue;
       const r = row as {
         media_id: string;
         bbox_x1: number | null;
@@ -132,11 +139,11 @@ export async function POST(request: NextRequest) {
           )
         : null;
 
-      (embeddings[r.media_id] ||= []).push(vec);
+      if (vec) (embeddings[r.media_id] ||= []).push(vec);
       (boxes[r.media_id] ||= []).push(box);
     }
 
-    return NextResponse.json({ embeddings, boxes });
+    return NextResponse.json(boxesOnly ? { boxes } : { embeddings, boxes });
   } catch (err) {
     console.error('candidate-embeddings error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
