@@ -367,8 +367,13 @@ def run_face_search(supabase: Client, selfie_embedding, event_id):
         return {"tier1": [], "tier2": tier2, "prototype": selfie_embedding}
 
     # ── Step B: iterative softmax-weighted prototype refinement ───────────────
+    seed_count = len(tier1_embeddings)
+    cycles_run = 0
+    growth = []
+
     current_proto = selfie_embedding
     for _ in range(REFINEMENT_CYCLES):
+        cycles_run += 1
         current_proto = build_prototype(tier1_embeddings, tier1_scores, PROTO_TAU)
         proto_results = search(current_proto)
         proto_score = {f["face_id"]: f["combined_score"] for f in proto_results}
@@ -387,8 +392,17 @@ def run_face_search(supabase: Client, selfie_embedding, event_id):
             if fid in proto_score:
                 tier1_scores[i] = proto_score[fid]
 
+        growth.append(added)
         if added == 0:
             break
+
+    # `candidates` hitting MAX_CANDIDATES means the search is truncated and the
+    # prototype only ever sees that slice of the gallery.
+    log(
+        f"  [search] refine: {cycles_run}/{REFINEMENT_CYCLES} cycle(s), "
+        f"seed {seed_count} -> {len(tier1_embeddings)} faces, added {growth}, "
+        f"candidates {len(initial)}/{MAX_CANDIDATES}"
+    )
 
     # ── Step C: final scoring vs the refined prototype (re-score tier-1 + tier-2) ──
     final_results = search(current_proto)
