@@ -81,9 +81,12 @@ look wrong.
 
 ## Open issues
 
-- **`candidates 200/200` saturates every search.** 3,577 faces clear the 0.20
-  prefilter but only 200 are ever returned, so refinement sees 2.8% of the gallery.
-  Raising it may recover real matches that currently never surface.
+- ~~`candidates 200/200` saturates every search~~ — **checked, not a problem.** The
+  0.20 prefilter admits 3,577 faces, so 200 slots always fill; saturation is not
+  truncation. Scores flatten long before the cap: rank 50 scores 0.354, rank 200
+  scores 0.321, rank 400 scores 0.301 — all far below the 0.44 bar a result must
+  clear. In a live search only 77 of the 200 candidates cleared 0.44, so ~123 slots
+  went unused. Raising `MAX_CANDIDATES` would only add faces that get rejected.
 - **A scale-aware display floor was built and reverted.** A fixed 0.44 floor admits
   ~10x more strangers here than on a 600-face event. The implementation scaled the
   floor with gallery size (0.44 at ~600 faces, capped at 0.55) and would have cut the
