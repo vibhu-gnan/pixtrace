@@ -26,9 +26,11 @@ interface GalleryGridProps {
     allowDownload?: boolean;
     loading?: boolean;
     showFaceScores?: boolean;
+    /** When set, each tile offers a "Not me" action (face-search results only). */
+    onNotMe?: (mediaId: string) => void;
 }
 
-export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhotoId, allowDownload = true, loading = false, showFaceScores = false }: GalleryGridProps) {
+export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhotoId, allowDownload = true, loading = false, showFaceScores = false, onNotMe }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -150,6 +152,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
                     <div key={colIdx} className="flex-1 flex flex-col gap-1">
                         {col.map((item) => (
                             <MasonryThumbnail
+                                onNotMe={onNotMe}
                                 key={item.id}
                                 item={item}
                                 eventHash={eventHash}
@@ -192,11 +195,13 @@ function MasonryThumbnail({
     eventHash,
     onClick,
     showFaceScores = false,
+    onNotMe,
 }: {
     item: GalleryMediaItem;
     eventHash?: string;
     onClick: () => void;
     showFaceScores?: boolean;
+    onNotMe?: (mediaId: string) => void;
 }) {
     const [loaded, setLoaded] = useState(false);
     const [imgSrc, setImgSrc] = useState(item.preview_url || item.original_url);
@@ -246,6 +251,22 @@ function MasonryThumbnail({
                 className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+            {/* Confident matches never reach the review queue, so this is the only way to
+                tell the matcher that a look-alike it was sure about is not the user. */}
+            {onNotMe && (
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onNotMe(item.id); }}
+                    className="absolute top-1.5 right-1.5 flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold text-white bg-black/55 hover:bg-red-600/90 transition-colors"
+                    aria-label="Not me - remove this photo"
+                >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                    Not me
+                </button>
+            )}
             {/* Face search score overlay — controlled by event permissions */}
             {showFaceScores && item._debugScore !== undefined && (
                 <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold leading-none"

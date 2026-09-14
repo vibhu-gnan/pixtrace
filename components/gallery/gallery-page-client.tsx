@@ -852,7 +852,7 @@ export function GalleryPageClient({
 
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className={`pt-1 relative${faceSearchActive ? ' pb-16' : ''}`}>
-                <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} showFaceScores={showFaceScores} />
+                <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} showFaceScores={showFaceScores} onNotMe={faceSearchActive ? (id) => setRejectedIds(prev => new Set(prev).add(id)) : undefined} />
 
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.
