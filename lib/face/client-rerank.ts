@@ -24,6 +24,7 @@ const PROTO_TAU = 1.0;       // softmax temperature (matches worker PROTO_TAU)
 const AUTO_DROP = 0.38;      // refined score below this => auto-reject (below the 0.44 seed)
 const MIN_POS_FOR_DROP = 2;  // require >=2 verified positives before we auto-reject anything
 const MAX_PASSES = 5;        // snowball passes; auto-kept photos strengthen the prototype
+const NEG_MARGIN = 0.02;     // how much closer to a rejected face before we auto-reject
 
 // ── vector math ────────────────────────────────────────────────────────────
 function dot(a: number[], b: number[]): number {
@@ -135,6 +136,29 @@ function refinedPrototype(
   return buildPrototype(picked, weights);
 }
 
+/**
+ * True when this media's most "you"-like face still resembles a face the user explicitly
+ * rejected more than it resembles the prototype. At a large event the false positives are
+ * a handful of genuinely similar-looking strangers, and one "Not me" identifies them by
+ * name — far sharper evidence than any absolute score cutoff.
+ */
+function looksLikeRejected(
+  faces: number[][],
+  proto: number[],
+  negatives: number[][],
+): boolean {
+  const face = l2normalize(pickBestFace(faces, proto));
+  const positive = combinedScore(face, proto);
+
+  let nearestNegative = -1;
+  for (const negative of negatives) {
+    const s = combinedScore(face, negative);
+    if (s > nearestNegative) nearestNegative = s;
+  }
+
+  return nearestNegative > positive + NEG_MARGIN;
+}
+
 export interface RecomputeInput {
   results: FaceSearchResult[];
   embMap: EmbeddingMap | null;
@@ -179,6 +203,13 @@ export function recomputeDecisions({
     else reviewBand.push(r);
   }
 
+  // Only *explicit* rejections count as negatives. Folding in the algorithm's own
+  // auto-drops would let a single bad guess reinforce itself on every later pass.
+  const negativeFaces: number[][] = [];
+  for (const mediaId of userDropped) {
+    for (const face of embMap[mediaId] || []) negativeFaces.push(l2normalize(face));
+  }
+
   let autoKeptCount = 0;
   let autoDroppedCount = 0;
 
@@ -200,7 +231,10 @@ export function recomputeDecisions({
         kept.add(r.media_id);
         autoKeptCount++;
         changed = true;
-      } else if (positiveCount >= MIN_POS_FOR_DROP && s < AUTO_DROP) {
+      } else if (
+        (positiveCount >= MIN_POS_FOR_DROP && s < AUTO_DROP) ||
+        (negativeFaces.length > 0 && looksLikeRejected(faces, proto, negativeFaces))
+      ) {
         dropped.add(r.media_id);
         autoDroppedCount++;
         changed = true;
