@@ -71,15 +71,27 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createAdminClient();
-    const { data: rows, error } = await adminClient
-      .from('face_embeddings')
-      .select('media_id, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2')
-      .eq('event_id', (eventData as { id: string }).id)
-      .in('media_id', mediaIds);
+    // Group shots carry 20+ faces each, so a few hundred matches run to thousands of
+    // rows — well past PostgREST's 1000-row default. Truncation here is silent and the
+    // re-ranker reads a missing embedding as "leave it for the human", so an unpaged
+    // query quietly strands most of the review queue.
+    const PAGE = 1000;
+    const rows: unknown[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await adminClient
+        .from('face_embeddings')
+        .select('media_id, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2')
+        .eq('event_id', (eventData as { id: string }).id)
+        .in('media_id', mediaIds)
+        .range(from, from + PAGE - 1);
 
-    if (error) {
-      console.error('candidate-embeddings query failed:', error.message);
-      return NextResponse.json({ error: 'Failed to load embeddings' }, { status: 500 });
+      if (error) {
+        console.error('candidate-embeddings query failed:', error.message);
+        return NextResponse.json({ error: 'Failed to load embeddings' }, { status: 500 });
+      }
+
+      rows.push(...(data ?? []));
+      if (!data || data.length < PAGE) break;
     }
 
     // Face boxes are stored in the original image's pixels, so the dimensions are needed
