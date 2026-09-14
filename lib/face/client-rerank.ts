@@ -102,6 +102,7 @@ function refinedPrototype(
   positiveIds: string[],
   scoreById: Map<string, number>,
   embMap: EmbeddingMap,
+  pinnedFace?: Map<string, number>,
 ): number[] | null {
   const entries = positiveIds
     .map((id) => ({ id, faces: embMap[id] || [], score: scoreById.get(id) ?? 0.5 }))
@@ -131,7 +132,13 @@ function refinedPrototype(
   if (!anchor) return null;
 
   // Refine: pick each positive media's best face vs the anchor, weight by its score.
-  const picked = entries.map((e) => pickBestFace(e.faces, anchor as number[]));
+  // A face the user decided on is pinned — in a group shot the guess could otherwise
+  // land on the look-alike standing next to them, which is what they just ruled on.
+  const picked = entries.map((e) => {
+    const pinned = pinnedFace?.get(e.id);
+    if (pinned !== undefined && e.faces[pinned]) return e.faces[pinned];
+    return pickBestFace(e.faces, anchor as number[]);
+  });
   const weights = entries.map((e) => e.score);
   return buildPrototype(picked, weights);
 }
@@ -172,6 +179,7 @@ export interface RecomputeResult {
   dropped: Set<string>;   // review-band media excluded from "Mine" (user + auto)
   autoKeptCount: number;  // how many the algorithm promoted on its own
   autoDroppedCount: number;
+  matchedFace: Map<string, number>;  // media -> index of the face a decision is about
 }
 
 /**
@@ -191,7 +199,7 @@ export function recomputeDecisions({
 
   // Nothing to re-rank with — fall back to pure manual review.
   if (!embMap) {
-    return { kept, dropped, autoKeptCount: 0, autoDroppedCount: 0 };
+    return { kept, dropped, autoKeptCount: 0, autoDroppedCount: 0, matchedFace: new Map() };
   }
 
   const scoreById = new Map<string, number>();
@@ -203,11 +211,35 @@ export function recomputeDecisions({
     else reviewBand.push(r);
   }
 
-  // Only *explicit* rejections count as negatives. Folding in the algorithm's own
-  // auto-drops would let a single bad guess reinforce itself on every later pass.
+  // Which face each decision is about: the one the algorithm matched, judged against a
+  // prototype built from the confident set alone so it stays stable while the user works
+  // through the queue — and so it names the same face the review UI showed them.
+  const seedProto = refinedPrototype(confidentIds, scoreById, embMap);
+  const matchedFace = new Map<string, number>();
+  if (seedProto) {
+    for (const r of results) {
+      const faces = embMap[r.media_id];
+      if (!faces || faces.length === 0) continue;
+      let bestIndex = 0;
+      let best = -1;
+      for (let i = 0; i < faces.length; i++) {
+        const s = combinedScore(l2normalize(faces[i]), seedProto);
+        if (s > best) { best = s; bestIndex = i; }
+      }
+      matchedFace.set(r.media_id, bestIndex);
+    }
+  }
+
+  // Only *explicit* rejections count as negatives — the algorithm's own auto-drops would
+  // let one bad guess reinforce itself on every later pass. And only the face that was
+  // actually shown: "not me" rules out that person, not everyone else in the photo, who
+  // may well include the user themselves standing in the background.
   const negativeFaces: number[][] = [];
   for (const mediaId of userDropped) {
-    for (const face of embMap[mediaId] || []) negativeFaces.push(l2normalize(face));
+    const faces = embMap[mediaId];
+    const index = matchedFace.get(mediaId);
+    const face = faces && index !== undefined ? faces[index] : undefined;
+    if (face) negativeFaces.push(l2normalize(face));
   }
 
   let autoKeptCount = 0;
@@ -216,7 +248,7 @@ export function recomputeDecisions({
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     // Positives = confident matches + everything currently kept (user or auto).
     const positiveIds = [...confidentIds, ...kept];
-    const proto = refinedPrototype(positiveIds, scoreById, embMap);
+    const proto = refinedPrototype(positiveIds, scoreById, embMap, matchedFace);
     if (!proto) break; // no seed yet (no confident matches, no confirmations)
 
     const positiveCount = positiveIds.length;
@@ -244,5 +276,5 @@ export function recomputeDecisions({
     if (!changed) break;
   }
 
-  return { kept, dropped, autoKeptCount, autoDroppedCount };
+  return { kept, dropped, autoKeptCount, autoDroppedCount, matchedFace };
 }

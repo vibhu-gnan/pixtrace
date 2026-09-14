@@ -10,6 +10,8 @@ interface FaceReviewModalProps {
   onReject: (mediaId: string) => void;
   onClose: () => void;
   showScore?: boolean;
+  /** media id -> padded square face box [x, y, w, h] in 0..1 fractions of the image. */
+  faceBoxes?: Record<string, number[] | null>;
 }
 
 /**
@@ -26,6 +28,7 @@ export function FaceReviewModal({
   onReject,
   onClose,
   showScore = false,
+  faceBoxes,
 }: FaceReviewModalProps) {
   // Consume the live queue head. The parent removes each decided photo from `candidates`
   // and also auto-resolves others as the prototype sharpens, so `candidates[0]` is always
@@ -107,7 +110,12 @@ export function FaceReviewModal({
         {/* Content */}
         <div className="px-5 pb-8">
           <div className="flex flex-col items-center gap-4">
-            <ReviewImage key={current.media_id} candidate={current} showScore={showScore} />
+            <ReviewImage
+              key={current.media_id}
+              candidate={current}
+              showScore={showScore}
+              faceBox={faceBoxes?.[current.media_id]}
+            />
 
             <div className="flex gap-3 w-full max-w-[360px] sm:max-w-[440px]">
               <button
@@ -143,8 +151,17 @@ export function FaceReviewModal({
 }
 
 // ─── Review image with the same R2-URL fallback chain as MasonryThumbnail ───
-function ReviewImage({ candidate, showScore }: { candidate: FaceSearchResult; showScore: boolean }) {
+function ReviewImage({
+  candidate,
+  showScore,
+  faceBox,
+}: {
+  candidate: FaceSearchResult;
+  showScore: boolean;
+  faceBox?: number[] | null;
+}) {
   const [imgSrc, setImgSrc] = useState(candidate.preview_url || candidate.original_url);
+  const [showFull, setShowFull] = useState(false);
   const retryCount = useRef(0);
   const MAX_RETRIES = 2;
 
@@ -156,21 +173,56 @@ function ReviewImage({ candidate, showScore }: { candidate: FaceSearchResult; sh
     }
   };
 
+  const cropped = !showFull && faceBox != null && faceBox.length === 4;
+
   return (
-    // Hug the image's natural shape (portrait or landscape) — cap height so tall photos
-    // fit and let wide group shots use the full dialog width, no fixed-aspect black bars.
-    <div className="relative rounded-2xl overflow-hidden bg-black/30 max-w-full">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={imgSrc}
-        alt="Photo to review"
-        onError={handleError}
-        className="block w-auto max-w-full max-h-[52vh] sm:max-h-[60vh] object-contain"
-      />
-      {showScore && (
-        <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[11px] font-mono font-bold leading-none bg-black/60 text-white">
-          {candidate.score.toFixed(3)}
-        </div>
+    <div className="flex flex-col items-center gap-2 max-w-full">
+      <div className="relative rounded-2xl overflow-hidden bg-black/30 max-w-full">
+        {cropped ? (
+          <>
+            {/* The crop is a background so it can be scaled freely; a hidden <img> keeps
+                the existing preview -> original fallback working. */}
+            <div
+              className="w-[min(70vw,300px)] aspect-square bg-no-repeat"
+              style={{
+                backgroundImage: `url(${imgSrc})`,
+                backgroundSize: `${100 / (faceBox[2] || 1)}% ${100 / (faceBox[3] || 1)}%`,
+                backgroundPosition: `${faceBox[2] < 1 ? (faceBox[0] / (1 - faceBox[2])) * 100 : 0}% ${
+                  faceBox[3] < 1 ? (faceBox[1] / (1 - faceBox[3])) * 100 : 0
+                }%`,
+              }}
+              role="img"
+              aria-label="Face to review"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imgSrc} alt="" onError={handleError} className="hidden" />
+          </>
+        ) : (
+          // Hug the image's natural shape (portrait or landscape) — cap height so tall photos
+          // fit and let wide group shots use the full dialog width, no fixed-aspect black bars.
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={imgSrc}
+            alt="Photo to review"
+            onError={handleError}
+            className="block w-auto max-w-full max-h-[52vh] sm:max-h-[60vh] object-contain"
+          />
+        )}
+        {showScore && (
+          <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[11px] font-mono font-bold leading-none bg-black/60 text-white">
+            {candidate.score.toFixed(3)}
+          </div>
+        )}
+      </div>
+
+      {faceBox != null && faceBox.length === 4 && (
+        <button
+          type="button"
+          onClick={() => setShowFull((v) => !v)}
+          className="text-xs text-white/60 hover:text-white/90 underline underline-offset-2"
+        >
+          {showFull ? 'Show just the face' : 'Show full photo'}
+        </button>
       )}
     </div>
   );

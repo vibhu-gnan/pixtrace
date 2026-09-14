@@ -83,6 +83,9 @@ export function GalleryPageClient({
     // Per-media face embeddings for the matched photos, fetched once per result set so we
     // can re-rank the review queue on-device (see lib/face/client-rerank.ts). Null until loaded.
     const [embMap, setEmbMap] = useState<EmbeddingMap | null>(null);
+    // Face boxes stay index-aligned with embMap's faces, so the review modal can crop to
+    // the one face a decision is actually about.
+    const [boxMap, setBoxMap] = useState<Record<string, (number[] | null)[]> | null>(null);
 
     // Auth + face profile state
     const { user, accessToken, loading: authLoading } = useGalleryAuth();
@@ -139,7 +142,7 @@ export function GalleryPageClient({
             // New result set — clear any prior review decisions + cached embeddings.
             setConfirmedIds(new Set());
             setRejectedIds(new Set());
-            setEmbMap(null);
+            setEmbMap(null); setBoxMap(null);
             setReviewOpen(false);
             setFaceSearchActive(true);
             faceSearchActiveRef.current = true;
@@ -168,6 +171,7 @@ export function GalleryPageClient({
                 const data = await resp.json();
                 if (!controller.signal.aborted && data?.embeddings) {
                     setEmbMap(data.embeddings as EmbeddingMap);
+                    setBoxMap((data.boxes ?? null) as Record<string, (number[] | null)[]> | null);
                 }
             } catch { /* offline / aborted — review just stays manual */ }
         })();
@@ -177,9 +181,14 @@ export function GalleryPageClient({
     // ── Fold the user's explicit confirm/reject decisions together with the algorithm's
     //    auto-resolutions. Recomputed from scratch (idempotent) whenever a decision or the
     //    embeddings change, so the review queue shrinks as the prototype sharpens. ──
-    const { kept, dropped, autoKeptCount } = useMemo(() => {
+    const { kept, dropped, autoKeptCount, matchedFace } = useMemo(() => {
         if (!faceSearchResults) {
-            return { kept: confirmedIds, dropped: rejectedIds, autoKeptCount: 0 };
+            return {
+                kept: confirmedIds,
+                dropped: rejectedIds,
+                autoKeptCount: 0,
+                matchedFace: new Map<string, number>(),
+            };
         }
         return recomputeDecisions({
             results: faceSearchResults,
@@ -189,6 +198,18 @@ export function GalleryPageClient({
             finalThreshold: FINAL_THRESHOLD,
         });
     }, [faceSearchResults, embMap, confirmedIds, rejectedIds]);
+
+    // The single face each review card should show: the one the matcher actually keyed on,
+    // so "is this you?" is answerable in a group shot instead of a guess about a crowd.
+    const faceBoxes = useMemo(() => {
+        const out: Record<string, number[] | null> = {};
+        if (!boxMap) return out;
+        for (const [mediaId, boxes] of Object.entries(boxMap)) {
+            const index = matchedFace.get(mediaId) ?? 0;
+            out[mediaId] = boxes[index] ?? null;
+        }
+        return out;
+    }, [boxMap, matchedFace]);
 
     // Photos below FINAL_THRESHOLD that are still undecided (after auto-resolution) — the
     // review queue the human actually sees, highest-confidence first.
@@ -239,7 +260,7 @@ export function GalleryPageClient({
             // New result set — clear any prior review decisions + cached embeddings.
             setConfirmedIds(new Set());
             setRejectedIds(new Set());
-            setEmbMap(null);
+            setEmbMap(null); setBoxMap(null);
             setReviewOpen(false);
         }
     }, [searchState, searchResults]);
@@ -317,7 +338,7 @@ export function GalleryPageClient({
         setFaceSearchResults(null);
         setConfirmedIds(new Set());
         setRejectedIds(new Set());
-        setEmbMap(null);
+        setEmbMap(null); setBoxMap(null);
         setReviewOpen(false);
         resetSearch();
         setSelfieModalOpen(true);
@@ -950,6 +971,7 @@ export function GalleryPageClient({
                     onConfirm={(id) => setConfirmedIds(prev => new Set(prev).add(id))}
                     onReject={(id) => setRejectedIds(prev => new Set(prev).add(id))}
                     onClose={() => setReviewOpen(false)}
+                    faceBoxes={faceBoxes}
                 />
             )}
 
