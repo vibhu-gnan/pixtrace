@@ -6,7 +6,7 @@ import { sendEmail } from '@/lib/email/resend';
 import { storageWarningSubject, storageWarningHtml } from '@/lib/email/templates/storage-warning';
 import { storageDeletedSubject, storageDeletedHtml } from '@/lib/email/templates/storage-deleted';
 import { captureError, captureWarning } from '@/lib/monitoring/sentry';
-import { runTakedownMaintenance } from '@/actions/takedowns';
+import { runTakedownMaintenance } from '@/lib/takedowns/maintenance';
 
 /**
  * GET|POST /api/cron/storage-cleanup

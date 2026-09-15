@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySecret } from '@/lib/security/verify-secret';
-import { runTakedownMaintenance } from '@/actions/takedowns';
+import { runTakedownMaintenance } from '@/lib/takedowns/maintenance';
 import { captureError } from '@/lib/monitoring/sentry';
 
 /**
