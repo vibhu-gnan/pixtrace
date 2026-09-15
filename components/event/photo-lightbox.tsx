@@ -444,7 +444,17 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
   const handleClose = useCallback(() => {
     if (pushedStateRef.current) {
       pushedStateRef.current = false;
-      try { window.history.back(); } catch { /* SSR guard */ }
+      // Deliberately NOT history.back(). Undoing a manual pushState by traversing
+      // drops the App Router out of client-side routing and hard-reloads the page,
+      // which destroys every bit of React state — including a guest's face-search
+      // results, sending them back to the selfie prompt. Measured: the traversal
+      // reloads even when the pushed entry preserves the router's own state.
+      // Rewriting the entry in place clears the marker without any traversal.
+      try {
+        const state = { ...(window.history.state || {}) };
+        delete state[LIGHTBOX_STATE_KEY];
+        window.history.replaceState(state, '', window.location.href);
+      } catch { /* SSR guard */ }
     }
     onCloseRef.current();
   }, []);
