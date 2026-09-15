@@ -25,6 +25,10 @@ const AUTO_DROP = 0.38;      // refined score below this => auto-reject (below t
 const MIN_POS_FOR_DROP = 2;  // require >=2 verified positives before we auto-reject anything
 const MAX_PASSES = 5;        // snowball passes; auto-kept photos strengthen the prototype
 const NEG_MARGIN = 0.02;     // how much closer to a rejected face before we auto-reject
+// Two faces at or above this are treated as the same person. Deliberately the same bar
+// used to call a match "definitely you": if it is strict enough to add a photo to Mine
+// unreviewed, it is strict enough to say a face belongs to someone already rejected.
+const SAME_PERSON_THRESHOLD = 0.666;
 
 // ── vector math ────────────────────────────────────────────────────────────
 function dot(a: number[], b: number[]): number {
@@ -282,7 +286,13 @@ export function recomputeDecisions({
         changed = true;
       } else if (
         (positiveCount >= MIN_POS_FOR_DROP && s < AUTO_DROP) ||
-        (negativeFaces.length > 0 && looksLikeRejected(faces, proto, negativeFaces))
+        (negativeFaces.length > 0 && (
+          // A look-alike is here *because* they resemble the user, so their score
+          // against the prototype cancels their score against the rejected face and
+          // the relative test never fires. Ask the absolute question too.
+          isRejectedPerson(faces, proto, negativeFaces, SAME_PERSON_THRESHOLD) ||
+          looksLikeRejected(faces, proto, negativeFaces)
+        ))
       ) {
         dropped.add(r.media_id);
         autoDroppedCount++;
@@ -309,4 +319,107 @@ export function recomputeDecisions({
   }
 
   return { kept, dropped, autoKeptCount, autoDroppedCount, matchedFace };
+}
+
+export interface CandidateCluster {
+  id: string;                    // representative media_id
+  members: FaceSearchResult[];   // score descending
+  representative: FaceSearchResult;
+  topScore: number;
+}
+
+/**
+ * The member whose face is most typical of the group, so the card shows a view the
+ * user can actually recognise. Deliberately not the highest-scoring member: for a
+ * stranger's cluster that is the single frame most confusable with the user, which is
+ * the hardest one to judge. Ties break toward the larger crop.
+ */
+function pickMedoid(
+  members: FaceSearchResult[],
+  faceOf: Map<string, number[]>,
+  faceAreas?: Record<string, number>,
+): FaceSearchResult {
+  if (members.length === 1) return members[0];
+
+  let best = members[0];
+  let bestRank = -Infinity;
+  for (const candidate of members) {
+    const face = faceOf.get(candidate.media_id);
+    if (!face) continue;
+
+    let total = 0;
+    let counted = 0;
+    for (const other of members) {
+      if (other.media_id === candidate.media_id) continue;
+      const otherFace = faceOf.get(other.media_id);
+      if (!otherFace) continue;
+      total += combinedScore(face, otherFace);
+      counted++;
+    }
+
+    const rank = (counted ? total / counted : 0) + (faceAreas?.[candidate.media_id] ?? 0) * 0.001;
+    if (rank > bestRank) { bestRank = rank; best = candidate; }
+  }
+  return best;
+}
+
+/**
+ * Group review candidates by identity so the user is asked about a person once instead
+ * of once per photo — at this event each attendee recurs in dozens of photos, so a
+ * queue of forty is really only a handful of decisions.
+ *
+ * Clusters on the *matched* face (the one the decision is already about, and the one
+ * the card crops to). Clustering on a photo's best face would group a crowd shot by
+ * whoever happens to stand next to the user.
+ *
+ * Complete-link — a photo joins only if it matches every existing member. Faces here
+ * average ~34 neighbours above the threshold and chains reach half again as far as
+ * direct matches, so single-link would quietly merge two similar people and discard
+ * the user's own photos. Splitting one person across two cards is the cheaper mistake.
+ */
+export function clusterCandidates(
+  candidates: FaceSearchResult[],
+  embMap: EmbeddingMap | null,
+  matchedFace: Map<string, number>,
+  sameThreshold: number = SAME_PERSON_THRESHOLD,
+  faceAreas?: Record<string, number>,
+): CandidateCluster[] {
+  const asSingleton = (c: FaceSearchResult): CandidateCluster => ({
+    id: c.media_id,
+    members: [c],
+    representative: c,
+    topScore: c.score,
+  });
+
+  if (!embMap) return candidates.map(asSingleton);
+
+  const faceOf = new Map<string, number[]>();
+  for (const candidate of candidates) {
+    const faces = embMap[candidate.media_id];
+    if (!faces || faces.length === 0) continue;
+    const index = matchedFace.get(candidate.media_id);
+    const face = index !== undefined ? faces[index] : faces[0];
+    if (face) faceOf.set(candidate.media_id, l2normalize(face));
+  }
+
+  const groups: FaceSearchResult[][] = [];
+  for (const candidate of [...candidates].sort((a, b) => b.score - a.score)) {
+    const face = faceOf.get(candidate.media_id);
+    if (!face) { groups.push([candidate]); continue; } // no embedding → judged alone
+
+    const home = groups.find((group) => group.every((member) => {
+      const memberFace = faceOf.get(member.media_id);
+      return memberFace ? combinedScore(face, memberFace) >= sameThreshold : false;
+    }));
+
+    if (home) home.push(candidate);
+    else groups.push([candidate]);
+  }
+
+  return groups
+    .map((members) => {
+      const representative = pickMedoid(members, faceOf, faceAreas);
+      return { id: representative.media_id, members, representative, topScore: members[0].score };
+    })
+    .sort((a, b) => b.topScore - a.topScore);
 }

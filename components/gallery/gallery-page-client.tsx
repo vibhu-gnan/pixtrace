@@ -15,7 +15,7 @@ import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
 import { useFaceProfile } from '@/lib/face/use-face-profile';
 import { useFaceSearch } from '@/lib/face/use-face-search';
 import type { FaceSearchResult } from '@/lib/face/use-face-search';
-import { recomputeDecisions, type EmbeddingMap } from '@/lib/face/client-rerank';
+import { recomputeDecisions, clusterCandidates, type EmbeddingMap } from '@/lib/face/client-rerank';
 
 // Matches at or above this combined score are treated as "definitely you" and shown in
 // "Mine" automatically. Matches below it (the band the worker still returned) go through
@@ -236,6 +236,23 @@ export function GalleryPageClient({
             .filter(r => r.score < FINAL_THRESHOLD && !kept.has(r.media_id) && !dropped.has(r.media_id))
             .sort((a, b) => b.score - a.score); // highest-confidence first
     }, [faceSearchResults, kept, dropped]);
+
+    // Crop area per photo, used only to break medoid ties toward a face big enough to
+    // recognise on the card.
+    const faceAreas = useMemo(() => {
+        const out: Record<string, number> = {};
+        for (const [mediaId, box] of Object.entries(faceBoxes)) {
+            if (box && box.length === 4) out[mediaId] = box[2] * box[3];
+        }
+        return out;
+    }, [faceBoxes]);
+
+    // One card per person rather than per photo: the same look-alike recurs across many
+    // photos here, and answering for each of them separately is the bulk of the work.
+    const reviewClusters = useMemo(
+        () => clusterCandidates(reviewCandidates, embMap, matchedFace, undefined, faceAreas),
+        [reviewCandidates, embMap, matchedFace, faceAreas],
+    );
 
     // Derive display media: face search results or normal gallery
     const displayMedia = useMemo(() => {
@@ -851,7 +868,7 @@ export function GalleryPageClient({
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-semibold text-gray-900 leading-tight">
-                                    Review {reviewCandidates.length} photo{reviewCandidates.length === 1 ? '' : 's'} that might be you
+                                    Review {reviewClusters.length} {reviewClusters.length === 1 ? 'person' : 'people'} who might be you
                                 </p>
                                 <p className="text-[11px] text-gray-500 leading-tight">
                                     {autoKeptCount > 0
@@ -981,12 +998,12 @@ export function GalleryPageClient({
             )}
 
             {/* Review Modal — one-at-a-time confirm/reject of sub-threshold matches */}
-            {reviewOpen && reviewCandidates.length > 0 && (
+            {reviewOpen && reviewClusters.length > 0 && (
                 <FaceReviewModal
-                    candidates={reviewCandidates}
+                    clusters={reviewClusters}
                     showScore={showFaceScores}
-                    onConfirm={(id) => setConfirmedIds(prev => new Set(prev).add(id))}
-                    onReject={(id) => setRejectedIds(prev => new Set(prev).add(id))}
+                    onConfirm={(ids) => setConfirmedIds(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; })}
+                    onReject={(ids) => setRejectedIds(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; })}
                     onClose={() => setReviewOpen(false)}
                     faceBoxes={faceBoxes}
                 />

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { FaceSearchResult } from '@/lib/face/use-face-search';
+import type { CandidateCluster } from '@/lib/face/client-rerank';
 
 interface FaceReviewModalProps {
-  /** Undecided review-band candidates (score < FINAL_THRESHOLD, not yet confirmed/rejected). */
-  candidates: FaceSearchResult[];
-  onConfirm: (mediaId: string) => void;
-  onReject: (mediaId: string) => void;
+  /** Undecided review-band candidates, grouped by person (score < FINAL_THRESHOLD). */
+  clusters: CandidateCluster[];
+  onConfirm: (mediaIds: string[]) => void;
+  onReject: (mediaIds: string[]) => void;
   onClose: () => void;
   showScore?: boolean;
   /** media id -> padded square face box [x, y, w, h] in 0..1 fractions of the image. */
@@ -15,15 +16,16 @@ interface FaceReviewModalProps {
 }
 
 /**
- * One-at-a-time review of lower-confidence face matches.
- * The user swipes/taps "This is me" (keep) or "Not me" (drop) through each candidate.
+ * One-at-a-time review of lower-confidence face matches, asked once per *person*.
+ * The user taps "This is me" (keep) or "Not me" (drop), and the answer applies to every
+ * photo of that person — the same stranger otherwise recurs many times in one queue.
  *
- * `candidates` is the parent's live list of *undecided* photos. Each decision removes that
- * id from the parent's set — and the parent may auto-resolve others as its face prototype
- * sharpens — so we always render the head (`candidates[0]`) and close once it's empty.
+ * `clusters` is the parent's live list of *undecided* groups. Each decision removes those
+ * ids from the parent's sets — and the parent may auto-resolve others as its face
+ * prototype sharpens — so we always render the head and close once it's empty.
  */
 export function FaceReviewModal({
-  candidates,
+  clusters,
   onConfirm,
   onReject,
   onClose,
@@ -34,21 +36,30 @@ export function FaceReviewModal({
   // and also auto-resolves others as the prototype sharpens, so `candidates[0]` is always
   // the next photo genuinely needing a human — the deck shrinks (sometimes by more than one)
   // as we go, and stale/auto-matched photos never appear.
-  const current = candidates[0];
-  const remaining = candidates.length;
+  const currentCluster = clusters[0];
+  const current = currentCluster?.representative;
+  const remaining = clusters.length;
+  const groupSize = currentCluster?.members.length ?? 0;
+
+  const memberIds = useCallback(
+    () => (currentCluster ? currentCluster.members.map((m) => m.media_id) : []),
+    [currentCluster],
+  );
 
   const handleConfirm = useCallback(() => {
-    if (current) onConfirm(current.media_id);
-  }, [current, onConfirm]);
+    const ids = memberIds();
+    if (ids.length) onConfirm(ids);
+  }, [memberIds, onConfirm]);
 
   const handleReject = useCallback(() => {
-    if (current) onReject(current.media_id);
-  }, [current, onReject]);
+    const ids = memberIds();
+    if (ids.length) onReject(ids);
+  }, [memberIds, onReject]);
 
   // Queue emptied (everything decided or auto-resolved) → done reviewing.
   useEffect(() => {
-    if (candidates.length === 0) onClose();
-  }, [candidates.length, onClose]);
+    if (clusters.length === 0) onClose();
+  }, [clusters.length, onClose]);
 
   // Keyboard: →/Enter = keep, ← = drop, Esc = close
   useEffect(() => {
@@ -91,7 +102,7 @@ export function FaceReviewModal({
           <div>
             <h2 className="text-lg font-semibold text-white">Is this you?</h2>
             <p className="text-xs text-white/50 leading-tight">
-              {remaining} photo{remaining === 1 ? '' : 's'} left to review
+              {remaining} {remaining === 1 ? 'person' : 'people'} left to review
             </p>
           </div>
           <button
@@ -116,6 +127,36 @@ export function FaceReviewModal({
               showScore={showScore}
               faceBox={faceBoxes?.[current.media_id]}
             />
+
+            {groupSize > 1 && (
+              <div className="flex flex-col items-center gap-2 -mt-1">
+                <p className="text-xs text-white/60">
+                  This person appears in {groupSize} of your photos
+                </p>
+                {/* Show the whole group: a wrong grouping should be visible before the
+                    user answers for all of it, not discovered afterwards. */}
+                <div className="flex gap-1.5 flex-wrap justify-center max-w-[360px]">
+                  {currentCluster.members.slice(0, 8).map((m) => {
+                    const box = faceBoxes?.[m.media_id];
+                    const src = m.preview_url || m.original_url;
+                    if (!box || box.length !== 4) return null;
+                    return (
+                      <div
+                        key={m.media_id}
+                        className="w-10 h-10 rounded-md bg-no-repeat border border-white/15"
+                        style={{
+                          backgroundImage: `url(${src})`,
+                          backgroundSize: `${100 / (box[2] || 1)}% ${100 / (box[3] || 1)}%`,
+                          backgroundPosition: `${box[2] < 1 ? (box[0] / (1 - box[2])) * 100 : 0}% ${
+                            box[3] < 1 ? (box[1] / (1 - box[3])) * 100 : 0
+                          }%`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3 w-full max-w-[360px] sm:max-w-[440px]">
               <button
