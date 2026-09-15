@@ -12,6 +12,10 @@ const PUBLIC_PREFIXES = [
   '/api/face',
   '/api/import/cleanup',
   '/api/cron/storage-cleanup',
+  // Cron routes authenticate themselves with CRON_SECRET. Without an entry here the
+  // middleware redirects them to /sign-in, which a scheduler silently follows and reads
+  // as success — the job never runs and nothing reports a failure.
+  '/api/cron/takedown-maintenance',
   '/api/health',
   '/sign-in',
   '/sign-up',
