@@ -75,6 +75,21 @@ look wrong.
 - **Payload size decides perceived correctness.** Embeddings for one search are
   ~16MB and take ~9s; the face boxes are 0.2MB. They are fetched separately for
   this reason — bundled, the crop appears broken for nine seconds.
+- **Paging without ORDER BY silently drops rows.** `.range(1000, 1999)` has no stable
+  meaning on an unordered query, so page two can come back short, a `length < PAGE`
+  loop reads that as the end of the data, and a third of the rows vanish — a
+  *different* third each call. Measured live: the same request returned 1831 of 2668
+  rows, and the media count moved between 42 and 55 across four identical calls. It
+  surfaced as face crops working, then a few full photos, then working again. Order by
+  `(media_id, face_index)`; it also keeps separate requests index-aligned.
+- **`history.back()` to undo a manual `pushState` hard-reloads the App Router.** The
+  lightbox pushed an entry so the back button would close it, then popped that entry on
+  close. The traversal drops out of client-side routing into a full page load, which
+  destroys all React state — a guest who ran a face search and opened one photo came
+  back to the selfie prompt with their results gone. Preserving the router's own keys in
+  the pushed state does *not* help; the traversal itself is the problem. Clear the marker
+  with `replaceState` instead. Verify with `performance.timeOrigin`: it changes on a
+  reload, and `navigation.type` flips from `navigate` to `reload`.
 - **ONNX Runtime reports GPU while running on CPU.** CUDA registers, then the first
   Conv fails and every op silently falls back. The worker now proves a Conv actually
   executes on CUDA before claiming the GPU.
