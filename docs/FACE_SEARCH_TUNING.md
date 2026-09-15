@@ -89,6 +89,22 @@ relative one. A look-alike scores high against the prototype precisely because t
 resemble the guest, which cancels the relative margin and let the same face return over
 and over.
 
+## Scale-aware display floor
+
+`display_floor(face_count)` in `worker/face_worker.py`. The floor stays at the tuned
+`TIER_1_THRESHOLD` (0.44) up to `FLOOR_BASE_FACES` (600), then rises `FLOOR_STEP` (0.05)
+per doubling, capped at `FLOOR_MAX` (0.55). EIS 4.0 (7,006 faces) lands at 0.55; every
+smaller event stays at 0.44 unchanged.
+
+It filters only the **final display list**. The seed, the prototype pool and the
+refinement cycles all still run at 0.44, so this cannot repeat the starved-recall
+incident that a flat 0.50 seed caused. `MIN_DISPLAY_RESULTS` (10) means the floor can
+thin the list but never hand someone an empty gallery.
+
+Measured on this gallery: confident matches (>= 0.666) are never cut, since the floor
+sits below that bar — only the uncertain tail is trimmed. Review band 36 → 22, 50 → 34,
+31 → 19. A search returning just 5 matches lost none, the guard holding as intended.
+
 ## Silent failure modes, all seen live
 
 Each of these produced no error and no log line. Check them first when results

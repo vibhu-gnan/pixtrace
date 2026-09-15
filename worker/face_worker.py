@@ -117,6 +117,15 @@ PROTO_MIN_SCORE = 0.55   # only clear matches shape it
 PROTO_MAX_FACES = 40     # and only the strongest few, so one cycle cannot flood it
 PROTO_MIN_FACES = 5      # but never starve a selfie whose matches are all borderline
 
+# How many strangers cross a fixed bar by chance grows with the gallery, so a floor
+# tuned on a few hundred faces is far too generous on several thousand. Scale what gets
+# *shown* with the gallery size — the 0.44 seed above is untouched, since raising that
+# is what starved recall when it was tried.
+FLOOR_BASE_FACES = 600     # gallery size TIER_1_THRESHOLD was tuned against
+FLOOR_STEP = 0.05          # added to the floor per doubling of gallery size
+FLOOR_MAX = 0.55           # never demand more than this, however large the event
+MIN_DISPLAY_RESULTS = 10   # and never let the floor hand someone an empty gallery
+
 
 def _fatal_config_check() -> None:
     missing = [
@@ -316,6 +325,36 @@ def build_prototype(embeddings, scores=None, tau=PROTO_TAU):
     return (proto / norm).tolist()
 
 
+def display_floor(face_count: int) -> float:
+    """Minimum score a match must reach to be shown, scaled to the gallery size.
+
+    Returns the tuned threshold for galleries at or below the size it was tuned on,
+    rising by FLOOR_STEP per doubling and capped at FLOOR_MAX. Holding result quality
+    steady as an event grows means asking for a little more similarity, because the
+    number of strangers scraping past a fixed bar grows with the number of faces.
+    """
+    if face_count <= FLOOR_BASE_FACES:
+        return TIER_1_THRESHOLD
+    doublings = math.log2(face_count / FLOOR_BASE_FACES)
+    return min(TIER_1_THRESHOLD + FLOOR_STEP * doublings, FLOOR_MAX)
+
+
+def gallery_face_count(supabase: Client, event_id) -> int:
+    """Faces in this event, or 0 when unknown so the floor stays at its tuned value."""
+    try:
+        resp = (
+            supabase.table("face_embeddings")
+            .select("id", count="exact")
+            .eq("event_id", event_id)
+            .limit(1)
+            .execute()
+        )
+        return resp.count or 0
+    except Exception as e:
+        log(f"  [search] gallery size lookup failed ({str(e)[:120]}) — using base floor.")
+        return 0
+
+
 def select_prototype_faces(embeddings, scores):
     """Choose the faces the prototype is built from, strongest first.
 
@@ -461,6 +500,16 @@ def run_face_search(supabase: Client, selfie_embedding, event_id):
     tier2 = [{"media_id": m, "score": round(s * 1000) / 1000} for m, s in tier2_media.items()]
     tier1.sort(key=lambda x: x["score"], reverse=True)
     tier2.sort(key=lambda x: x["score"], reverse=True)
+
+    floor = display_floor(gallery_face_count(supabase, event_id))
+    if floor > TIER_1_THRESHOLD:
+        above = [t for t in tier1 if t["score"] >= floor]
+        # Someone whose only appearances are borderline should still see them rather
+        # than an empty gallery, so the floor can thin the list but never empty it.
+        shown = above if len(above) >= MIN_DISPLAY_RESULTS else tier1[:MIN_DISPLAY_RESULTS]
+        if len(shown) < len(tier1):
+            log(f"  [search] floor {floor:.2f}: {len(tier1)} -> {len(shown)} shown")
+        tier1 = shown
 
     return {"tier1": tier1, "tier2": tier2, "prototype": current_proto}
 
