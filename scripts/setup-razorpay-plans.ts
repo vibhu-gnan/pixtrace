@@ -2,7 +2,7 @@
  * One-time script to create Razorpay subscription plans and store their IDs in Supabase.
  *
  * Prerequisites:
- *   1. Run the SQL migration (supabase/migrations/20260225_subscription_system.sql) first
+ *   1. Run the SQL migration (supabase/migrations/20260225000001_subscription_system.sql) first
  *   2. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET to your .env.local
  *   3. Add NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY to your .env.local
  *
