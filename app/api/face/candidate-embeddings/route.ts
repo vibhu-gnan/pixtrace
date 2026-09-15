@@ -90,6 +90,12 @@ export async function POST(request: NextRequest) {
         .select(columns)
         .eq('event_id', (eventData as { id: string }).id)
         .in('media_id', mediaIds)
+        // Without an explicit order PostgREST gives no row-order guarantee, so the
+        // boxes request and the embeddings request could interleave faces differently
+        // and the index identifying a face in one would point at another in the other.
+        // It also makes paging unstable, letting rows repeat or vanish between pages.
+        .order('media_id', { ascending: true })
+        .order('face_index', { ascending: true })
         .range(from, from + PAGE - 1);
 
       if (error) {
