@@ -24,6 +24,7 @@ export default function TakedownList({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [zoomedId, setZoomedId] = useState<string | null>(null);
 
   const act = (id: string, action: 'approve' | 'decline') => {
     setError(null);
@@ -61,6 +62,27 @@ export default function TakedownList({
         return (
           <div key={request.id} className="rounded-xl border border-gray-200 bg-white p-4">
             <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-start gap-4 min-w-0">
+                {/* Approving deletes the photo, so show it rather than asking blind. */}
+                {request.preview_url ? (
+                  <button
+                    type="button"
+                    onClick={() => setZoomedId(zoomedId === request.id ? null : request.id)}
+                    className="shrink-0 rounded-lg overflow-hidden border border-gray-200 hover:border-gray-400 transition-colors"
+                    title="Click to enlarge"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={request.preview_url}
+                      alt={request.filename || 'Photo requested for removal'}
+                      className="w-20 h-20 object-cover"
+                    />
+                  </button>
+                ) : (
+                  <div className="shrink-0 w-20 h-20 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
+                    <span className="text-[10px] text-gray-400 text-center px-1">preview<br />unavailable</span>
+                  </div>
+                )}
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900">
                   {request.requester_email || 'A signed-in guest'}
@@ -68,11 +90,15 @@ export default function TakedownList({
                 <p className="text-xs text-gray-500 mt-0.5">
                   Hidden now · {hoursLeft(request.auto_restore_at)} before it returns
                 </p>
+                {request.filename && (
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">{request.filename}</p>
+                )}
                 {request.reason && (
                   <p className="mt-2 text-sm text-gray-700 bg-gray-50 border-l-2 border-gray-300 pl-3 py-1.5">
                     {request.reason}
                   </p>
                 )}
+              </div>
               </div>
 
               <div className="flex gap-2 shrink-0">
@@ -102,6 +128,15 @@ export default function TakedownList({
                 )}
               </div>
             </div>
+
+            {zoomedId === request.id && request.preview_url && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={request.preview_url}
+                alt={request.filename || 'Photo requested for removal'}
+                className="mt-3 w-full max-h-[60vh] object-contain rounded-lg bg-gray-50 border border-gray-200"
+              />
+            )}
 
             {confirming && (
               <p className="mt-3 text-xs text-gray-500">

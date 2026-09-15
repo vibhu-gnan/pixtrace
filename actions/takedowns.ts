@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getCurrentOrganizer } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendTakedownRequestEmail } from '@/lib/email/send-takedown-email';
+import { getPreviewUrl } from '@/lib/storage/cloudflare-images';
 
 /** How long a photo stays hidden while the organizer decides. */
 const HIDE_WINDOW_HOURS = 6;
@@ -24,6 +25,9 @@ export interface TakedownRequestRow {
   status: string;
   created_at: string;
   auto_restore_at: string;
+  /** Signed preview URL, so the organizer can see what they are deciding about. */
+  preview_url: string | null;
+  filename: string | null;
 }
 
 /**
@@ -177,12 +181,37 @@ export async function getTakedownRequests(eventId: string): Promise<TakedownRequ
 
   const { data } = await supabase
     .from('takedown_requests')
-    .select('id, media_id, requester_email, reason, status, created_at, auto_restore_at')
+    .select('id, media_id, requester_email, reason, status, created_at, auto_restore_at, media!inner(r2_key, preview_r2_key, original_filename)')
     .eq('event_id', eventId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
-  return (data as TakedownRequestRow[]) ?? [];
+  // Approving is destructive, so the decision should never be made blind — sign a
+  // preview for each request. One at a time is fine: this list is capped at ten.
+  return Promise.all(
+    (data ?? []).map(async (row) => {
+      const r = row as unknown as TakedownRequestRow & {
+        media: { r2_key: string; preview_r2_key: string | null; original_filename: string | null };
+      };
+      let preview: string | null = null;
+      try {
+        preview = await getPreviewUrl(r.media.r2_key, r.media.preview_r2_key);
+      } catch {
+        // A missing preview must not hide the request itself.
+      }
+      return {
+        id: r.id,
+        media_id: r.media_id,
+        requester_email: r.requester_email,
+        reason: r.reason,
+        status: r.status,
+        created_at: r.created_at,
+        auto_restore_at: r.auto_restore_at,
+        preview_url: preview,
+        filename: r.media.original_filename ?? null,
+      };
+    }),
+  );
 }
 
 /** Shared ownership check: returns the request only if the caller owns its event. */
