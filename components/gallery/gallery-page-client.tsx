@@ -22,6 +22,22 @@ import { recomputeDecisions, type EmbeddingMap } from '@/lib/face/client-rerank'
 // the one-at-a-time review modal so the user can keep or drop each one. Fixed for all faces.
 const FINAL_THRESHOLD = 0.666;
 
+// TEMPORARY diagnostic (remove once the quiet revert to "Find Your Photos" is traced).
+// Records mounts and result transitions to sessionStorage so the trail survives whatever
+// resets the component. Read it in the console with: __faceDiag()
+function faceDiag(msg: string) {
+    if (typeof window === 'undefined') return;
+    const line = `${new Date().toISOString().slice(11, 23)} ${msg}`;
+    try {
+        const prev = JSON.parse(sessionStorage.getItem('faceDiag') || '[]') as string[];
+        prev.push(line);
+        sessionStorage.setItem('faceDiag', JSON.stringify(prev.slice(-200)));
+    } catch { /* storage unavailable */ }
+    console.log('[face-diag]', line);
+}
+
+
+
 interface GalleryPageClientProps {
     initialMedia: GalleryMediaItem[];
     albums: { id: string; name: string }[];
@@ -86,6 +102,13 @@ export function GalleryPageClient({
     // Face boxes stay index-aligned with embMap's faces, so the review modal can crop to
     // the one face a decision is actually about.
     const [boxMap, setBoxMap] = useState<Record<string, (number[] | null)[]> | null>(null);
+
+    useEffect(() => {
+        (window as unknown as { __faceDiag?: () => string[] }).__faceDiag = () =>
+            JSON.parse(sessionStorage.getItem('faceDiag') || '[]');
+        faceDiag('MOUNT gallery-page-client');
+        return () => faceDiag('UNMOUNT gallery-page-client');
+    }, []);
 
     // Auth + face profile state
     const { user, accessToken, loading: authLoading } = useGalleryAuth();
@@ -280,6 +303,11 @@ export function GalleryPageClient({
             setReviewOpen(false);
         }
     }, [searchState, searchResults]);
+
+    // TEMPORARY: trace every transition that could flip the UI back to the CTA.
+    useEffect(() => {
+        faceDiag(`results=${faceSearchResults ? faceSearchResults.length : 'null'} active=${faceSearchActive} searchState=${searchState} hasProfile=${hasProfile} user=${user ? 'yes' : 'no'}`);
+    }, [faceSearchResults, faceSearchActive, searchState, hasProfile, user]);
 
     // ── Selfie confirmed → close modal, start background search ──
     const handleSelfieConfirmed = useCallback((blob: Blob) => {
