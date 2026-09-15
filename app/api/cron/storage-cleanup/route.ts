@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/email/resend';
 import { storageWarningSubject, storageWarningHtml } from '@/lib/email/templates/storage-warning';
 import { storageDeletedSubject, storageDeletedHtml } from '@/lib/email/templates/storage-deleted';
 import { captureError, captureWarning } from '@/lib/monitoring/sentry';
+import { runTakedownMaintenance } from '@/actions/takedowns';
 
 /**
  * GET|POST /api/cron/storage-cleanup
@@ -55,10 +56,22 @@ async function handler(request: NextRequest) {
     });
   }
 
+  // Takedown housekeeping rides along here rather than on its own schedule: this plan
+  // allows only two cron jobs, and a third made Vercel refuse the deployment outright.
+  // Daily is ample — the 6-hour restore is a timestamp and needs no job, leaving only
+  // the 30-day purge and retries of notifications that failed to send.
+  let takedowns = { expired: 0, notified: 0, purged: 0 };
+  try {
+    takedowns = await runTakedownMaintenance();
+  } catch (err) {
+    captureError(err as Error, { source: 'storage-cleanup', extra: { phase: 'takedowns' } });
+  }
+
   return NextResponse.json({
     warningsSent,
     organizersProcessed,
     eventsDeleted,
+    takedowns,
     ...(errors.length > 0 && { errors }),
   });
 }

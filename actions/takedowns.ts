@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteR2WithTracking } from '@/lib/storage/r2-cleanup';
 import { decrementStorageUsed } from '@/lib/plans/limits';
 import { sendTakedownRequestEmail } from '@/lib/email/send-takedown-email';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** How long a photo stays hidden while the organizer decides. */
 const HIDE_WINDOW_HOURS = 6;
@@ -319,4 +320,82 @@ export async function purgeExpiredTakedowns(): Promise<{ purged: number }> {
   }
 
   return { purged };
+}
+
+/**
+ * Periodic housekeeping, called from the daily cron.
+ *
+ * Note what is absent: restoring photos after the 6-hour window. That lives in
+ * `media.takedown_hidden_until`, so a photo reappears the moment it passes whether or
+ * not this ever runs. Only the parts that genuinely need a scheduler are here.
+ */
+export async function runTakedownMaintenance(): Promise<{
+  expired: number;
+  notified: number;
+  purged: number;
+}> {
+  const supabase = createAdminClient() as SupabaseClient;
+  const nowIso = new Date().toISOString();
+
+  // Retire requests whose window elapsed, so the photo can be requested again later.
+  let expired = 0;
+  try {
+    const { data } = await supabase
+      .from('takedown_requests')
+      .update({ status: 'expired' })
+      .eq('status', 'pending')
+      .lt('auto_restore_at', nowIso)
+      .select('id');
+    expired = data?.length ?? 0;
+  } catch (err) {
+    console.error('takedown maintenance: expire failed', err);
+  }
+
+  // Retry notifications that never sent. sendEmail returns false rather than throwing,
+  // and a request is stamped only on success, so these are exactly the ones missed.
+  let notified = 0;
+  try {
+    const { data: unnotified } = await supabase
+      .from('takedown_requests')
+      .select('id, reason, requester_email, event_id, events!inner(name, event_hash), media!inner(original_filename)')
+      .eq('status', 'pending')
+      .is('notified_at', null)
+      .limit(50);
+
+    for (const row of unnotified ?? []) {
+      const r = row as unknown as {
+        id: string; reason: string | null; requester_email: string | null; event_id: string;
+        events: { name: string; event_hash: string };
+        media: { original_filename: string | null };
+      };
+
+      const sent = await sendTakedownRequestEmail({
+        eventId: r.event_id,
+        eventName: r.events.name,
+        eventHash: r.events.event_hash,
+        filename: r.media?.original_filename ?? null,
+        reason: r.reason,
+        requesterEmail: r.requester_email,
+      });
+
+      if (sent) {
+        await supabase
+          .from('takedown_requests')
+          .update({ notified_at: new Date().toISOString() })
+          .eq('id', r.id);
+        notified++;
+      }
+    }
+  } catch (err) {
+    console.error('takedown maintenance: notify retry failed', err);
+  }
+
+  let purged = 0;
+  try {
+    ({ purged } = await purgeExpiredTakedowns());
+  } catch (err) {
+    console.error('takedown maintenance: purge failed', err);
+  }
+
+  return { expired, notified, purged };
 }

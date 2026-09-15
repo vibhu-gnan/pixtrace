@@ -7,10 +7,6 @@
     {
       "path": "/api/face/trigger",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/takedown-maintenance",
-      "schedule": "15 * * * *"
     }
   ]
 }
