@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getR2Object, R2ConfigError, R2AccessError } from '@/lib/storage/r2-client';
 import { verifyDownloadToken } from '@/lib/storage/download-token';
+import { getPublicClient } from '@/lib/supabase/public';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -20,6 +21,21 @@ export async function GET(request: NextRequest) {
     // Defense-in-depth: path traversal prevention — only allow safe R2 key characters
     if (r2Key.includes('..') || r2Key.startsWith('/') || /[^\w/._-]/.test(r2Key)) {
         return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
+    }
+
+    // Tokens stay valid for hours, so a photo taken down after one was minted would
+    // otherwise still be downloadable. Re-check on every request. The anon client is
+    // used deliberately: RLS already excludes hidden and taken-down media, so the row
+    // simply is not returned.
+    const { data: visible } = await getPublicClient()
+        .from('media')
+        .select('id')
+        .or(`r2_key.eq.${r2Key},preview_r2_key.eq.${r2Key},thumbnail_r2_key.eq.${r2Key}`)
+        .limit(1)
+        .maybeSingle();
+
+    if (!visible) {
+        return NextResponse.json({ error: 'This photo is no longer available' }, { status: 404 });
     }
 
     try {

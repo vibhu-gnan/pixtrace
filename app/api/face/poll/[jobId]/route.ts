@@ -104,7 +104,11 @@ export async function GET(
     let mediaQuery = adminClient
       .from('media')
       .select('id, album_id, r2_key, preview_r2_key, width, height')
-      .in('id', mediaIds);
+      .in('id', mediaIds)
+      // Admin client bypasses RLS, so the takedown filter has to be explicit here or
+      // a hidden photo would still surface through face search.
+      .is('takedown_purge_at', null)
+      .or(`takedown_hidden_until.is.null,takedown_hidden_until.lte.${new Date().toISOString()}`);
 
     if (job.album_id) {
       mediaQuery = mediaQuery.eq('album_id', job.album_id);

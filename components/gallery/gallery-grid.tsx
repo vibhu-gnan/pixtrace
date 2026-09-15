@@ -182,6 +182,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
                     eventName={eventName}
                     logoUrl={logoUrl}
                     allowDownload={allowDownload}
+                    allowTakedownRequest
                 />
             )}
         </>

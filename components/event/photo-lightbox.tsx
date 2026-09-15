@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { TakedownRequestButton } from '@/components/gallery/takedown-request-button';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { MediaItem } from '@/actions/media';
 import { ShareSheet } from '@/components/story/share-sheet';
@@ -334,12 +335,14 @@ interface PhotoLightboxProps {
   eventName?: string;
   logoUrl?: string;
   allowDownload?: boolean;
+  /** Public gallery only: lets a guest ask for this photo to be taken down. */
+  allowTakedownRequest?: boolean;
 }
 
 const SWIPE_THRESHOLD = 50;
 const LIGHTBOX_STATE_KEY = 'pixtrace-lightbox';
 
-export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, eventName, logoUrl, allowDownload = true }: PhotoLightboxProps) {
+export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, eventName, logoUrl, allowDownload = true, allowTakedownRequest = false }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
   const [linkCopied, setLinkCopied] = useState(false);
@@ -693,6 +696,9 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
                 </span>
               )}
             </button>
+            {allowTakedownRequest && eventHash && currentPhoto && (
+              <TakedownRequestButton eventHash={eventHash} mediaId={currentPhoto.id} />
+            )}
             <button
               onClick={handleClose}
               className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
