@@ -62,6 +62,33 @@ refine: 3/3 cycle(s), seed 20 -> 77 faces, added [54, 2, 1], prototype from 19 f
 Same selfie, same gallery, before and after separating the pools: 226 prototype
 faces and 109 results became 77 and 50.
 
+## Review queue: grouped by person
+
+At ~35 photos per attendee, a review queue of forty photos is really a handful of
+people. The queue is clustered by identity (`clusterCandidates` in
+`lib/face/client-rerank.ts`) and the guest answers once per person.
+
+Three choices that look arbitrary in the code and are not:
+
+| Choice | Why |
+|---|---|
+| Cluster the **matched face**, not a photo's best face | The matched face is the one the card crops to. Clustering a photo's best face groups a crowd shot by whoever stands next to the guest, so the card and the grouping would judge different people. |
+| **Complete-link** (must match *every* member), not single-link | Faces average ~34 neighbours at 0.666 and 2-hop reachability grows a cluster 1.6-1.8x (5→9, 2→3, 28→46). Single-link rides those chains and merges two similar people, which silently discards the guest's own photos. Splitting one person across two cards is the cheaper mistake. |
+| Representative is the **medoid**, not the top scorer | The highest-scoring frame of a stranger is the one most confusable with the guest — the hardest to judge. The medoid is the most typical view. Ties break toward the larger crop. |
+
+Risk is asymmetric: rejecting a wrong cluster is recoverable, but *confirming* one puts
+a stranger into the prototype as a weighted positive and drifts it. Hence the card shows
+a crop strip of the whole group — a bad grouping is visible before it is answered for.
+
+Measured: 36 candidates → 20 cards, 50 → 30, with the worst repeat (8 photos of one
+person) collapsing to a single decision. Deliberately conservative; the dial for more
+grouping is average-link, not a lower threshold.
+
+The review band also applies the **absolute** same-person test now, not only the
+relative one. A look-alike scores high against the prototype precisely because they
+resemble the guest, which cancels the relative margin and let the same face return over
+and over.
+
 ## Silent failure modes, all seen live
 
 Each of these produced no error and no log line. Check them first when results
