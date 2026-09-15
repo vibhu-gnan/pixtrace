@@ -454,7 +454,15 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
     if (!isOpen || typeof window === 'undefined' || !window.history) return;
     if (pushedStateRef.current) return;
 
-    window.history.pushState({ [LIGHTBOX_STATE_KEY]: true }, '', window.location.href);
+    // Spread the existing state: the App Router keeps its routing tree in history
+    // state, and replacing it wholesale leaves the entry unrecognisable on popstate,
+    // so going back falls out of client routing into a full page reload — which drops
+    // every bit of React state, including a face search the guest just ran.
+    window.history.pushState(
+      { ...window.history.state, [LIGHTBOX_STATE_KEY]: true },
+      '',
+      window.location.href,
+    );
     pushedStateRef.current = true;
 
     const handlePopState = () => {
