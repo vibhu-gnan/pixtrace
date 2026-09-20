@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import { getPublicGallery, checkEventOwnership } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 import { HeroSlideshow } from '@/components/gallery/hero-slideshow';
+import { GalleryFooter } from '@/components/gallery/gallery-footer';
 import { getSignedR2Url } from '@/lib/storage/r2-client';
 
 // ISR: serve from edge cache, revalidate every hour
@@ -96,7 +97,7 @@ export default async function GalleryEventPage({
     const albumOnly = only === '1' && !!initialAlbumId;
     const { isOwnerPreview, ...result } = await getCachedGalleryWithFallback(eventHash);
 
-    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = result;
+    const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder, credit, showPoweredBy } = result;
 
     if (!event) {
       notFound();
@@ -230,10 +231,9 @@ export default async function GalleryEventPage({
           />
         </div>
 
-        {/* Footer */}
-        <footer className="py-8 text-center border-t border-gray-100">
-          <p className="text-xs text-gray-400">Powered by PIXTRACE</p>
-        </footer>
+        {/* Footer — photographer credit, or our mark, or neither.
+            Shared with app/[slug] so the two cannot drift. */}
+        <GalleryFooter credit={credit} showPoweredBy={showPoweredBy} eventHash={event.event_hash || eventHash} />
       </main>
     );
   } catch (error) {

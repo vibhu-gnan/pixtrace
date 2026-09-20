@@ -680,6 +680,53 @@ export async function updateEventPhotoOrder(eventId: string, order: 'oldest_firs
   return { success: true };
 }
 
+/**
+ * Hide the photographer's credit on one gallery.
+ *
+ * The organizer-level profile in Settings drives every gallery; this is the
+ * escape hatch for the case that actually comes up — a studio shooting under an
+ * agency's name, or a corporate client who wants no third-party branding. It is
+ * an override, not a second editor: there is deliberately no per-event way to
+ * change the name or the channels.
+ *
+ * Not plan-gated. The credit renders on every plan including Free, so turning
+ * it off must be free too.
+ */
+export async function updateEventCreditVisibility(eventId: string, hidden: boolean) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const supabase = createAdminClient();
+
+  // Ownership is enforced inside the RPC via p_organizer_id.
+  const { error } = await supabase.rpc('merge_event_theme', {
+    p_event_id: eventId,
+    p_organizer_id: organizer.id,
+    p_theme_patch: { hideCredit: !!hidden },
+  });
+
+  if (error) {
+    console.error('Error updating credit visibility:', error);
+    return { error: 'Failed to update credit visibility' };
+  }
+
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
+  revalidatePath(`/events/${eventId}/settings`);
+  if (evt?.event_hash) {
+    // Both public routes — /[slug] resolves by event_hash too, so the same
+    // value covers each.
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
+  }
+
+  return { success: true };
+}
+
 export async function updateEventLogo(eventId: string, logoUrl: string | null) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };

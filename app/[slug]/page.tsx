@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import { getPublicGallery } from '@/actions/gallery';
 import { GalleryPageClient } from '@/components/gallery/gallery-page-client';
 import { HeroSlideshow } from '@/components/gallery/hero-slideshow';
+import { GalleryFooter } from '@/components/gallery/gallery-footer';
 
 // ISR: serve from edge cache, revalidate every hour
 export const revalidate = 3600;
@@ -87,7 +88,7 @@ export default async function GallerySlugPage({
         const { slug } = await params;
         const { photo: initialPhotoId } = await searchParams;
 
-        const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder } = await getCachedGallery(slug);
+        const { event, media, albums, totalCount, coverUrl: resolvedCoverUrl, heroSlides, mobileHeroSlides, heroIntervalMs, photoOrder, credit, showPoweredBy } = await getCachedGallery(slug);
 
         if (!event) {
             notFound();
@@ -167,10 +168,9 @@ export default async function GallerySlugPage({
                     />
                 </div>
 
-                {/* Footer */}
-                <footer className="py-8 text-center border-t border-gray-100">
-                    <p className="text-xs text-gray-400">Powered by PIXTRACE</p>
-                </footer>
+                {/* Footer — photographer credit, or our mark, or neither.
+                    Shared with app/gallery/[eventHash] so the two cannot drift. */}
+                <GalleryFooter credit={credit} showPoweredBy={showPoweredBy} eventHash={event.event_hash || slug} />
             </main>
         );
     } catch (error) {

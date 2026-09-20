@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export interface PlanLimits {
@@ -18,7 +19,16 @@ export interface PlanLimits {
   graceDaysRemaining: number | null;
 }
 
-export async function getOrganizerPlanLimits(organizerId: string): Promise<PlanLimits> {
+/**
+ * Effective plan limits for an organizer.
+ *
+ * Memoized per request with React `cache()`. Three round trips is a lot to spend
+ * twice on the same render, and the public gallery already calls this once to
+ * downgrade `allow_download` on a lapsed plan (actions/gallery.ts) before the
+ * photographer-credit path asks it about `white_label`. Same arguments in one
+ * request now resolve to one query set; nothing about the return value changes.
+ */
+export const getOrganizerPlanLimits = cache(async (organizerId: string): Promise<PlanLimits> => {
   const supabase = createAdminClient();
 
   // Fetch organizer first (needed for plan_id)
@@ -89,7 +99,7 @@ export async function getOrganizerPlanLimits(organizerId: string): Promise<PlanL
     storageGraceDeadline,
     graceDaysRemaining,
   };
-}
+});
 
 export function canCreateEvent(limits: PlanLimits): { allowed: boolean; reason?: string } {
   if (limits.maxEvents === 0) return { allowed: true };

@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUser } from '@/lib/auth';
 import { getPreviewUrl, getOriginalUrl } from '@/lib/storage/cloudflare-images';
 import { getOrganizerPlanLimits, hasFeature } from '@/lib/plans/limits';
+import { resolvePhotographerCredit } from '@/lib/credit/resolve-credit';
+import type { PhotographerCredit } from '@/lib/credit/types';
 
 export interface HeroSlide {
     url: string;
@@ -114,6 +116,10 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
     heroMode: HeroMode;
     heroIntervalMs: number;
     photoOrder: 'oldest_first' | 'newest_first';
+    /** Photographer credit for the gallery footer. Null when not configured or hidden. */
+    credit: PhotographerCredit | null;
+    /** Our own footer mark. Independent of `credit` — see GalleryFooter. */
+    showPoweredBy: boolean;
 }> {
     const supabase = ownerBypass ? createAdminClient() : getPublicClient();
 
@@ -135,7 +141,7 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
     const { data: event, error: eventError } = await (query.single() as unknown as Promise<{ data: EventRow | null; error: unknown }>);
 
     if (eventError || !event) {
-        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first' };
+        return { event: null, media: [], albums: [], totalCount: 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: 'oldest_first', credit: null, showPoweredBy: true };
     }
 
     // Defense-in-depth: enforce plan feature flags on gallery render.
@@ -184,7 +190,8 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
 
     if (mediaError) {
         console.error('Error fetching gallery media:', mediaError);
-        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first' };
+        const emptyCredit = await resolvePhotographerCredit((event as any).organizer_id, event.theme, event.name);
+        return { event, media: [], albums: (albums || []).map(a => ({ id: a.id, name: a.name })), totalCount: count || 0, coverUrl: null, coverR2Key: null, heroSlides: [], mobileHeroSlides: [], heroMode: 'single', heroIntervalMs: 5000, photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first', credit: emptyCredit.credit, showPoweredBy: emptyCredit.showPoweredBy };
     }
 
     // Build album name lookup
@@ -282,6 +289,15 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
         ).then(slides => slides.filter((s): s is HeroSlide => s !== null));
     }
 
+    // Resolved here rather than in the pages: app/[slug] and app/gallery/[eventHash]
+    // both consume this, and duplicating resolution across them is exactly how
+    // the two routes drifted apart in the first place.
+    const { credit, showPoweredBy } = await resolvePhotographerCredit(
+        (event as any).organizer_id,
+        event.theme,
+        event.name,
+    );
+
     return {
         event,
         media,
@@ -294,6 +310,8 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
         heroMode,
         heroIntervalMs,
         photoOrder: photoOrderSetting as 'oldest_first' | 'newest_first',
+        credit,
+        showPoweredBy,
     };
 }
 

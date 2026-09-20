@@ -5,6 +5,15 @@ import { getCurrentOrganizer } from '@/lib/auth/session';
 import type { NotificationPreferences, DefaultEventPreferences } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/auth';
+import {
+  sanitizePhone,
+  sanitizeText,
+  sanitizeBrandingKey,
+  sanitizeWhatsApp,
+  sanitizeInstagram,
+  sanitizeWebsite,
+  sanitizePublicEmail,
+} from '@/lib/validation/contact';
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -42,13 +51,10 @@ function sanitizeAvatarUrl(url: string | null): string | null {
   return null;
 }
 
-/** Strip phone to digits, +, spaces, and hyphens only. */
-function sanitizePhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const cleaned = raw.trim().replace(/[^\d+\-\s()]/g, '');
-  if (!cleaned || cleaned.length > 20) return null;
-  return cleaned;
-}
+// sanitizePhone and the photographer-credit validators live in
+// lib/validation/contact.ts — they are shared with the branding form and cannot
+// be exported from here, since every export of a 'use server' module becomes a
+// public POST endpoint and Next.js rejects non-async exports outright.
 
 // ─── Profile ─────────────────────────────────────────────────
 
@@ -116,6 +122,125 @@ export async function updateProfile(data: {
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
+  return { success: true };
+}
+
+// ─── Photographer Credit ─────────────────────────────────────
+
+export interface CreditProfileInput {
+  enabled: boolean;
+  displayName: string | null;
+  tagline: string | null;
+  logoKey: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  website: string | null;
+  publicEmail: string | null;
+}
+
+/** Channels that count as "reachable" — enabling the credit needs at least one. */
+function countChannels(row: {
+  credit_whatsapp: string | null;
+  credit_instagram: string | null;
+  credit_website: string | null;
+  credit_public_email: string | null;
+}): number {
+  return [row.credit_whatsapp, row.credit_instagram, row.credit_website, row.credit_public_email]
+    .filter(Boolean).length;
+}
+
+/**
+ * Save the photographer's public credit.
+ *
+ * Each field is dropped to null rather than rejected when it doesn't validate,
+ * so one malformed handle never blocks the whole save — with one exception:
+ * turning the credit ON is refused unless there is a name and a way to be
+ * reached, because a credit with no contact is just clutter on the gallery.
+ *
+ * Note what is NOT done here: enabling on the caller's behalf. Publishing a
+ * phone number and email to every gallery guest is an explicit act, never
+ * inferred from the fields being filled in.
+ */
+export async function updateCreditProfile(data: CreditProfileInput) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+  if (!data || typeof data !== 'object') return { error: 'Invalid input' };
+
+  const displayName = sanitizeText(data.displayName, 80);
+  const tagline = sanitizeText(data.tagline, 120);
+  const logoKey = sanitizeBrandingKey(data.logoKey);
+  const whatsapp = sanitizeWhatsApp(data.whatsapp);
+  const instagram = sanitizeInstagram(data.instagram);
+  const website = sanitizeWebsite(data.website);
+  const publicEmail = sanitizePublicEmail(data.publicEmail);
+
+  const next = {
+    credit_whatsapp: whatsapp,
+    credit_instagram: instagram,
+    credit_website: website,
+    credit_public_email: publicEmail,
+  };
+
+  const enabled = data.enabled === true;
+  if (enabled && !displayName) {
+    return { error: 'Add a studio or display name before showing your details.' };
+  }
+  if (enabled && countChannels(next) === 0) {
+    return { error: 'Add at least one way to reach you before showing your details.' };
+  }
+
+  // Clean up a replaced logo. Same fire-and-forget idiom as updateProfile —
+  // a failed delete must not fail the save; r2-cleanup tracks it for retry.
+  const oldLogo = organizer.credit_logo_url;
+  if (oldLogo?.startsWith('branding/') && oldLogo !== logoKey) {
+    import('@/lib/storage/r2-cleanup')
+      .then(({ deleteR2WithTracking }) => {
+        deleteR2WithTracking([oldLogo], 'media_delete');
+      })
+      .catch((err) => console.error('Failed to clean up old branding logo:', err));
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('organizers')
+    .update({
+      credit_enabled: enabled,
+      credit_display_name: displayName,
+      credit_tagline: tagline,
+      credit_logo_url: logoKey,
+      ...next,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', organizer.id);
+
+  if (error) {
+    console.error('Failed to update credit profile:', error);
+    return { error: 'Failed to save your details' };
+  }
+
+  revalidatePath('/settings');
+
+  // Galleries are ISR'd at an hour, so without this a change is invisible for
+  // up to that long. Bounded to the 50 most recent events: an organizer with
+  // hundreds should not pay for a full sweep on every keystroke-to-save, and
+  // the stale remainder self-corrects on its next revalidation anyway.
+  try {
+    const { data: events } = await supabase
+      .from('events')
+      .select('event_hash')
+      .eq('organizer_id', organizer.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    for (const e of (events ?? []) as Array<{ event_hash: string | null }>) {
+      if (!e.event_hash) continue;
+      revalidatePath(`/gallery/${e.event_hash}`);
+      revalidatePath(`/${e.event_hash}`);
+    }
+  } catch (err) {
+    console.error('Credit profile saved but gallery revalidation failed:', err);
+  }
+
   return { success: true };
 }
 
@@ -375,6 +500,12 @@ export async function deleteAccount(confirmEmail: string) {
     // Avatar file
     if (organizer.avatar_url && organizer.avatar_url.startsWith('avatars/')) {
       allKeysToDelete.push(organizer.avatar_url);
+    }
+
+    // Photographer-credit logo. Organizer-scoped, so it is not covered by the
+    // per-event `logos/` loop above and would otherwise be orphaned forever.
+    if (organizer.credit_logo_url && organizer.credit_logo_url.startsWith('branding/')) {
+      allKeysToDelete.push(organizer.credit_logo_url);
     }
 
     // Delete all R2 objects in batches

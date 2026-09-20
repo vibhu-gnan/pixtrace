@@ -33,6 +33,17 @@ export interface OrganizerProfile {
   custom_storage_limit_bytes: number | null;
   custom_max_events: number | null;
   custom_feature_flags: Record<string, unknown> | null;
+  // Photographer credit — shown to gallery guests. `credit_enabled` is an
+  // explicit opt-in: these fields are published to everyone holding a gallery
+  // link, so nothing here goes public until the organizer says so.
+  credit_enabled: boolean;
+  credit_display_name: string | null;
+  credit_tagline: string | null;
+  credit_logo_url: string | null;
+  credit_whatsapp: string | null;
+  credit_instagram: string | null;
+  credit_website: string | null;
+  credit_public_email: string | null;
   created_at: string;
   updated_at: string;
 }

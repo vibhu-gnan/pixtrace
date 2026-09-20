@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { OrganizerProfile } from '@/lib/auth/session';
 import { ProfileForm } from './profile-form';
+import { BrandingForm } from './branding-form';
 import { NotificationSettings } from './notification-settings';
 import { EventDefaultsForm } from './event-defaults-form';
 import { AccountSettings } from './account-settings';
@@ -17,6 +18,7 @@ export interface AuthInfo {
 
 const TABS = [
   { id: 'profile', label: 'Profile' },
+  { id: 'branding', label: 'Branding' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'event-defaults', label: 'Event Defaults' },
   { id: 'account', label: 'Account' },
@@ -35,9 +37,11 @@ function getInitialTab(): TabId {
 interface SettingsTabsProps {
   organizer: OrganizerProfile;
   authInfo: AuthInfo;
+  /** Signed URL for a saved photographer-credit logo, resolved on the server. */
+  creditLogoUrl: string | null;
 }
 
-export function SettingsTabs({ organizer, authInfo }: SettingsTabsProps) {
+export function SettingsTabs({ organizer, authInfo, creditLogoUrl }: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('profile');
 
   // Sync tab from URL hash on mount
@@ -82,6 +86,9 @@ export function SettingsTabs({ organizer, authInfo }: SettingsTabsProps) {
         >
           {activeTab === 'profile' && (
             <ProfileForm organizer={organizer} authInfo={authInfo} />
+          )}
+          {activeTab === 'branding' && (
+            <BrandingForm organizer={organizer} initialLogoUrl={creditLogoUrl} />
           )}
           {activeTab === 'notifications' && (
             <NotificationSettings organizer={organizer} />

@@ -482,3 +482,119 @@ BEGIN
   RETURNING *;
 END;
 $$;
+
+-- ============================================================
+-- SECURITY HARDENING
+-- Mirrors 20260920091500_security_hardening.sql so a fresh dev database
+-- starts in the same state as production rather than reproducing the
+-- findings the linter raised there.
+-- ============================================================
+
+-- email_logs is written by lib/email/resend.ts and read by actions/admin.ts,
+-- both through the service-role client. No policy: service_role only.
+ALTER TABLE email_logs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON email_logs FROM anon, authenticated;
+
+-- Every caller of these functions uses the service-role key. PUBLIC is named
+-- explicitly because Postgres grants EXECUTE to PUBLIC on function creation,
+-- so revoking anon/authenticated alone would leave the hole open.
+REVOKE EXECUTE ON FUNCTION increment_storage_used(uuid, bigint)            FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION increment_view_count(text)                      FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION increment_view_count_by(text, integer)          FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION increment_album_view_count(uuid, integer)       FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION merge_event_theme(uuid, uuid, jsonb)            FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION get_album_covers(uuid[])                        FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION claim_face_processing_jobs(integer, integer)    FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION increment_storage_used(uuid, bigint)            TO service_role;
+GRANT EXECUTE ON FUNCTION increment_view_count(text)                      TO service_role;
+GRANT EXECUTE ON FUNCTION increment_view_count_by(text, integer)          TO service_role;
+GRANT EXECUTE ON FUNCTION increment_album_view_count(uuid, integer)       TO service_role;
+GRANT EXECUTE ON FUNCTION merge_event_theme(uuid, uuid, jsonb)            TO service_role;
+GRANT EXECUTE ON FUNCTION get_album_covers(uuid[])                        TO service_role;
+GRANT EXECUTE ON FUNCTION claim_face_processing_jobs(integer, integer)    TO service_role;
+
+-- A mutable search_path lets a role with CREATE on an earlier schema shadow a
+-- table or operator the body resolves. pg_temp last, and explicit.
+ALTER FUNCTION increment_storage_used(uuid, bigint)            SET search_path = public, pg_temp;
+ALTER FUNCTION increment_view_count(text)                      SET search_path = public, pg_temp;
+ALTER FUNCTION increment_view_count_by(text, integer)          SET search_path = public, pg_temp;
+ALTER FUNCTION increment_album_view_count(uuid, integer)       SET search_path = public, pg_temp;
+ALTER FUNCTION merge_event_theme(uuid, uuid, jsonb)            SET search_path = public, pg_temp;
+ALTER FUNCTION get_album_covers(uuid[])                        SET search_path = public, pg_temp;
+ALTER FUNCTION claim_face_processing_jobs(integer, integer)    SET search_path = public, pg_temp;
+ALTER FUNCTION notify_new_media()                              SET search_path = public, pg_temp;
+
+-- search_face_embeddings / _lite are created by the face-search migrations,
+-- which are not part of this bootstrap — they are hardened in the migration.
+
+-- ============================================================
+-- PHOTOGRAPHER CREDIT
+-- Mirrors 20260920100000_photographer_credit.sql.
+-- ============================================================
+--
+-- Read on PUBLIC gallery pages, but ONLY via createAdminClient() with an
+-- explicit column whitelist (lib/credit/resolve-credit.ts). Do NOT add an anon
+-- SELECT policy to organizers to make this easier — supabase-js column
+-- selection is client-side, so any anon-readable policy exposes the whole row
+-- (email, phone, plan_id, razorpay_customer_id, storage_used_bytes).
+
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_enabled      BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_display_name VARCHAR(80);
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_tagline      VARCHAR(120);
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_logo_url     TEXT;
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_whatsapp     VARCHAR(20);
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_instagram    VARCHAR(30);
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_website      TEXT;
+ALTER TABLE organizers ADD COLUMN IF NOT EXISTS credit_public_email VARCHAR(255);
+
+ALTER TABLE organizers DROP CONSTRAINT IF EXISTS organizers_credit_website_https;
+ALTER TABLE organizers ADD  CONSTRAINT organizers_credit_website_https
+  CHECK (credit_website IS NULL OR credit_website ~ '^https://[^\s]{1,200}$');
+ALTER TABLE organizers DROP CONSTRAINT IF EXISTS organizers_credit_instagram_fmt;
+ALTER TABLE organizers ADD  CONSTRAINT organizers_credit_instagram_fmt
+  CHECK (credit_instagram IS NULL OR credit_instagram ~ '^[A-Za-z0-9._]{1,30}$');
+ALTER TABLE organizers DROP CONSTRAINT IF EXISTS organizers_credit_whatsapp_fmt;
+ALTER TABLE organizers ADD  CONSTRAINT organizers_credit_whatsapp_fmt
+  CHECK (credit_whatsapp IS NULL OR credit_whatsapp ~ '^[0-9]{8,15}$');
+ALTER TABLE organizers DROP CONSTRAINT IF EXISTS organizers_credit_logo_key;
+ALTER TABLE organizers ADD  CONSTRAINT organizers_credit_logo_key
+  CHECK (credit_logo_url IS NULL OR credit_logo_url ~ '^branding/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+\.[a-zA-Z0-9]{2,5}$');
+
+-- Click counts live in their own table, NOT a column on events: `anon` holds a
+-- table-level SELECT grant on events which automatically covers new columns, so
+-- a counter there would let anyone read a photographer's enquiry volume at
+-- /rest/v1/events?select=credit_clicks. If you are tempted to simplify this
+-- back onto events, that is the bug.
+CREATE TABLE IF NOT EXISTS credit_click_counts (
+  event_id UUID   NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  channel  TEXT   NOT NULL CHECK (channel IN ('whatsapp','instagram','website','email','profile')),
+  count    BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (event_id, channel)
+);
+ALTER TABLE credit_click_counts ENABLE ROW LEVEL SECURITY;  -- no policies: service_role only
+REVOKE ALL ON credit_click_counts FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION increment_credit_click(
+    event_hash_input text,
+    channel_input    text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF channel_input NOT IN ('whatsapp','instagram','website','email','profile') THEN
+        RETURN;
+    END IF;
+    INSERT INTO credit_click_counts (event_id, channel, count)
+    SELECT e.id, channel_input, 1
+      FROM events e
+     WHERE e.event_hash = event_hash_input AND e.is_public = true
+    ON CONFLICT (event_id, channel) DO UPDATE SET count = credit_click_counts.count + 1;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION increment_credit_click(text, text) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION increment_credit_click(text, text) TO service_role;
