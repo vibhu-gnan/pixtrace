@@ -12,6 +12,7 @@ import {
   sanitizeWhatsApp,
   sanitizePublicEmail,
 } from '@/lib/validation/contact';
+import { CircularImageEditor } from '@/components/settings/circular-image-editor';
 
 /**
  * Branding settings — the photographer's public credit.
@@ -72,6 +73,8 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
   const [enabled, setEnabled] = useState(organizer.credit_enabled);
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  /** Local object URL opened in the circular crop editor before upload. */
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,10 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
   useEffect(() => {
     return () => { if (logoPreview) URL.revokeObjectURL(logoPreview); };
   }, [logoPreview]);
+
+  useEffect(() => {
+    return () => { if (cropSrc) URL.revokeObjectURL(cropSrc); };
+  }, [cropSrc]);
 
   // Normalised values — what will actually be stored. The preview renders from
   // these, not the raw input, so a pasted Instagram URL shows as the handle it
@@ -121,8 +128,9 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
     if (enabled && !canEnable) setEnabled(false);
   }, [enabled, canEnable]);
 
-  const handleLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoPick = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = '';
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -134,10 +142,28 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
       return;
     }
 
+    setError(null);
+    setCropSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  }, []);
+
+  const closeCropper = useCallback(() => {
+    setCropSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  const handleCropApply = useCallback(async (blob: Blob) => {
     setUploading(true);
     setError(null);
-
     try {
+      const file = new File([blob], 'logo.png', { type: 'image/png' });
+      if (file.size > MAX_LOGO_BYTES) {
+        throw new Error('Cropped logo is over 2MB — try a smaller image.');
+      }
       const form = new FormData();
       form.append('file', file);
       const res = await fetch('/api/upload/branding', { method: 'POST', body: form });
@@ -148,16 +174,15 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
       const { key } = await res.json();
 
       if (logoPreview) URL.revokeObjectURL(logoPreview);
-      setLogoPreview(URL.createObjectURL(file));
+      setLogoPreview(URL.createObjectURL(blob));
       setLogoKey(key);
+      closeCropper();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload logo. Please try again.');
     } finally {
       setUploading(false);
-      // Reset so re-picking the same file fires onChange again.
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [logoPreview]);
+  }, [logoPreview, closeCropper]);
 
   function removeLogo() {
     if (logoPreview) URL.revokeObjectURL(logoPreview);
@@ -244,17 +269,25 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
               </div>
               {/* Shown at true render size on purpose — a logo that reads at
                   400px often turns to mush at 56. */}
-              <span className="text-xs text-gray-500">Shown at 56px. Square marks read best. JPEG, PNG or WebP, under 2MB.</span>
+              <span className="text-xs text-gray-500">Shown at 56px. You can drag to position after picking. JPEG, PNG or WebP, under 2MB.</span>
             </div>
           </div>
           <input
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={handleLogoUpload}
+            onChange={handleLogoPick}
             className="hidden"
           />
         </div>
+
+        {cropSrc && (
+          <CircularImageEditor
+            imageSrc={cropSrc}
+            onCancel={closeCropper}
+            onApply={handleCropApply}
+          />
+        )}
 
         <div>
           <label htmlFor="credit-name" className={label}>Studio or display name</label>
