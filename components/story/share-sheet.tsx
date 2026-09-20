@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { StoryTemplate } from '@/lib/story/story-card-generator';
+import { SAFE_TOP_PCT, SAFE_BOTTOM_PCT } from '@/lib/story/layout-constants';
 
 interface ShareSheetProps {
   isOpen: boolean;
@@ -13,6 +14,12 @@ interface ShareSheetProps {
   eventSubtitle?: string;
   logoUrl?: string;
   galleryUrl: string;
+  /** Photographer handle, e.g. '@aaravstudio'. */
+  creditHandle?: string;
+  /** Studio name, used when there is no handle. */
+  creditName?: string;
+  /** False on white_label plans. */
+  showPoweredBy?: boolean;
 }
 
 const TEMPLATES: { id: StoryTemplate; label: string }[] = [
@@ -31,9 +38,15 @@ export function ShareSheet({
   eventSubtitle,
   logoUrl,
   galleryUrl,
+  creditHandle,
+  creditName,
+  showPoweredBy = true,
 }: ShareSheetProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<StoryTemplate>('immersive');
   const [showLogo, setShowLogo] = useState(true);
+  // Defaults on: the guest is already sharing the photographer's work, so
+  // crediting them is the honest default rather than an opt-in they'd miss.
+  const [showCredit, setShowCredit] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -107,6 +120,9 @@ export function ShareSheet({
         eventName,
         eventSubtitle,
         logoUrl: showLogo ? logoUrl : undefined,
+        creditHandle: showCredit ? creditHandle : undefined,
+        creditName: showCredit ? creditName : undefined,
+        showPoweredBy,
         template: selectedTemplate,
       }, signal);
       clearTimeout(timeoutId);
@@ -122,7 +138,7 @@ export function ShareSheet({
       console.error('Story generation failed:', err);
       return null;
     }
-  }, [photoUrl, photoR2Key, eventName, eventSubtitle, logoUrl, showLogo, selectedTemplate]);
+  }, [photoUrl, photoR2Key, eventName, eventSubtitle, logoUrl, showLogo, selectedTemplate, showCredit, creditHandle, creditName, showPoweredBy]);
 
   const handleShareStory = useCallback(async () => {
     if (generating) return;
@@ -282,7 +298,7 @@ export function ShareSheet({
                           }
                     }
                   >
-                    <TemplatePreview template={tmpl.id} photoUrl={photoUrl} eventName={eventName} />
+                    <TemplatePreview template={tmpl.id} photoUrl={photoUrl} eventName={eventName} creditLabel={showCredit ? (creditHandle || creditName) : undefined} />
                   </div>
                   <span
                     className="text-[11px] font-semibold transition-colors tracking-wide"
@@ -318,6 +334,33 @@ export function ShareSheet({
                   style={{
                     background: showLogo ? '#111' : 'rgba(255,255,255,0.5)',
                     left: showLogo ? '21px' : '3px',
+                  }}
+                />
+              </div>
+            </button>
+          </div>
+        )}
+
+        {(creditHandle || creditName) && (
+          <div className="px-5 pb-4">
+            <button
+              onClick={() => setShowCredit(v => !v)}
+              className="w-full flex items-center justify-between py-3 px-4 rounded-2xl transition-all active:scale-[0.98]"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              } as React.CSSProperties}
+            >
+              <span className="text-[13px] font-semibold text-white/70">Include photographer credit</span>
+              <div
+                className="relative w-[42px] h-[24px] rounded-full transition-all duration-200 flex-shrink-0"
+                style={{ background: showCredit ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.15)' }}
+              >
+                <div
+                  className="absolute top-[3px] w-[18px] h-[18px] rounded-full transition-all duration-200"
+                  style={{
+                    background: showCredit ? '#111' : 'rgba(255,255,255,0.5)',
+                    left: showCredit ? '21px' : '3px',
                   }}
                 />
               </div>
@@ -477,15 +520,28 @@ function ShareButton({
 
 // ─── Mini Template Previews ────────────────────────────────────
 
+/**
+ * CSS mock of each canvas template, for the picker strip.
+ *
+ * This is hand-maintained and WILL silently desync from the real renderer —
+ * it already did once. Offsets are therefore computed from the same
+ * layout-constants the canvas uses, so a change to the safe areas moves both
+ * at once instead of only one.
+ */
 function TemplatePreview({
   template,
   photoUrl,
   eventName,
+  creditLabel,
 }: {
   template: StoryTemplate;
   photoUrl: string;
   eventName: string;
+  creditLabel?: string;
 }) {
+  // Same fractions the canvas uses, expressed as percentages of the 9:16 box.
+  const safeBottom = `${SAFE_BOTTOM_PCT}%`;
+  const safeTop = `${SAFE_TOP_PCT}%`;
   const shortName = eventName.length > 16 ? eventName.slice(0, 16) + '…' : eventName;
 
   const imgFill: React.CSSProperties = {
@@ -503,7 +559,7 @@ function TemplatePreview({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={photoUrl} alt="" style={imgFill} />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90" />
-          <div className="absolute bottom-3 left-0 right-0 text-center px-2">
+          <div className="absolute left-0 right-0 text-center px-2" style={{ bottom: safeBottom }}>
             <div className="text-[8px] font-black text-white uppercase tracking-wider leading-tight drop-shadow">
               {shortName}
             </div>
@@ -534,7 +590,7 @@ function TemplatePreview({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={photoUrl} alt="" style={imgFill} />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90" />
-          <div className="absolute bottom-3 left-0 right-0 text-center px-2">
+          <div className="absolute left-0 right-0 text-center px-2" style={{ bottom: safeBottom }}>
             <div className="text-[9px] font-black text-white uppercase tracking-wider leading-tight drop-shadow-lg">
               {shortName}
             </div>
@@ -551,7 +607,7 @@ function TemplatePreview({
           {/* Light darken overlay */}
           <div className="absolute inset-0 bg-black/20" />
           {/* Glass card */}
-          <div className="absolute top-[14px] left-[8px] right-[8px] z-10">
+          <div className="absolute left-[8px] right-[8px] z-10" style={{ top: safeTop }}>
             <div
               className="rounded-[12px] overflow-hidden"
               style={{
@@ -569,11 +625,11 @@ function TemplatePreview({
             </div>
           </div>
           {/* Name + subtitle */}
-          <div className="absolute bottom-3 left-0 right-0 text-center px-2 z-10">
+          <div className="absolute left-0 right-0 text-center px-2 z-10" style={{ bottom: safeBottom }}>
             <div className="text-[8px] font-black text-white uppercase tracking-wider leading-tight drop-shadow">
               {shortName}
             </div>
-            <div className="text-[5px] text-white/35 mt-0.5 tracking-wide">PIXTRACE</div>
+            <div className="text-[5px] text-white/35 mt-0.5 tracking-wide">{creditLabel || 'PIXTRACE'}</div>
           </div>
         </div>
       );

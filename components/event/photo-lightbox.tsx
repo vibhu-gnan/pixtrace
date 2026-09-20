@@ -834,6 +834,9 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
         photoR2Key={currentPhoto.r2_key}
         eventName={eventName}
         logoUrl={logoUrl}
+        creditHandle={credit?.instagramHandle ? `@${credit.instagramHandle}` : undefined}
+        creditName={credit?.displayName}
+        showPoweredBy={credit ? credit.showPoweredBy : true}
         galleryUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/gallery/${eventHash}`}
       />
     )}
