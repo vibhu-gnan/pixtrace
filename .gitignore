@@ -50,3 +50,5 @@ __pycache__/
 
 # research / scratch
 not important/
+# Local experiment folder — do not commit
+Prj-3_Test/

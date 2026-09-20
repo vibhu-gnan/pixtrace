@@ -60,30 +60,16 @@ export function EventLogoSettings({ eventId, initialLogoUrl, initialLogoDisplay 
 
         setIsUploading(true);
         try {
-            // 1. Get presigned URL
-            const res = await fetch('/api/upload/logo', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    filename: file.name,
-                    contentType: file.type,
-                    eventId,
-                }),
-            });
+            const form = new FormData();
+            form.append('file', file);
+            form.append('eventId', eventId);
+            const res = await fetch('/api/upload/logo', { method: 'POST', body: form });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || 'Failed to upload file');
+            }
+            const { key } = await res.json();
 
-            if (!res.ok) throw new Error('Failed to get upload URL');
-            const { uploadUrl, key } = await res.json();
-
-            // 2. Upload to R2
-            const uploadRes = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: file,
-                headers: { 'Content-Type': file.type },
-            });
-
-            if (!uploadRes.ok) throw new Error('Failed to upload file');
-
-            // 3. Update event in DB (store R2 key, not public URL)
             const result = await updateEventLogo(eventId, key);
             if (result.error) throw new Error(result.error);
 

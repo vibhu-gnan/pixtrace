@@ -138,19 +138,14 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/upload/branding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      });
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/upload/branding', { method: 'POST', body: form });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to get upload URL');
+        throw new Error(body.error || 'Upload failed');
       }
-      const { uploadUrl, key } = await res.json();
-
-      const put = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-      if (!put.ok) throw new Error('Upload failed');
+      const { key } = await res.json();
 
       if (logoPreview) URL.revokeObjectURL(logoPreview);
       setLogoPreview(URL.createObjectURL(file));

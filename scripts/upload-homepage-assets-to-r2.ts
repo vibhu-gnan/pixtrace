@@ -55,6 +55,7 @@ function getR2Client(accountId: string, accessKeyId: string, secretAccessKey: st
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
     // Increase timeout for large files on slow connections.
     requestHandler: { requestTimeout: 60_000 },
   });

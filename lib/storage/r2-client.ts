@@ -67,6 +67,13 @@ function ensureR2(): { client: S3Client; bucket: string } {
       accessKeyId: accessKeyId!,
       secretAccessKey: secretAccessKey!,
     },
+    forcePathStyle: true,
+    // AWS SDK v3.729+ signs CRC32 checksums into PutObject by default.
+    // R2 does not implement those headers, and browser PUTs to a presigned URL
+    // never send them — so the upload fails (often as a opaque "Failed to fetch"
+    // because error responses omit CORS headers). Keep checksums off unless required.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
   _bucket = bucketName!;
 

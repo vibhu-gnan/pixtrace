@@ -640,6 +640,7 @@ def get_r2():
             region_name="auto",
             config=BotoConfig(
                 signature_version="s3v4",
+                s3={'addressing_style': 'path'},
                 retries={"max_attempts": 3, "mode": "standard"},
                 # Without explicit timeouts a half-open connection parks a pool
                 # thread indefinitely instead of failing and being retried.
