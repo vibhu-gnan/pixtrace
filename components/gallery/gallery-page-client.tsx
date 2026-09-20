@@ -9,7 +9,7 @@ import type { GalleryMediaItem } from '@/actions/gallery';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
 import { FaceReviewModal } from './face-review-modal';
-import { CreditResultsBanner, CreditEndOfList } from './credit-moment';
+import { CreditResultsBanner } from './credit-moment';
 import type { PhotographerCredit } from '@/lib/credit/types';
 import { FaceSearchToggle } from './face-search-toggle';
 import { FaceSearchStatusPill } from './face-search-status-pill';
@@ -950,12 +950,9 @@ export function GalleryPageClient({
             </AnimatePresence>
             {((!hasMore && !loading && media.length > 0 && !faceSearchActive) || (faceSearchActive && displayMedia.length > 0)) && (
                 <div className={faceSearchActive ? 'pb-20' : ''}>
-                    {/* The guest has finished scrolling, so nothing is interrupted.
-                        Suppressed while the results banner is showing — one credit
-                        surface at a time, or it reads as nagging. */}
-                    {credit && !(faceSearchActive && !creditBannerDismissed) && (
-                        <CreditEndOfList credit={credit} eventHash={eventHash} />
-                    )}
+                    {/* Credit lives in GalleryFooter (and CreditResultsBanner during
+                        face-search results). An end-of-list card here duplicated the
+                        same WhatsApp/Instagram block under Return to Top. */}
                     <div className="py-8 flex justify-center">
                         <button
                             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

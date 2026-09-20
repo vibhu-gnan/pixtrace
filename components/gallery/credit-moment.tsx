@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { CreditCard } from './credit-card';
 import type { PhotographerCredit, CreditChannel } from '@/lib/credit/types';
 import { creditMonogram } from '@/lib/credit/types';
 
@@ -80,7 +79,7 @@ export function CreditResultsBanner({
                        focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900"
             style={
               credit.whatsappUrl
-                ? { backgroundColor: '#25D366', color: '#111827' }   // 9.5:1 — see credit-card.tsx
+                ? { backgroundColor: '#25D366', color: '#111827' }   // measured 8.94:1 — see credit-card.tsx
                 : { backgroundColor: '#111827', color: '#ffffff' }
             }
           >
@@ -103,26 +102,8 @@ export function CreditResultsBanner({
   );
 }
 
-/**
- * Compact card at the end of the grid. The guest has finished scrolling, so
- * nothing is interrupted — this is the lowest-risk placement and the one to
- * ship first.
- */
-export function CreditEndOfList({
-  credit,
-  eventHash,
-}: {
-  credit: PhotographerCredit;
-  eventHash: string;
-}) {
-  const [fired] = useState(() => new Set<string>());
-  return (
-    <div className="mx-auto max-w-sm px-4 pt-2 pb-6">
-      <CreditCard
-        credit={credit}
-        variant="compact"
-        onChannelClick={(channel) => shareBeacon(eventHash, fired, channel)}
-      />
-    </div>
-  );
-}
+// An end-of-list credit card used to live here. It was dropped: GalleryFooter
+// renders the full credit immediately below the "Return to Top" button, so the
+// two stacked into the same WhatsApp/Instagram block twice in a row. The
+// completion-moment placements that survive are the results banner above and
+// the post-download toast in photo-lightbox.tsx.

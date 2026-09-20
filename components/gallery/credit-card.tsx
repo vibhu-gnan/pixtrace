@@ -26,8 +26,8 @@ interface CreditCardProps {
 
 // #25D366 is WhatsApp's brand green. Paired with WHITE text it is 1.98:1 and
 // fails WCAG AA outright — which is what most implementations ship. Paired with
-// near-black (#111827) it is 9.5:1 and passes AAA, while staying instantly
-// recognisable. Do not "fix" this to white text.
+// near-black (#111827) it is 8.94:1 — measured on the rendered page — which
+// passes AAA while staying instantly recognisable. Do not "fix" this to white.
 const WHATSAPP_BG = '#25D366';
 const WHATSAPP_FG = '#111827';
 
