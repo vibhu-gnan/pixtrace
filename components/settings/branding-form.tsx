@@ -133,6 +133,13 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (!file) return;
 
+    // `accept` on the input is only a hint — the OS picker lets people choose
+    // "All files". SVG in particular loads at 0x0 and would dead-end in the
+    // cropper, so name it explicitly rather than failing later.
+    if (file.type === 'image/svg+xml') {
+      setError('SVG logos are not supported. Please export a PNG, JPEG or WebP.');
+      return;
+    }
     if (!file.type.startsWith('image/')) {
       setError('Please choose an image file (JPEG, PNG or WebP).');
       return;

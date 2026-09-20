@@ -32,6 +32,7 @@ export function CircularImageEditor({
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -40,13 +41,26 @@ export function CircularImageEditor({
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
+      // A vector image with no intrinsic size loads "successfully" at 0x0.
+      // Without this guard `ready` goes true, Apply enables, and the export
+      // silently no-ops on its own !natural.w check — a dead end with no
+      // message. Treat it as a load failure instead.
+      if (!img.naturalWidth || !img.naturalHeight) {
+        setReady(false);
+        setLoadError("That image has no fixed size, so it can't be cropped. Try a PNG, JPEG or WebP.");
+        return;
+      }
       imgRef.current = img;
       setNatural({ w: img.naturalWidth, h: img.naturalHeight });
       setZoom(1);
       setOffset({ x: 0, y: 0 });
+      setLoadError(null);
       setReady(true);
     };
-    img.onerror = () => setReady(false);
+    img.onerror = () => {
+      setReady(false);
+      setLoadError("That image couldn't be opened. Try a different file.");
+    };
     img.src = imageSrc;
   }, [imageSrc]);
 
@@ -146,6 +160,10 @@ export function CircularImageEditor({
         <p className="mt-1 text-sm text-gray-500">
           Drag to position. Guests see this inside a circle.
         </p>
+
+        {loadError && (
+          <p role="alert" className="mt-3 text-sm text-red-600">{loadError}</p>
+        )}
 
         <div className="mt-4 flex justify-center">
           <div
