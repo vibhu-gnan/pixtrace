@@ -6,6 +6,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import type { MediaItem } from '@/actions/media';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { refreshMediaUrl } from '@/lib/gallery/url-refresh';
+import { creditMonogram, type PhotographerCredit, type CreditChannel } from '@/lib/credit/types';
 
 type LoadingPhase = 'thumbnail' | 'preview' | 'loading_original' | 'original';
 
@@ -337,12 +338,14 @@ interface PhotoLightboxProps {
   allowDownload?: boolean;
   /** Public gallery only: lets a guest ask for this photo to be taken down. */
   allowTakedownRequest?: boolean;
+  /** Public gallery only: photographer credit, shown once after a download. */
+  credit?: PhotographerCredit | null;
 }
 
 const SWIPE_THRESHOLD = 50;
 const LIGHTBOX_STATE_KEY = 'pixtrace-lightbox';
 
-export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, eventName, logoUrl, allowDownload = true, allowTakedownRequest = false }: PhotoLightboxProps) {
+export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash, eventName, logoUrl, allowDownload = true, allowTakedownRequest = false, credit = null }: PhotoLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>('thumbnail');
   const [linkCopied, setLinkCopied] = useState(false);
@@ -524,11 +527,19 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  // Separate from downloadSuccess on purpose. That one drives the 2s green
+  // check on the button and resets on every photo change; extending it would
+  // change both behaviours. The credit needs longer to read and must appear at
+  // most once, however many photos get downloaded.
+  const [creditToast, setCreditToast] = useState(false);
+  const creditToastShownRef = useRef(false);
 
   useEffect(() => {
     setIsDownloading(false);
     setDownloadSuccess(false);
     setShareSheetOpen(false);
+    // creditToastShownRef is deliberately NOT reset here — browsing forty
+    // photos and downloading ten should surface the credit once, not ten times.
   }, [currentIndex]);
 
   const handleDownload = useCallback(async () => {
@@ -562,13 +573,21 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
 
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 2000);
+
+      // Peak-end: the guest has what they came for. 6s, not 2 — long enough to
+      // read a studio name and decide, short enough not to linger.
+      if (credit && !creditToastShownRef.current) {
+        creditToastShownRef.current = true;
+        setCreditToast(true);
+        setTimeout(() => setCreditToast(false), 6000);
+      }
     } catch {
       // Fallback: open the presigned original URL directly
       window.open(currentPhoto.original_url, '_blank');
     } finally {
       setIsDownloading(false);
     }
-  }, [currentPhoto, isDownloading, eventHash]);
+  }, [currentPhoto, isDownloading, eventHash, credit]);
 
   // Keep latest nav callbacks in refs so keyboard handler never goes stale
   const handlePreviousRef = useRef(handlePrevious);
@@ -756,6 +775,55 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+
+    {/* Credit toast — outside the Dialog for the same z-index reason as the
+        share sheet. Bottom-centre, above the mobile home indicator. */}
+    {creditToast && credit && eventHash && (
+      <div className="fixed inset-x-0 bottom-0 z-[70] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pointer-events-none">
+        <div className="mx-auto max-w-sm flex items-center gap-3 rounded-xl bg-white shadow-lg border border-gray-200 px-4 py-3 pointer-events-auto">
+          {credit.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={credit.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0 bg-gray-100" />
+          ) : (
+            <div aria-hidden="true" className="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-semibold shrink-0">
+              {creditMonogram(credit.displayName)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900 truncate">Saved</p>
+            <p className="text-xs text-gray-600 truncate">Shot by {credit.displayName}</p>
+          </div>
+          {(credit.whatsappUrl || credit.instagramUrl || credit.websiteUrl || credit.emailUrl) && (
+            <a
+              href={(credit.whatsappUrl || credit.instagramUrl || credit.websiteUrl || credit.emailUrl)!}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              onClick={() => {
+                const ch: CreditChannel = credit.whatsappUrl ? 'whatsapp'
+                  : credit.instagramUrl ? 'instagram'
+                  : credit.websiteUrl ? 'website' : 'email';
+                fetch(`/api/gallery/credit-click?hash=${encodeURIComponent(eventHash)}&channel=${ch}`,
+                      { method: 'POST', keepalive: true }).catch(() => {});
+              }}
+              className="shrink-0 h-10 px-4 inline-flex items-center rounded-lg text-sm font-semibold"
+              style={credit.whatsappUrl
+                ? { backgroundColor: '#25D366', color: '#111827' }
+                : { backgroundColor: '#111827', color: '#ffffff' }}
+            >
+              {credit.whatsappUrl ? 'Message' : 'Visit'}
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => setCreditToast(false)}
+            aria-label="Dismiss"
+            className="shrink-0 w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center"
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    )}
 
     {/* Share sheet — rendered outside Dialog to avoid z-index conflicts */}
     {eventName && eventHash && currentPhoto && (

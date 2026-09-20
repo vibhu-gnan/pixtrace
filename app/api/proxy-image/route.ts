@@ -18,6 +18,30 @@ const MAX_PROXY_SIZE = 25 * 1024 * 1024; // 25MB max
 async function authorizeProxyAccess(r2Key: string, request: NextRequest): Promise<boolean> {
   const pub = getPublicClient();
 
+  // 0. Photographer-credit logo. Short-circuited on the prefix so the three
+  //    media/cover lookups below are skipped entirely for these keys.
+  //
+  //    Served through the proxy rather than a presigned URL because the gallery
+  //    is ISR-cached for an hour and the story-card canvas fetches this too: a
+  //    stable, same-origin, 24h-cacheable URL has no expiry to outrun. Note the
+  //    admin client — `organizers` has no anon SELECT policy, so the anon client
+  //    would silently match nothing and deny every logo.
+  if (r2Key.startsWith('branding/')) {
+    try {
+      const admin = createAdminClient();
+      const { data } = await admin
+        .from('organizers')
+        .select('id')
+        .eq('credit_logo_url', r2Key)
+        .eq('credit_enabled', true)   // an unpublished credit's logo stays private
+        .limit(1)
+        .maybeSingle();
+      return Boolean(data);
+    } catch {
+      return false;
+    }
+  }
+
   // 1. Media (original, preview, or thumbnail variant) in a public event
   const { data: mediaMatch } = await pub
     .from('media')

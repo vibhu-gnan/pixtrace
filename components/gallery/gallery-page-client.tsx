@@ -9,6 +9,8 @@ import type { GalleryMediaItem } from '@/actions/gallery';
 import { ShareSheet } from '@/components/story/share-sheet';
 import { FaceSearchModal } from './face-search-modal';
 import { FaceReviewModal } from './face-review-modal';
+import { CreditResultsBanner, CreditEndOfList } from './credit-moment';
+import type { PhotographerCredit } from '@/lib/credit/types';
 import { FaceSearchToggle } from './face-search-toggle';
 import { FaceSearchStatusPill } from './face-search-status-pill';
 import { useGalleryAuth } from '@/lib/auth/use-gallery-auth';
@@ -41,6 +43,8 @@ interface GalleryPageClientProps {
     showFaceScores?: boolean;
     isOwnerPreview?: boolean;
     albumOnly?: boolean;
+    /** Photographer credit, resolved server-side. Null when not configured or hidden. */
+    credit?: PhotographerCredit | null;
 }
 
 export function GalleryPageClient({
@@ -61,6 +65,7 @@ export function GalleryPageClient({
     showFaceScores = false,
     isOwnerPreview = false,
     albumOnly = false,
+    credit = null,
 }: GalleryPageClientProps) {
     // Validate initialAlbumId — only use if it matches an actual album
     const validInitialAlbum = initialAlbumId && albums.some(a => a.id === initialAlbumId) ? initialAlbumId : null;
@@ -74,6 +79,9 @@ export function GalleryPageClient({
     const [selfieModalOpen, setSelfieModalOpen] = useState(false);
     const [faceSearchResults, setFaceSearchResults] = useState<FaceSearchResult[] | null>(null);
     const [faceSearchActive, setFaceSearchActive] = useState(false);
+    // Session-only: a guest who dismisses the credit banner should not see it
+    // again on this visit, but it is not worth persisting across visits.
+    const [creditBannerDismissed, setCreditBannerDismissed] = useState(false);
     const faceSearchActiveRef = useRef(false);
     const selfieBlobRef = useRef<Blob | null>(null);
     // Review decisions on sub-FINAL_THRESHOLD matches — the user's *explicit* choices.
@@ -308,6 +316,10 @@ export function GalleryPageClient({
 
     // ── User taps the "Found N photos" pill → activate Mine mode ──
     const handleViewSearchResults = useCallback(() => {
+        // Surface the credit only now: the guest has asked to see their photos,
+        // which is the moment of completion. Firing on searchState === 'results'
+        // would show it while the pill is still up and nothing has been seen.
+        setCreditBannerDismissed(false);
         setFaceSearchActive(true);
         faceSearchActiveRef.current = true;
         if (!albumOnly) setActiveAlbum(null);
@@ -884,9 +896,22 @@ export function GalleryPageClient({
             )}
             </AnimatePresence>
 
+            {/* ── Credit at the moment of completion ──────────────
+                Inline and dismissible, above the results. Never fixed-position:
+                FaceSearchToggle and FaceSearchStatusPill already own the bottom
+                of the viewport and a floating card would collide with them. */}
+            {credit && faceSearchActive && displayMedia.length > 0 && !creditBannerDismissed && (
+                <CreditResultsBanner
+                    credit={credit}
+                    eventHash={eventHash}
+                    matchCount={displayMedia.length}
+                    onDismiss={() => setCreditBannerDismissed(true)}
+                />
+            )}
+
             {/* ── Photo Grid ───────────────────────────────────── */}
             <div className={`pt-1 relative${faceSearchActive ? ' pb-16' : ''}`}>
-                <GalleryGrid media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} showFaceScores={showFaceScores} onNotMe={faceSearchActive ? (id) => setRejectedIds(prev => new Set(prev).add(id)) : undefined} />
+                <GalleryGrid credit={credit} media={displayMedia} eventHash={eventHash} eventName={eventName} logoUrl={logoUrl} initialPhotoId={initialPhotoId} allowDownload={allowDownload} loading={loading && !faceSearchActive} showFaceScores={showFaceScores} onNotMe={faceSearchActive ? (id) => setRejectedIds(prev => new Set(prev).add(id)) : undefined} />
 
                 {/* Invisible sentinel — sits inside the grid container,
                     positioned to trigger ~800px before the user reaches the end.
@@ -924,13 +949,21 @@ export function GalleryPageClient({
             )}
             </AnimatePresence>
             {((!hasMore && !loading && media.length > 0 && !faceSearchActive) || (faceSearchActive && displayMedia.length > 0)) && (
-                <div className={`py-8 flex justify-center${faceSearchActive ? ' pb-20' : ''}`}>
-                    <button
-                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                        className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
-                    >
-                        Return to Top
-                    </button>
+                <div className={faceSearchActive ? 'pb-20' : ''}>
+                    {/* The guest has finished scrolling, so nothing is interrupted.
+                        Suppressed while the results banner is showing — one credit
+                        surface at a time, or it reads as nagging. */}
+                    {credit && !(faceSearchActive && !creditBannerDismissed) && (
+                        <CreditEndOfList credit={credit} eventHash={eventHash} />
+                    )}
+                    <div className="py-8 flex justify-center">
+                        <button
+                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                            className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
+                        >
+                            Return to Top
+                        </button>
+                    </div>
                 </div>
             )}
 

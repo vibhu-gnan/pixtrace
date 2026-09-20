@@ -9,6 +9,8 @@ import { EditEventDetails } from '@/components/dashboard/edit-event-details';
 import { QRCodeGenerator } from '@/components/dashboard/qr-code-generator';
 import { EventLinkActions } from '@/components/event/event-link-actions';
 import { getSignedR2Url } from '@/lib/storage/r2-client';
+import { getCreditClickStats, formatChannelBreakdown } from '@/lib/credit/click-stats';
+import { EventCreditVisibility } from '@/components/dashboard/event-credit-visibility';
 
 export default async function SettingsPage({
   params,
@@ -29,6 +31,10 @@ export default async function SettingsPage({
   const resolvedLogoUrl = logoRaw
     ? (logoRaw.startsWith('http://') || logoRaw.startsWith('https://') ? logoRaw : await getSignedR2Url(logoRaw))
     : null;
+
+  const creditStats = await getCreditClickStats(eventId);
+  const channelBreakdown = formatChannelBreakdown(creditStats);
+  const creditHidden = (eventData.theme as any)?.hideCredit === true;
 
   const startDate = eventData.event_date ? new Date(eventData.event_date) : null;
   const endDate = eventData.event_end_date ? new Date(eventData.event_end_date) : null;
@@ -101,6 +107,11 @@ export default async function SettingsPage({
             />
           </section>
 
+          {/* Photographer credit — per-event override */}
+          <section>
+            <EventCreditVisibility eventId={eventData.id} initialHidden={creditHidden} />
+          </section>
+
           {/* Event Details */}
           <section>
             <div className="flex items-center gap-2 mb-6">
@@ -139,6 +150,19 @@ export default async function SettingsPage({
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Gallery Views</p>
                 <p className="text-base text-gray-900">{(eventData.view_count || 0).toLocaleString()}</p>
+              </div>
+              <div>
+                {/* "Taps", never "guests" — there is no per-person dedupe, and a
+                    number labelled as people would be quietly wrong. */}
+                <p className="text-sm font-medium text-gray-500 mb-1">Credit taps</p>
+                <p className="text-base text-gray-900">{creditStats.total.toLocaleString()}</p>
+                {channelBreakdown ? (
+                  <p className="text-xs text-gray-500 mt-0.5">{channelBreakdown}</p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    No taps yet — counted per visit, not per person.
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">Event Status</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import type { PhotographerCredit } from '@/lib/credit/types';
 import { PhotoLightbox } from '@/components/event/photo-lightbox';
 import { refreshMediaUrl } from '@/lib/gallery/url-refresh';
 import { LoadingSpinner } from '@/components/UI/LoadingStates';
@@ -28,9 +29,12 @@ interface GalleryGridProps {
     showFaceScores?: boolean;
     /** When set, each tile offers a "Not me" action (face-search results only). */
     onNotMe?: (mediaId: string) => void;
+    /** Public gallery only — the dashboard lightbox passes nothing, so a
+     *  photographer never sees their own credit shown back at them. */
+    credit?: PhotographerCredit | null;
 }
 
-export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhotoId, allowDownload = true, loading = false, showFaceScores = false, onNotMe }: GalleryGridProps) {
+export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhotoId, allowDownload = true, loading = false, showFaceScores = false, onNotMe, credit = null }: GalleryGridProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
     const [columns, setColumns] = useState(4);
@@ -174,6 +178,7 @@ export function GalleryGrid({ media, eventHash, eventName, logoUrl, initialPhoto
 
             {lightboxOpen && (
                 <PhotoLightbox
+        credit={credit}
                     media={lightboxMedia}
                     initialIndex={lightboxIndex}
                     isOpen={lightboxOpen}

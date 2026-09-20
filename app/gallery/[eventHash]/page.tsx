@@ -211,6 +211,7 @@ export default async function GalleryEventPage({
         {/* ── Gallery Content ──────────────────────────────── */}
         <div id="gallery" className="bg-white">
           <GalleryPageClient
+                        credit={credit}
             initialMedia={media}
             albums={albums}
             eventHash={eventHash}

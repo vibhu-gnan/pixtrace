@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSignedR2Url } from '@/lib/storage/r2-client';
 import { getOrganizerPlanLimits, hasFeature } from '@/lib/plans/limits';
 import { buildCredit, type PhotographerCredit } from '@/lib/credit/types';
 
@@ -113,13 +112,12 @@ export async function resolvePhotographerCredit(
         logoUrl = rawLogo;
       } else if (rawLogo.startsWith('branding/')) {
         logoR2Key = rawLogo;
-        try {
-          logoUrl = await getSignedR2Url(rawLogo, 86400);
-        } catch (err) {
-          // A missing logo must never remove the credit — the card falls back
-          // to its monogram.
-          console.error('[credit] failed to sign logo URL:', err);
-        }
+        // Stable same-origin URL rather than a presigned one. The gallery is
+        // ISR-cached for an hour and the story-card canvas fetches the same
+        // image, so a signature that can expire inside the cache window is a
+        // bug waiting to happen. /api/proxy-image authorizes `branding/` keys
+        // against credit_enabled and serves them with a 24h cache header.
+        logoUrl = `/api/proxy-image?r2Key=${encodeURIComponent(rawLogo)}`;
       }
     }
 

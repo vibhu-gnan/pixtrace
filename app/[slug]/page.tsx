@@ -155,6 +155,7 @@ export default async function GallerySlugPage({
                 {/* ── Gallery Content ──────────────────────────────── */}
                 <div id="gallery">
                     <GalleryPageClient
+                        credit={credit}
                         initialMedia={media}
                         albums={albums}
                         eventHash={event.event_hash || slug}
