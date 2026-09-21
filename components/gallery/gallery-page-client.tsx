@@ -82,6 +82,17 @@ export function GalleryPageClient({
     // Session-only: a guest who dismisses the credit banner should not see it
     // again on this visit, but it is not worth persisting across visits.
     const [creditBannerDismissed, setCreditBannerDismissed] = useState(false);
+    // True while the page footer is on screen. The floating face-search pill is
+    // hidden then: at the end of the page it sat over the photographer's credit
+    // and its 30px purple glow read as a rendering smudge on the white below.
+    const [footerVisible, setFooterVisible] = useState(false);
+    useEffect(() => {
+        const el = document.getElementById('gallery-footer');
+        if (!el || typeof IntersectionObserver === 'undefined') return;
+        const io = new IntersectionObserver(([entry]) => setFooterVisible(entry.isIntersecting), { threshold: 0 });
+        io.observe(el);
+        return () => io.disconnect();
+    }, []);
     const faceSearchActiveRef = useRef(false);
     const selfieBlobRef = useRef<Blob | null>(null);
     // Review decisions on sub-FINAL_THRESHOLD matches — the user's *explicit* choices.
@@ -953,13 +964,25 @@ export function GalleryPageClient({
                     {/* Credit lives in GalleryFooter (and CreditResultsBanner during
                         face-search results). An end-of-list card here duplicated the
                         same WhatsApp/Instagram block under Return to Top. */}
-                    <div className="py-8 flex justify-center">
+                    {/* A deliberate end to the grid. Masonry columns always finish at
+                        different heights; a divider with a count makes that ragged
+                        edge read as "that's everything" rather than "still loading". */}
+                    <div className="mt-6 mx-auto max-w-5xl px-6 py-6 flex items-center gap-4 text-sm text-gray-600">
+                        <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
+                        <span className="whitespace-nowrap">
+                            {faceSearchActive
+                                ? `That's all ${displayMedia.length} of your photos`
+                                : `That's all ${totalCount} photo${totalCount === 1 ? '' : 's'}`}
+                        </span>
+                        <span aria-hidden="true">·</span>
                         <button
                             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                            className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm font-medium transition-colors"
+                            className="whitespace-nowrap font-medium text-gray-800 hover:text-gray-950 underline-offset-4 hover:underline
+                                       focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 rounded"
                         >
-                            Return to Top
+                            Back to top ↑
                         </button>
+                        <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
                     </div>
                 </div>
             )}
@@ -987,7 +1010,7 @@ export function GalleryPageClient({
 
             {/* ── ALL / Mine Toggle (hidden when status pill is showing) ── */}
             <AnimatePresence>
-            {!revoked && media.length > 0 && faceSearchEnabled && searchState === 'idle' && (
+            {!revoked && media.length > 0 && faceSearchEnabled && searchState === 'idle' && !footerVisible && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}

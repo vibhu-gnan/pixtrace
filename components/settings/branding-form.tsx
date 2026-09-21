@@ -253,10 +253,10 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
               <img
                 src={logoPreview || initialLogoUrl || ''}
                 alt="Your logo"
-                className="w-14 h-14 rounded-full object-cover bg-gray-100 border border-gray-200"
+                className="w-[72px] h-[72px] rounded-full object-cover bg-gray-100 border border-gray-200"
               />
             ) : (
-              <div className="w-14 h-14 rounded-full bg-gray-100 border border-dashed border-gray-300" />
+              <div className="w-[72px] h-[72px] rounded-full bg-gray-100 border border-dashed border-gray-300" />
             )}
             <div className="flex flex-col gap-1">
               <div className="flex gap-2">
@@ -276,7 +276,7 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
               </div>
               {/* Shown at true render size on purpose — a logo that reads at
                   400px often turns to mush at 56. */}
-              <span className="text-xs text-gray-500">Shown at 56px. You can drag to position after picking. JPEG, PNG or WebP, under 2MB.</span>
+              <span className="text-xs text-gray-500">Shown at 72px. Simple, bold marks read best — fine script or small text won&apos;t be legible. JPEG, PNG or WebP, under 2MB.</span>
             </div>
           </div>
           <input
@@ -309,7 +309,7 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
           </label>
           <input id="credit-tagline" type="text" value={tagline} maxLength={120}
                  onChange={(e) => setTagline(e.target.value)}
-                 placeholder="Wedding &amp; candid · Bengaluru" className={field} />
+                 placeholder="Event &amp; corporate photography · Gurugram" className={field} />
           <p className={hint}>{tagline.length}/120</p>
         </div>
 
@@ -446,7 +446,7 @@ export function BrandingForm({ organizer, initialLogoUrl }: BrandingFormProps) {
           ) : (
             // An empty state that shows the path rather than making them find it.
             <div className="text-center py-6">
-              <div className="w-14 h-14 mx-auto rounded-full bg-gray-100 border border-dashed border-gray-300" />
+              <div className="w-[72px] h-[72px] mx-auto rounded-full bg-gray-100 border border-dashed border-gray-300" />
               <p className="mt-3 text-sm text-gray-500">Your credit isn&apos;t ready yet</p>
               <ul className="mt-3 text-xs text-gray-500 space-y-1 text-left inline-block">
                 <li>{displayName.trim() ? '✓' : '○'} Add a studio name</li>

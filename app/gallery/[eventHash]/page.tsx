@@ -225,7 +225,7 @@ export default async function GalleryEventPage({
             logoUrl={resolvedLogoUrl}
             coverUrl={coverUrl}
             mobileCoverUrl={mobileCoverUrl}
-            faceSearchEnabled={event.face_search_enabled ?? false}
+           
             showFaceScores={event.show_face_scores ?? false}
             isOwnerPreview={isOwnerPreview}
             albumOnly={albumOnly}
@@ -234,7 +234,7 @@ export default async function GalleryEventPage({
 
         {/* Footer — photographer credit, or our mark, or neither.
             Shared with app/[slug] so the two cannot drift. */}
-        <GalleryFooter credit={credit} showPoweredBy={showPoweredBy} faceSearchEnabled={event.face_search_enabled ?? false} eventHash={event.event_hash || eventHash} />
+        <GalleryFooter credit={credit} showPoweredBy={showPoweredBy} eventHash={event.event_hash || eventHash} />
       </main>
     );
   } catch (error) {

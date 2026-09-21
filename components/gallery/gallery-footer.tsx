@@ -11,55 +11,75 @@ import { CreditLinks } from './credit-links';
  *
  * Used by BOTH public routes — app/[slug] and app/gallery/[eventHash] — which
  * previously carried identical copy-pasted footers.
+ *
+ * `id="gallery-footer"` is load-bearing: GalleryPageClient observes it to hide
+ * the floating face-search pill once the footer is on screen, so the pill (and
+ * its glow) never sits on top of the credit.
  */
+
+// UTM-tagged so gallery-driven signups are attributable. Every guest at every
+// event sees this line, and some of them are photographers or organisers —
+// it is the cheapest acquisition channel the product has.
+const PIXTRACE_URL = '/?utm_source=gallery&utm_medium=footer&utm_campaign=powered_by';
+
+function PoweredBy() {
+  return (
+    <a
+      href={PIXTRACE_URL}
+      target="_blank"
+      rel="noopener"
+      // gray-600 on white is 7.56:1 — comfortably past AA's 4.5:1 rather than
+      // sitting just above it.
+      className="group inline-flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 transition-colors
+                 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 rounded"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="" width={16} height={16} className="w-4 h-4 rounded-sm" />
+      <span>
+        Photographers: get a gallery like this with <span className="font-semibold">PIXTRACE</span>
+      </span>
+      <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
+    </a>
+  );
+}
+
 export function GalleryFooter({
   credit,
   showPoweredBy,
   eventHash,
-  faceSearchEnabled = false,
 }: {
   credit: PhotographerCredit | null;
   showPoweredBy: boolean;
   eventHash: string;
-  /**
-   * When face search is on, GalleryPageClient renders a fixed pill at the
-   * bottom of the viewport ("Find Your Photos" / the ALL-Mine toggle). Measured
-   * on production, it covered the footer's Instagram and Website buttons by
-   * 44px once scrolled to the end — the secondary channels were tappable in
-   * theory and hidden in practice. Reserve room for it.
-   */
-  faceSearchEnabled?: boolean;
 }) {
   // `credit` and `showPoweredBy` are independent, so there are four cases:
   //
   //   credit  poweredBy  →  render
   //   ──────  ─────────     ─────────────────────────────────────────
-  //   null    true          today's footer (the day-one path for everyone)
+  //   null    true          our line only (the day-one path for everyone)
   //   null    false         NOTHING — not an empty bordered strip
-  //   set     true          credit card + our mark
-  //   set     false         credit card alone
-  //
-  // Row two is the one that bites: a white-labelled organizer who has not
-  // configured a credit would otherwise get a bare 1px border and 5rem of
-  // whitespace at the end of every gallery.
-  const clearance = faceSearchEnabled ? ' pb-28' : '';
-
+  //   set     true          credit + our line beneath it
+  //   set     false         credit alone
   if (!credit) {
     if (!showPoweredBy) return null;
     return (
-      <footer className={`py-8 text-center border-t border-gray-100${clearance}`}>
-        {/* gray-500 is 4.83:1 on white. gray-400 — what this was — is ~2.5:1
-            and fails WCAG AA for normal text. */}
-        <p className="text-xs text-gray-500">Powered by PIXTRACE</p>
+      <footer id="gallery-footer" className="border-t border-gray-100 py-8 flex justify-center px-4">
+        <PoweredBy />
       </footer>
     );
   }
 
   return (
-    <footer className={`border-t border-gray-100 py-10 px-4${clearance}`}>
-      <CreditLinks credit={credit} eventHash={eventHash} />
+    <footer id="gallery-footer" className="border-t border-gray-100 bg-gray-50/70">
+      {/* Wider than the old 28rem column, so a desktop footer is a row rather
+          than a narrow strip marooned in white space. */}
+      <div className="max-w-5xl mx-auto px-6 py-10">
+        <CreditLinks credit={credit} eventHash={eventHash} />
+      </div>
       {showPoweredBy && (
-        <p className="mt-8 text-xs text-gray-500 text-center">Powered by PIXTRACE</p>
+        <div className="border-t border-gray-100 py-4 flex justify-center px-4">
+          <PoweredBy />
+        </div>
       )}
     </footer>
   );

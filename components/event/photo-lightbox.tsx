@@ -805,12 +805,12 @@ export function PhotoLightbox({ media, initialIndex, isOpen, onClose, eventHash,
                 fetch(`/api/gallery/credit-click?hash=${encodeURIComponent(eventHash)}&channel=${ch}`,
                       { method: 'POST', keepalive: true }).catch(() => {});
               }}
-              className="shrink-0 h-10 px-4 inline-flex items-center rounded-lg text-sm font-semibold"
+              className="shrink-0 h-10 px-4 inline-flex items-center rounded-full border text-sm font-medium"
               style={credit.whatsappUrl
-                ? { backgroundColor: '#25D366', color: '#111827' }
-                : { backgroundColor: '#111827', color: '#ffffff' }}
+                ? { backgroundColor: '#E8F7EE', borderColor: '#9FDDB6', color: '#0B5D32' }
+                : { backgroundColor: '#ffffff', borderColor: '#D1D5DB', color: '#1F2937' }}
             >
-              {credit.whatsappUrl ? 'Message' : 'Visit'}
+              {credit.whatsappUrl ? 'Book them' : 'View profile'}
             </a>
           )}
           <button

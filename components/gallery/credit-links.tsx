@@ -39,5 +39,5 @@ export function CreditLinks({
     });
   }, [eventHash]);
 
-  return <CreditCard credit={credit} onChannelClick={handleChannelClick} />;
+  return <CreditCard credit={credit} layout="row" onChannelClick={handleChannelClick} />;
 }

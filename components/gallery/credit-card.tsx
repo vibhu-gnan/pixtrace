@@ -10,26 +10,29 @@ import { creditMonogram, type PhotographerCredit, type CreditChannel } from '@/l
  * component backs the gallery footer and the live preview in Branding settings,
  * so what the photographer approves is literally what ships.
  *
- * Accessibility and contrast notes are inline where the value looks arbitrary —
- * several of these numbers are the difference between passing WCAG AA and not.
+ * Tone, deliberately: guests came to find their photos, not to hire anyone.
+ * The credit should be findable and legible, never louder than the photographs
+ * above it. So there is no saturated full-width bar — every channel is the same
+ * size of quiet pill, and WhatsApp is distinguished by a tint and a reason to
+ * tap ("Book VP Studio for your event") rather than by volume.
  */
 
 interface CreditCardProps {
   credit: PhotographerCredit;
   /** Fires before navigation, for click attribution. Must not block the link. */
   onChannelClick?: (channel: CreditChannel) => void;
-  /** `compact` is the in-gallery placement; `full` is the footer. */
-  variant?: 'full' | 'compact';
+  /** `row` puts identity and actions side by side on wide screens (the footer);
+   *  `stack` keeps them centred in one column (the settings preview). */
+  layout?: 'row' | 'stack';
   /** Disables navigation. Used by the settings preview. */
   preview?: boolean;
 }
 
-// #25D366 is WhatsApp's brand green. Paired with WHITE text it is 1.98:1 and
-// fails WCAG AA outright — which is what most implementations ship. Paired with
-// near-black (#111827) it is 8.94:1 — measured on the rendered page — which
-// passes AAA while staying instantly recognisable. Do not "fix" this to white.
-const WHATSAPP_BG = '#25D366';
-const WHATSAPP_FG = '#111827';
+// Tinted rather than solid. Text #0B5D32 on #E8F7EE is 7.3:1 (AAA), and on the
+// white page around it the pill reads as "a WhatsApp link", not as an alarm.
+const WA_BG = '#E8F7EE';
+const WA_BORDER = '#9FDDB6';
+const WA_FG = '#0B5D32';
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -41,8 +44,10 @@ function WhatsAppIcon({ className }: { className?: string }) {
 
 function InstagramIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069M12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0m0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8m6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -65,19 +70,19 @@ function MailIcon({ className }: { className?: string }) {
   );
 }
 
-export function CreditCard({ credit, onChannelClick, variant = 'full', preview = false }: CreditCardProps) {
+/** "https://www.vpstudio.in/about" → "vpstudio.in" — a link that reads as a link. */
+function displayHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'Website';
+  }
+}
+
+export function CreditCard({ credit, onChannelClick, layout = 'stack', preview = false }: CreditCardProps) {
   const [logoFailed, setLogoFailed] = useState(false);
   const showLogo = Boolean(credit.logoUrl) && !logoFailed;
-  const compact = variant === 'compact';
-
-  // Secondary channels. Each gets a visible text label, not an icon alone: a
-  // globe beside an Instagram glyph is not guessable, and guests are on a phone
-  // in a hurry. 48x48 is the WCAG 2.5.5 / Material / HIG touch-target floor.
-  const secondary = [
-    credit.instagramUrl && { key: 'instagram' as const, href: credit.instagramUrl, label: 'Instagram', Icon: InstagramIcon, aria: 'Open Instagram profile (opens in a new tab)' },
-    credit.websiteUrl && { key: 'website' as const, href: credit.websiteUrl, label: 'Website', Icon: GlobeIcon, aria: 'Open website (opens in a new tab)' },
-    credit.emailUrl && { key: 'email' as const, href: credit.emailUrl, label: 'Email', Icon: MailIcon, aria: `Email ${credit.displayName}` },
-  ].filter(Boolean) as Array<{ key: CreditChannel; href: string; label: string; Icon: typeof MailIcon; aria: string }>;
+  const row = layout === 'row';
 
   const linkProps = (channel: CreditChannel, external: boolean) => ({
     onClick: (e: React.MouseEvent) => {
@@ -89,72 +94,110 @@ export function CreditCard({ credit, onChannelClick, variant = 'full', preview =
     ...(external ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {}),
   });
 
+  // One size for every channel. The previous design put a full-width saturated
+  // bar next to lone grey icons, which read as "one real button and some
+  // leftovers". Equal pills, each labelled with what it actually opens.
+  const pill =
+    'inline-flex items-center gap-2 h-11 px-4 rounded-full border text-sm font-medium ' +
+    'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 ' +
+    'max-w-full';
+  const neutral = `${pill} border-gray-300 bg-white text-gray-800 hover:bg-gray-50 hover:border-gray-400`;
+
   return (
-    <div className={compact ? 'text-center' : 'max-w-md mx-auto text-center'}>
+    <div
+      className={
+        row
+          ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-6 md:gap-10 text-center md:text-left'
+          : 'flex flex-col items-center gap-5 text-center'
+      }
+    >
       {/* Identity */}
-      {showLogo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={credit.logoUrl!}
-          alt=""
-          onError={() => setLogoFailed(true)}
-          className={`${compact ? 'w-10 h-10' : 'w-14 h-14'} mx-auto rounded-full object-cover bg-gray-100`}
-        />
-      ) : (
-        <div
-          aria-hidden="true"
-          className={`${compact ? 'w-10 h-10 text-base' : 'w-14 h-14 text-xl'} mx-auto rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold`}
-        >
-          {creditMonogram(credit.displayName)}
+      <div className={row ? 'flex flex-col md:flex-row items-center gap-4 min-w-0' : 'flex flex-col items-center gap-3'}>
+        {showLogo ? (
+          // 72px: at the old 56px, a logo with a script and small type under it
+          // rendered as a dark circle with unreadable marks.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={credit.logoUrl!}
+            alt={`${credit.displayName} logo`}
+            onError={() => setLogoFailed(true)}
+            className="w-[72px] h-[72px] shrink-0 rounded-full object-cover bg-gray-100 ring-1 ring-gray-200"
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            className="w-[72px] h-[72px] shrink-0 rounded-full bg-gray-900 text-white flex items-center justify-center text-2xl font-semibold"
+          >
+            {creditMonogram(credit.displayName)}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wider text-gray-500">Photographed by</p>
+          <p className="mt-0.5 text-lg font-semibold text-gray-900 break-words">{credit.displayName}</p>
+          {credit.tagline && (
+            <p className="mt-0.5 text-sm text-gray-600 break-words">{credit.tagline}</p>
+          )}
         </div>
-      )}
+      </div>
 
-      <p className={`${compact ? 'mt-2 text-sm' : 'mt-3 text-lg'} font-semibold text-gray-900`}>
-        Photos by {credit.displayName}
-      </p>
-      {credit.tagline && (
-        <p className={`${compact ? 'text-xs' : 'text-sm'} text-gray-600 mt-0.5 truncate`}>
-          {credit.tagline}
-        </p>
-      )}
-
-      {/* Primary CTA — exactly one filled button. Two competing CTAs halve the
-          click rate on both, so the other channels stay visually secondary. */}
-      {credit.whatsappUrl && (
-        <a
-          href={credit.whatsappUrl}
-          {...linkProps('whatsapp', true)}
-          style={{ backgroundColor: WHATSAPP_BG, color: WHATSAPP_FG }}
-          className={`${compact ? 'mt-3 h-11' : 'mt-5 h-12'} w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 font-semibold
-                      transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900`}
-        >
-          <WhatsAppIcon className="w-5 h-5" />
-          Message on WhatsApp
-        </a>
-      )}
-
-      {secondary.length > 0 && (
-        <ul className={`${compact ? 'mt-3' : 'mt-5'} flex items-start justify-center gap-3 list-none p-0`}>
-          {secondary.map(({ key, href, label, Icon, aria }) => (
-            <li key={key}>
-              <a
-                href={href}
-                aria-label={aria}
-                {...linkProps(key, key !== 'email')}
-                className="flex flex-col items-center gap-1 group"
-              >
-                {/* 48x48 exactly — not a 32px icon with padding. */}
-                <span className="w-12 h-12 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center
-                                 group-hover:bg-gray-200 transition-colors
-                                 group-focus-visible:ring-2 group-focus-visible:ring-offset-2 group-focus-visible:ring-gray-900">
-                  <Icon className="w-5 h-5" />
-                </span>
-                <span className="text-[11px] text-gray-600">{label}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Channels */}
+      <ul className={`flex flex-wrap gap-2.5 list-none p-0 m-0 ${row ? 'justify-center md:justify-end' : 'justify-center'}`}>
+        {credit.whatsappUrl && (
+          <li className="max-w-full">
+            <a
+              href={credit.whatsappUrl}
+              {...linkProps('whatsapp', true)}
+              style={{ backgroundColor: WA_BG, borderColor: WA_BORDER, color: WA_FG }}
+              className={`${pill} hover:brightness-[0.97]`}
+              aria-label={`Book ${credit.displayName} for your event on WhatsApp (opens in a new tab)`}
+            >
+              <WhatsAppIcon className="w-4 h-4 shrink-0" />
+              {/* A reason to tap, not just a channel name. */}
+              <span className="truncate">Book {credit.displayName} for your event</span>
+            </a>
+          </li>
+        )}
+        {credit.instagramUrl && (
+          <li className="max-w-full">
+            <a
+              href={credit.instagramUrl}
+              {...linkProps('instagram', true)}
+              className={neutral}
+              aria-label={`${credit.displayName} on Instagram, @${credit.instagramHandle} (opens in a new tab)`}
+            >
+              <InstagramIcon className="w-4 h-4 shrink-0" />
+              {/* The handle itself, so it reads as a real profile link. */}
+              <span className="truncate">@{credit.instagramHandle}</span>
+            </a>
+          </li>
+        )}
+        {credit.websiteUrl && (
+          <li className="max-w-full">
+            <a
+              href={credit.websiteUrl}
+              {...linkProps('website', true)}
+              className={neutral}
+              aria-label={`${credit.displayName} website (opens in a new tab)`}
+            >
+              <GlobeIcon className="w-4 h-4 shrink-0" />
+              <span className="truncate">{displayHost(credit.websiteUrl)}</span>
+            </a>
+          </li>
+        )}
+        {credit.emailUrl && (
+          <li className="max-w-full">
+            <a
+              href={credit.emailUrl}
+              {...linkProps('email', false)}
+              className={neutral}
+              aria-label={`Email ${credit.displayName}`}
+            >
+              <MailIcon className="w-4 h-4 shrink-0" />
+              <span>Email</span>
+            </a>
+          </li>
+        )}
+      </ul>
     </div>
   );
 }
