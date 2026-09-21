@@ -23,23 +23,29 @@ import { CreditLinks } from './credit-links';
 const PIXTRACE_URL = '/?utm_source=gallery&utm_medium=footer&utm_campaign=powered_by';
 
 function PoweredBy() {
+  // Only "PIXTRACE" is the link: the sentence reads as a quiet invitation, and
+  // the brand name is the obvious thing to tap.
   return (
-    <a
-      href={PIXTRACE_URL}
-      target="_blank"
-      rel="noopener"
-      // gray-600 on white is 7.56:1 — comfortably past AA's 4.5:1 rather than
-      // sitting just above it.
-      className="group inline-flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 transition-colors
-                 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 rounded"
-    >
+    // gray-600 on white is 7.56:1 — comfortably past AA's 4.5:1.
+    <p className="inline-flex items-center gap-2 text-xs text-gray-600">
+      {/* The favicon, not /logo.png: that file is 2880x1620 with a small mark
+          in the middle, so at 16px it rendered as an invisible sliver. The
+          favicon is the asset actually drawn for small sizes. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="" width={16} height={16} className="w-4 h-4 rounded-sm" />
+      <img src="/favicon-32x32.png" alt="" width={18} height={18} className="w-[18px] h-[18px]" />
       <span>
-        Photographers: get a gallery like this with <span className="font-semibold">PIXTRACE</span>
+        Create your own event gallery like this with{' '}
+        <a
+          href={PIXTRACE_URL}
+          target="_blank"
+          rel="noopener"
+          className="font-semibold text-gray-900 underline decoration-gray-300 underline-offset-2 hover:decoration-gray-900
+                     focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 rounded"
+        >
+          PIXTRACE
+        </a>
       </span>
-      <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
-    </a>
+    </p>
   );
 }
 
