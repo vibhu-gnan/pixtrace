@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   '/api/download',
   '/api/webhooks',
   '/api/proxy-image',
+  '/api/photo',        // watermarked gallery images — public by design
   '/api/face',
   '/api/import/cleanup',
   '/api/cron/storage-cleanup',

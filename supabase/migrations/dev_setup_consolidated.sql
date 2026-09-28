@@ -598,3 +598,9 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION increment_credit_click(text, text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION increment_credit_click(text, text) TO service_role;
+
+-- ============================================================
+-- EVENT WATERMARK  (mirrors 20260928120000_event_watermark.sql)
+-- ============================================================
+ALTER TABLE events ADD COLUMN IF NOT EXISTS watermark_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS watermark_text    VARCHAR(60);

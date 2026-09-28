@@ -727,6 +727,58 @@ export async function updateEventCreditVisibility(eventId: string, hidden: boole
   return { success: true };
 }
 
+/**
+ * Turn the watermark on or off for one event, with an optional wording override.
+ *
+ * Not plan-gated: an unpaid client is exactly the situation this exists for, and
+ * putting it behind a plan would be charging for the ability to withhold work.
+ *
+ * `updated_at` is bumped deliberately. Watermarked photos are served from
+ * /api/photo with an immutable, year-long cache header, and the cache key is
+ * the event's updated_at — so without this bump, flipping the toggle would
+ * leave every CDN edge serving the previous version indefinitely.
+ */
+export async function updateEventWatermark(
+  eventId: string,
+  enabled: boolean,
+  text?: string | null,
+) {
+  const organizer = await getCurrentOrganizer();
+  if (!organizer) return { error: 'Unauthorized' };
+
+  const trimmed = typeof text === 'string' ? text.trim().slice(0, 60) : null;
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('events')
+    .update({
+      watermark_enabled: !!enabled,
+      watermark_text: trimmed || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', eventId)
+    .eq('organizer_id', organizer.id);   // ownership, house convention
+
+  if (error) {
+    console.error('Error updating watermark:', error);
+    return { error: 'Failed to update watermark' };
+  }
+
+  const { data: evt } = await supabase
+    .from('events')
+    .select('event_hash')
+    .eq('id', eventId)
+    .single();
+
+  revalidatePath(`/events/${eventId}/settings`);
+  if (evt?.event_hash) {
+    revalidatePath(`/gallery/${evt.event_hash}`);
+    revalidatePath(`/${evt.event_hash}`);
+  }
+
+  return { success: true };
+}
+
 export async function updateEventLogo(eventId: string, logoUrl: string | null) {
   const organizer = await getCurrentOrganizer();
   if (!organizer) return { error: 'Unauthorized' };

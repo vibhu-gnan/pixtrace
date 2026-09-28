@@ -11,6 +11,9 @@ import { EventLinkActions } from '@/components/event/event-link-actions';
 import { getSignedR2Url } from '@/lib/storage/r2-client';
 import { getCreditClickStats, formatChannelBreakdown } from '@/lib/credit/click-stats';
 import { EventCreditVisibility } from '@/components/dashboard/event-credit-visibility';
+import { EventWatermarkSettings } from '@/components/dashboard/event-watermark-settings';
+import { getCurrentOrganizer } from '@/lib/auth/session';
+import { resolveWatermarkText } from '@/lib/images/watermark';
 
 export default async function SettingsPage({
   params,
@@ -35,6 +38,11 @@ export default async function SettingsPage({
   const creditStats = await getCreditClickStats(eventId);
   const channelBreakdown = formatChannelBreakdown(creditStats);
   const creditHidden = (eventData.theme as any)?.hideCredit === true;
+
+  // Shown as the placeholder so the organizer sees what will actually be burned
+  // in before turning it on.
+  const organizer = await getCurrentOrganizer();
+  const studioName = resolveWatermarkText(null, organizer);
 
   const startDate = eventData.event_date ? new Date(eventData.event_date) : null;
   const endDate = eventData.event_end_date ? new Date(eventData.event_end_date) : null;
@@ -110,6 +118,16 @@ export default async function SettingsPage({
           {/* Photographer credit — per-event override */}
           <section>
             <EventCreditVisibility eventId={eventData.id} initialHidden={creditHidden} />
+          </section>
+
+          {/* Watermark — for galleries shared before payment */}
+          <section>
+            <EventWatermarkSettings
+              eventId={eventData.id}
+              initialEnabled={(eventData as any).watermark_enabled ?? false}
+              initialText={(eventData as any).watermark_text ?? null}
+              studioName={studioName}
+            />
           </section>
 
           {/* Event Details */}

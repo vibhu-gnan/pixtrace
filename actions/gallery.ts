@@ -200,7 +200,10 @@ export async function getPublicGallery(identifier: string, ownerBypass = false):
         albumMap.set(a.id, a.name);
     }
 
-    const media = await mapMediaRows(mediaRows || [], albumMap);
+    const wmCtx = (event as any).watermark_enabled
+        ? { version: String(Date.parse((event as any).updated_at ?? '') || 0) }
+        : null;
+    const media = await mapMediaRows(mediaRows || [], albumMap, wmCtx);
 
     // 5. Resolve cover image URL (may not be in first page of media)
     let coverUrl: string | null = null;
@@ -342,7 +345,7 @@ export async function getPublicGalleryPage(
 
     const supabase = ownerBypass ? createAdminClient() : getPublicClient();
 
-    type EventIdRow = { id: string };
+    type EventIdRow = { id: string; watermark_enabled?: boolean | null; updated_at?: string | null };
     type MediaRow = {
         id: string; album_id: string; r2_key: string; original_filename: string;
         media_type: string; width: number | null; height: number | null;
@@ -350,7 +353,10 @@ export async function getPublicGalleryPage(
     };
 
     // Fetch event — bypass RLS check for owner preview
-    let eventQuery = supabase.from('events').select('id').eq('event_hash', eventHash);
+    let eventQuery = supabase
+        .from('events')
+        .select('id, watermark_enabled, updated_at')
+        .eq('event_hash', eventHash);
     if (!ownerBypass) eventQuery = eventQuery.eq('is_public', true);
     const { data: event } = await (eventQuery.single() as unknown as Promise<{ data: EventIdRow | null; error: unknown }>);
 
@@ -391,16 +397,34 @@ export async function getPublicGalleryPage(
     const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
     return {
-        media: await mapMediaRows(pageRows, albumMap),
+        media: await mapMediaRows(
+            pageRows,
+            albumMap,
+            event.watermark_enabled ? { version: String(Date.parse(event.updated_at ?? '') || 0) } : null,
+        ),
         hasMore,
     };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
 
+/** What a watermarked event serves instead of a presigned R2 URL. */
+interface WatermarkContext { version: string }
+
+/**
+ * When an event is watermarked, EVERY image URL in the payload must point at
+ * /api/photo — including original_url, which the lightbox loads on intent.
+ * Leaving that one presigned would hand over the clean file after a three
+ * second wait, which is the whole thing this feature exists to prevent.
+ */
+function watermarkedUrl(mediaId: string, wm: WatermarkContext): string {
+    return `/api/photo/${mediaId}?v=${encodeURIComponent(wm.version)}`;
+}
+
 async function mapMediaRows(
     rows: any[],
     albumMap: Map<string, string>,
+    wm: WatermarkContext | null = null,
 ): Promise<GalleryMediaItem[]> {
     return Promise.all(rows.map(async (item: any) => ({
         id: item.id,
@@ -411,8 +435,12 @@ async function mapMediaRows(
         media_type: item.media_type,
         width: item.width,
         height: item.height,
-        preview_url: item.media_type === 'image' ? await getPreviewUrl(item.r2_key, item.preview_r2_key) : '',
-        original_url: item.media_type === 'image' ? await getOriginalUrl(item.r2_key) : '',
+        preview_url: item.media_type !== 'image'
+            ? ''
+            : wm ? watermarkedUrl(item.id, wm) : await getPreviewUrl(item.r2_key, item.preview_r2_key),
+        original_url: item.media_type !== 'image'
+            ? ''
+            : wm ? watermarkedUrl(item.id, wm) : await getOriginalUrl(item.r2_key),
         created_at: item.created_at || new Date().toISOString(), // Fallback for old items
     })));
 }

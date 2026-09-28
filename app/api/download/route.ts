@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getR2Object, R2ConfigError, R2AccessError } from '@/lib/storage/r2-client';
 import { verifyDownloadToken } from '@/lib/storage/download-token';
 import { getPublicClient } from '@/lib/supabase/public';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { applyWatermark, resolveWatermarkText } from '@/lib/images/watermark';
+
+// sharp (used when the event is watermarked) needs the Node runtime.
+export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -29,7 +34,7 @@ export async function GET(request: NextRequest) {
     // simply is not returned.
     const { data: visible } = await getPublicClient()
         .from('media')
-        .select('id')
+        .select('id, event_id')
         .or(`r2_key.eq.${r2Key},preview_r2_key.eq.${r2Key},thumbnail_r2_key.eq.${r2Key}`)
         .limit(1)
         .maybeSingle();
@@ -37,6 +42,21 @@ export async function GET(request: NextRequest) {
     if (!visible) {
         return NextResponse.json({ error: 'This photo is no longer available' }, { status: 404 });
     }
+
+    // A watermarked gallery that still served clean downloads would be pointless:
+    // the download is the file the client would actually use. Organizers own this
+    // setting and anon cannot read it, hence the admin client.
+    const { data: eventRow } = await createAdminClient()
+        .from('events')
+        .select('watermark_enabled, watermark_text, organizers(credit_display_name, business_name, name)')
+        .eq('id', (visible as unknown as { event_id: string }).event_id)
+        .maybeSingle();
+
+    const wmEvent = eventRow as unknown as {
+        watermark_enabled: boolean | null;
+        watermark_text: string | null;
+        organizers: { credit_display_name: string | null; business_name: string | null; name: string | null } | null;
+    } | null;
 
     try {
         const { body, contentType } = await getR2Object(r2Key);
@@ -47,16 +67,30 @@ export async function GET(request: NextRequest) {
         }
 
         // Sanitize filename
-        const safeName = filename
+        let safeName = filename
             .replace(/[/\\]/g, '_')
             .replace(/\.\./g, '_')
             .slice(0, 255);
 
-        return new NextResponse(Buffer.from(body), {
+        let outBody: Buffer = Buffer.from(body);
+        let outType = contentType;
+
+        if (wmEvent?.watermark_enabled) {
+            // Full resolution, not the gallery's 1400px cap: this is the file the
+            // client will actually use, so the only thing that should differ is
+            // the mark. Re-encoded to WebP, so the extension has to follow.
+            const text = resolveWatermarkText(wmEvent.watermark_text, wmEvent.organizers);
+            const marked = await applyWatermark(outBody, text, { quality: 90 });
+            outBody = marked.buffer;
+            outType = marked.contentType;
+            safeName = safeName.replace(/\.[^.]+$/, '') + '.webp';
+        }
+
+        return new NextResponse(new Uint8Array(outBody), {
             headers: {
-                'Content-Type': contentType,
+                'Content-Type': outType,
                 'Content-Disposition': `attachment; filename="${encodeURIComponent(safeName)}"`,
-                'Content-Length': body.byteLength.toString(),
+                'Content-Length': outBody.byteLength.toString(),
                 'Cache-Control': 'private, no-store',
             },
         });
