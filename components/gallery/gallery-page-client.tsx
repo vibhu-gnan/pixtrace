@@ -970,9 +970,14 @@ export function GalleryPageClient({
                     <div className="mt-6 mx-auto max-w-5xl px-6 py-6 flex items-center gap-4 text-sm text-gray-600">
                         <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
                         <span className="whitespace-nowrap">
+                            {/* totalCount is event-wide, so it must NOT be used while an
+                                album tab is active — the grid is filtered to that album
+                                and the count would contradict what is on screen. */}
                             {faceSearchActive
                                 ? `That's all ${displayMedia.length} of your photos`
-                                : `That's all ${totalCount} photo${totalCount === 1 ? '' : 's'}`}
+                                : activeAlbum
+                                    ? `That's all ${displayMedia.length} photo${displayMedia.length === 1 ? '' : 's'} in this album`
+                                    : `That's all ${totalCount} photo${totalCount === 1 ? '' : 's'}`}
                         </span>
                         <span aria-hidden="true">·</span>
                         <button
